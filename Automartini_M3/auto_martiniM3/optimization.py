@@ -172,12 +172,10 @@ def read_bead_params():
     return bead_params
 
 
-def gaussian_overlap(conformer, bead1, bead2, ringatoms):
+def gaussian_overlap(dist, bead1, bead2, ringatoms, bead_params):
     """ "Returns overlap coefficient between two gaussians
     given distance dist"""
     logger.debug("Entering gaussian_overlap()")
-    dist = Chem.rdMolTransforms.GetBondLength(conformer, int(bead1), int(bead2))
-    bead_params = read_bead_params()
     sigma = bead_params["rvdw"]
     if bead1 in ringatoms and bead2 in ringatoms:
         sigma = bead_params["rvdw_aromatic"]
@@ -191,7 +189,7 @@ def gaussian_overlap(conformer, bead1, bead2, ringatoms):
     return bead_params["bd_bd_overlap_coeff"] * math.exp(-(dist**2) / 4.0 / sigma**2)
 
 
-def atoms_in_gaussian(molecule, conformer, bead_id, ringatoms):
+def atoms_in_gaussian(bead_id, ringatoms, bond_dists, masses):
     """Returns weighted sum of atoms contained in bead bead_id"""
     logger.debug("Entering atoms_in_gaussian()")
     weight_sum = 0.0
@@ -200,31 +198,32 @@ def atoms_in_gaussian(molecule, conformer, bead_id, ringatoms):
     lumped_atoms = []
     if bead_id in ringatoms:
         sigma = bead_params["rvdw_aromatic"]
-    for i in range(conformer.GetNumAtoms()):
-        dist_bd_at = Chem.rdMolTransforms.GetBondLength(conformer, i, int(bead_id))
+    for i in range(bond_dists.shape[0]):
+        dist_bd_at = bond_dists[i, int(bead_id)]
         if dist_bd_at < sigma:
             lumped_atoms.append(i)
-        weight_sum -= molecule.GetAtomWithIdx(i).GetMass() * math.exp(
+        mass = masses[i]
+        weight_sum -= mass * math.exp(
             -(dist_bd_at**2) / 2 / sigma**2
         )
     return bead_params["at_in_bd_coeff"] * weight_sum, lumped_atoms
 
 
-def penalize_lonely_atoms(molecule, conformer, lumped_atoms):
+def penalize_lonely_atoms(lumped_atoms, masses):
     """Penalizes configuration if atoms aren't included
     in any CG bead"""
     logger.debug("Entering penalize_lonely_atoms()")
     weight_sum = 0.0
     bead_params = read_bead_params()
-    num_atoms = conformer.GetNumAtoms()
+    num_atoms = len(masses) 
     atoms_array = np.arange(num_atoms)
     for i in np.nditer(np.arange(atoms_array.size)):
         if atoms_array[i] not in lumped_atoms:
-            weight_sum += molecule.GetAtomWithIdx(int(atoms_array[i])).GetMass()
+            weight_sum += masses[int(atoms_array[i])]
     return bead_params["lonely_atom_penalize"] * weight_sum
 
 
-def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
+def eval_gaussian_interac(list_beads, ringatoms, bead_params, bond_dists, masses):
     """From collection of CG beads placed on mol, evaluate
     objective function of interacting beads"""
     logger.debug("Entering eval_gaussian_interac()")
@@ -232,7 +231,6 @@ def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
     weight_sum = 0.0
     weight_overlap = 0.0
     weight_at_in_bd = 0.0
-    bead_params = read_bead_params()
 
     # Offset energy for every new CG bead.
     # Distinguish between aromatics and others.
@@ -254,14 +252,15 @@ def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
     for i in np.nditer(np.arange(list_beads_array.size)):
         if i < list_beads_array.size - 1:
             for j in np.nditer(np.arange(i + 1, list_beads_array.size)):
-                weight_overlap += gaussian_overlap(
-                    conformer, list_beads_array[i], list_beads_array[j], ringatoms
-                )
+                bead1 = list_beads_array[i]
+                bead2 = list_beads_array[j]
+                dist = bond_dists[i, j]
+                weight_overlap += gaussian_overlap(dist, bead1, bead2, ringatoms, bead_params,)
     weight_sum += weight_overlap
 
     # Attraction between atoms nearby to CG bead
     for i in np.nditer(np.arange(list_beads_array.size)):
-        weight, lumped = atoms_in_gaussian(molecule, conformer, list_beads_array[i], ringatoms)
+        weight, lumped = atoms_in_gaussian(list_beads_array[i], ringatoms, bond_dists, masses)
         weight_at_in_bd += weight
         lumped_array = np.asarray(lumped)
         for j in np.nditer(np.arange(lumped_array.size)):
@@ -269,10 +268,36 @@ def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
                 lumped_atoms.append(lumped_array[j])
     weight_sum += weight_at_in_bd
     # Penalty for excluding atoms
-    weight_lonely_atoms = penalize_lonely_atoms(molecule, conformer, lumped_atoms)
+    weight_lonely_atoms = penalize_lonely_atoms(lumped_atoms, masses)
     weight_sum += weight_lonely_atoms
     return weight_sum
 
+
+def _get_bond_distances(conformer):
+    """Return a symmetric (N,N) distance matrix with a 0 diagonal.
+
+    Notes
+    -----
+    `Chem.rdMolTransforms.GetBondLength` is used here (even though it returns a
+    pairwise distance) to preserve existing behavior.
+    """
+    n = conformer.GetNumAtoms()
+    dists = np.zeros((n, n), dtype=np.float32)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = Chem.rdMolTransforms.GetBondLength(conformer, i, j)
+            dists[i, j] = dist
+            dists[j, i] = dist
+    return dists
+
+
+def _get_masses(molecule):
+    """Return an array of atomic masses for all atoms in the molecule."""
+    masses = []
+    for i in range(molecule.GetNumAtoms()):
+        mass = molecule.GetAtomWithIdx(i).GetMass()
+        masses.append(mass)
+    return np.array(masses)
 
 
 @timeit
@@ -290,9 +315,13 @@ def collect_energies_and_combs(
     """Collect energies and combinations for all acceptable trials"""
     logger.debug("Entering collect_energies_and_combs()") 
     # Trial positions: any heavy atom
+    bead_params = read_bead_params()
+    bond_dists = _get_bond_distances(conformer)
+    masses = _get_masses(molecule)
+
     for trial_comb in acceptable_trials:
         # Do the energy evaluation
-        trial_ene = eval_gaussian_interac(molecule, conformer, trial_comb, ringatoms_flat)
+        trial_ene = eval_gaussian_interac(trial_comb, ringatoms_flat, bead_params, bond_dists, masses)
         combs.append(trial_comb)
         energies.append(trial_ene)
         logger.debug("; %s %s", trial_comb, trial_ene)
