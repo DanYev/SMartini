@@ -89,6 +89,14 @@ def check_beads_cy_np(
     if n_trial <= 1:
         return True
 
+    # Check for beads at the same place (duplicates)
+    # Fast path: sort a copy and check adjacent values.
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
+    tmp.sort()
+    for bi in range(1, n_trial):
+        if tmp[bi] == tmp[bi - 1]:
+            return False
+
     # Track if any bond is found fully within the same ring; reject if so.
     cdef int nrings = 0
     cdef int rid

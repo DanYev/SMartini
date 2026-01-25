@@ -37,6 +37,9 @@ from .optimization_cy import (
     find_acceptable_trials_cy_np,
 )  
 
+# Energy kernel (Cython)
+from .energy_cy import eval_gaussian_interac_np
+
 logger = logging.getLogger(__name__)
 
 
@@ -172,105 +175,7 @@ def read_bead_params():
     return bead_params
 
 
-def gaussian_overlap(dist, bead1, bead2, ringatoms, bead_params):
-    """ "Returns overlap coefficient between two gaussians
-    given distance dist"""
-    logger.debug("Entering gaussian_overlap()")
-    sigma = bead_params["rvdw"]
-    if bead1 in ringatoms and bead2 in ringatoms:
-        sigma = bead_params["rvdw_aromatic"]
-    if (
-        bead1 in ringatoms
-        and bead2 not in ringatoms
-        or bead1 not in ringatoms
-        and bead2 in ringatoms
-    ):
-        sigma = bead_params["rvdw_cross"]
-    return bead_params["bd_bd_overlap_coeff"] * math.exp(-(dist**2) / 4.0 / sigma**2)
-
-
-def atoms_in_gaussian(bead_id, ringatoms, bond_dists, masses):
-    """Returns weighted sum of atoms contained in bead bead_id"""
-    logger.debug("Entering atoms_in_gaussian()")
-    weight_sum = 0.0
-    bead_params = read_bead_params()
-    sigma = bead_params["rvdw"]
-    lumped_atoms = []
-    if bead_id in ringatoms:
-        sigma = bead_params["rvdw_aromatic"]
-    for i in range(bond_dists.shape[0]):
-        dist_bd_at = bond_dists[i, int(bead_id)]
-        if dist_bd_at < sigma:
-            lumped_atoms.append(i)
-        mass = masses[i]
-        weight_sum -= mass * math.exp(
-            -(dist_bd_at**2) / 2 / sigma**2
-        )
-    return bead_params["at_in_bd_coeff"] * weight_sum, lumped_atoms
-
-
-def penalize_lonely_atoms(lumped_atoms, masses):
-    """Penalizes configuration if atoms aren't included
-    in any CG bead"""
-    logger.debug("Entering penalize_lonely_atoms()")
-    weight_sum = 0.0
-    bead_params = read_bead_params()
-    num_atoms = len(masses) 
-    atoms_array = np.arange(num_atoms)
-    for i in np.nditer(np.arange(atoms_array.size)):
-        if atoms_array[i] not in lumped_atoms:
-            weight_sum += masses[int(atoms_array[i])]
-    return bead_params["lonely_atom_penalize"] * weight_sum
-
-
-def eval_gaussian_interac(list_beads, ringatoms, bead_params, bond_dists, masses):
-    """From collection of CG beads placed on mol, evaluate
-    objective function of interacting beads"""
-    logger.debug("Entering eval_gaussian_interac()")
-
-    weight_sum = 0.0
-    weight_overlap = 0.0
-    weight_at_in_bd = 0.0
-
-    # Offset energy for every new CG bead.
-    # Distinguish between aromatics and others.
-    num_aromatics = 0
-    lumped_atoms = []
-
-    # Creat list_beads array and loop over indices
-    list_beads_array = np.asarray(list_beads)
-    for bead in list_beads_array:
-        if bead in ringatoms:
-            num_aromatics += 1
-    weight_offset_bd_weights = (
-        bead_params["offset_bd_weight"] * (list_beads_array.size - num_aromatics)
-        + bead_params["offset_bd_aromatic_weight"] * num_aromatics
-    )
-    weight_sum += weight_offset_bd_weights
-
-    # Repulsive overlap between CG beads
-    for i in np.nditer(np.arange(list_beads_array.size)):
-        if i < list_beads_array.size - 1:
-            for j in np.nditer(np.arange(i + 1, list_beads_array.size)):
-                bead1 = list_beads_array[i]
-                bead2 = list_beads_array[j]
-                dist = bond_dists[i, j]
-                weight_overlap += gaussian_overlap(dist, bead1, bead2, ringatoms, bead_params,)
-    weight_sum += weight_overlap
-
-    # Attraction between atoms nearby to CG bead
-    for i in np.nditer(np.arange(list_beads_array.size)):
-        weight, lumped = atoms_in_gaussian(list_beads_array[i], ringatoms, bond_dists, masses)
-        weight_at_in_bd += weight
-        lumped_array = np.asarray(lumped)
-        for j in np.nditer(np.arange(lumped_array.size)):
-            if lumped_array[j] not in lumped_atoms:
-                lumped_atoms.append(lumped_array[j])
-    weight_sum += weight_at_in_bd
-    # Penalty for excluding atoms
-    weight_lonely_atoms = penalize_lonely_atoms(lumped_atoms, masses)
-    weight_sum += weight_lonely_atoms
-    return weight_sum
+"""Energy evaluation has been moved to Cython (`energy_cy.pyx`)."""
 
 
 def _get_bond_distances(conformer):
@@ -319,9 +224,42 @@ def collect_energies_and_combs(
     bond_dists = _get_bond_distances(conformer)
     masses = _get_masses(molecule)
 
+    # Precompute ring mask once
+    n_atoms = bond_dists.shape[0]
+    is_ring = np.zeros(n_atoms, dtype=np.uint8)
+    for a in ringatoms_flat:
+        ia = int(a)
+        if 0 <= ia < n_atoms:
+            is_ring[ia] = 1
+
+    # Scalarize bead params once (avoid dict lookups in the inner loop)
+    p_offset = float(bead_params["offset_bd_weight"])
+    p_offset_ar = float(bead_params["offset_bd_aromatic_weight"])
+    p_lonely = float(bead_params["lonely_atom_penalize"])
+    p_overlap = float(bead_params["bd_bd_overlap_coeff"])
+    p_at_in = float(bead_params["at_in_bd_coeff"])
+    p_rvdw = float(bead_params["rvdw"])
+    p_rvdw_ar = float(bead_params["rvdw_aromatic"])
+    p_rvdw_cross = float(bead_params["rvdw_cross"])
+
     for trial_comb in acceptable_trials:
         # Do the energy evaluation
-        trial_ene = eval_gaussian_interac(trial_comb, ringatoms_flat, bead_params, bond_dists, masses)
+        trial_ene = float(
+            eval_gaussian_interac_np(
+                np.asarray(trial_comb, dtype=np.int32),
+                is_ring,
+                bond_dists,
+                masses.astype(np.float32, copy=False),
+                p_offset,
+                p_offset_ar,
+                p_lonely,
+                p_overlap,
+                p_at_in,
+                p_rvdw,
+                p_rvdw_ar,
+                p_rvdw_cross,
+            )
+        )
         combs.append(trial_comb)
         energies.append(trial_ene)
         logger.debug("; %s %s", trial_comb, trial_ene)
@@ -392,7 +330,7 @@ def find_bead_pos(
     list_combs = []
     list_energies = []
 
-    for num_beads in range(min_beads, min_beads+2):
+    for num_beads in range(min_beads, max_beads -2):
         logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
