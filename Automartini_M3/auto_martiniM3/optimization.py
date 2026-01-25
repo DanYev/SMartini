@@ -1,4 +1,4 @@
-"""
+r"""
 Created on March 13, 2019 by Andrew Abi-Mansour
 Updated to Martini 3 force field on January 31, 2025 by Magdalena Szczuka
 
@@ -35,6 +35,18 @@ from . import topology # AutoM3 change
 from reforge.utils import timeit
 
 logger = logging.getLogger(__name__)
+
+# Optional Cython accelerators (compiled extension). Safe fallback to pure Python.
+try:
+    from .optimization_cy import (
+        check_beads_cy,
+        find_acceptable_trials_cy,
+        find_acceptable_trials_cy_np,
+    )  # type: ignore
+except Exception:  # pragma: no cover
+    check_beads_cy = None
+    find_acceptable_trials_cy = None
+    find_acceptable_trials_cy_np = None
 
 
 def read_bead_params():
@@ -158,70 +170,67 @@ def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
 def check_beads(molecule, list_heavyatoms, heavyatom_coords, trial_comb, ring_atoms, listbonds):
     """Check if CG bead positions in trailComb are acceptable"""
     logger.debug("Entering check_beads()")
-    # Check for beads at the same place
+    # # Check for beads at the same place
     # count = Counter(trial_comb)
-    all_different = True
     # for val in count.values():
     #     if val != 1:
-    #         print(val)
-    #         all_different = False
     #         acceptable_trial = False
     #         logger.debug("Error. Multiple beads on the same atom position for %s" % trial_comb)
-    #         break
-    if all_different:
-        # Check for beads linked by chemical bond (except in rings)
-        bonds_in_rings = [0] * len(ring_atoms)
-        for bi in range(len(trial_comb)):
-            for bj in range(bi + 1, len(trial_comb)):
-                if [trial_comb[bi], trial_comb[bj]] in listbonds or \
-                   [trial_comb[bj], trial_comb[bi]] in listbonds:
-                    bond_in_ring = False
-                    for r in range(len(ring_atoms)):
-                        if trial_comb[bi] in ring_atoms[r] and trial_comb[bj] in ring_atoms[r]:
-                            bonds_in_rings[r] += 1
-                            bond_in_ring = True
-                    if not bond_in_ring:
-                        acceptable_trial = False
-                        logger.debug("Error. No bond in ring for %s" % trial_comb)
-                        return acceptable_trial
+    #         return acceptable_trial
 
-        # Don't allow bonds between atoms of the same ring.
-        for bir in range(len(bonds_in_rings)):
-            if bonds_in_rings[bir] > 0:
-                logger.debug("Error. Bonds between atoms of the same ring for %s" % trial_comb)
-                acceptable_trial = False
-                return acceptable_trial
+    # Check for beads linked by chemical bond (except in rings)
+    bonds_in_rings = [0] * len(ring_atoms)
+    for bi in range(len(trial_comb)):
+        for bj in range(bi + 1, len(trial_comb)):
+            if [trial_comb[bi], trial_comb[bj]] in listbonds or \
+                [trial_comb[bj], trial_comb[bi]] in listbonds:
+                bond_in_ring = False
+                for r in range(len(ring_atoms)):
+                    if trial_comb[bi] in ring_atoms[r] and trial_comb[bj] in ring_atoms[r]:
+                        bonds_in_rings[r] += 1
+                        bond_in_ring = True
+                if not bond_in_ring:
+                    acceptable_trial = False
+                    logger.debug("Error. No bond in ring for %s" % trial_comb)
+                    return acceptable_trial
 
-        # Check for two terminal beads linked by only one atom
-        for bi in range(len(trial_comb)):
-            for bj in range(bi + 1, len(trial_comb)):
-                if (
-                    [item for sublist in listbonds for item in sublist].count(trial_comb[bi])
-                    == 1
-                ) and (
-                    [item for sublist in listbonds for item in sublist].count(trial_comb[bj])
-                    == 1
-                ):
-                    # Both beads are on terminal atoms. Block contribution
-                    # if the two terminal atoms are linked to the same atom.
-                    partneri = None
-                    partnerj = None
-                    for bond in listbonds:
-                        if bond[0] == trial_comb[bi]:
-                            partneri = bond[1]
-                        if bond[1] == trial_comb[bi]:
-                            partneri = bond[0]
-                        if bond[0] == trial_comb[bj]:
-                            partnerj = bond[1]
-                        if bond[1] == trial_comb[bj]:
-                            partnerj = bond[0]
-                    if partneri == partnerj:
-                        acceptable_trial = False
-                        logger.debug(
-                            "Error. Two terminal beads linked to the same atom for %s"
-                            % trial_comb
-                        )
-                        return acceptable_trial
+    # Don't allow bonds between atoms of the same ring.
+    for bir in range(len(bonds_in_rings)):
+        if bonds_in_rings[bir] > 0:
+            acceptable_trial = False
+            logger.debug("Error. Bonds between atoms of the same ring for %s" % trial_comb)
+            return acceptable_trial
+
+    # Check for two terminal beads linked by only one atom
+    for bi in range(len(trial_comb)):
+        for bj in range(bi + 1, len(trial_comb)):
+            if (
+                [item for sublist in listbonds for item in sublist].count(trial_comb[bi])
+                == 1
+            ) and (
+                [item for sublist in listbonds for item in sublist].count(trial_comb[bj])
+                == 1
+            ):
+                # Both beads are on terminal atoms. Block contribution
+                # if the two terminal atoms are linked to the same atom.
+                partneri = None
+                partnerj = None
+                for bond in listbonds:
+                    if bond[0] == trial_comb[bi]:
+                        partneri = bond[1]
+                    if bond[1] == trial_comb[bi]:
+                        partneri = bond[0]
+                    if bond[0] == trial_comb[bj]:
+                        partnerj = bond[1]
+                    if bond[1] == trial_comb[bj]:
+                        partnerj = bond[0]
+                if partneri == partnerj:
+                    acceptable_trial = False
+                    logger.debug(
+                        "Error. Two terminal beads linked to the same atom for %s"
+                        % trial_comb
+                    )
+                    return acceptable_trial
     return True
 
 
@@ -230,17 +239,49 @@ def find_acceptable_trials(seq_one_beads,
     molecule, list_heavy_atoms, heavyatom_coords, ring_atoms, list_bonds,
     allatom_coords, force_map):
     # Find all acceptable trials for a given sequence of one bead
-    acceptable_trials = []
-    for trial_comb in seq_one_beads:
-        acceptable_trial = check_beads(
-            molecule, list_heavy_atoms, heavyatom_coords, trial_comb, ring_atoms, list_bonds
-        ) # AutoM3 change : Added molecule argument
-        if acceptable_trial:
-            # if all_atoms_in_beads_connected(
-            #         trial_comb, heavyatom_coords, list_heavy_atoms, list_bonds, molecule, allatom_coords, force_map
-            #     ):
-            acceptable_trials.append(trial_comb)
-    return acceptable_trials
+    return find_acceptable_trials_cy(
+        seq_one_beads,
+        molecule,
+        list_heavy_atoms,
+        heavyatom_coords,
+        ring_atoms,
+        list_bonds,
+        allatom_coords,
+        force_map,
+    )
+    # acceptable_trials = []
+    # for trial_comb in seq_one_beads:
+    #     acceptable_trial = check_beads(
+    #         molecule, list_heavy_atoms, heavyatom_coords, trial_comb, ring_atoms, list_bonds
+    #     ) # AutoM3 change : Added molecule argument
+    #     if acceptable_trial:
+    #         # if all_atoms_in_beads_connected(
+    #         #         trial_comb, heavyatom_coords, list_heavy_atoms, list_bonds, molecule, allatom_coords, force_map
+    #         #     ):
+    #         acceptable_trials.append(trial_comb)
+    # return acceptable_trials
+
+
+def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
+    """Build a dense `ring_id_of_atom` array.
+
+    ring_id_of_atom[atom_id] = ring index, or -1 when not in any ring.
+    """
+    max_atom = -1
+    for ring in ring_atoms:
+        if ring:
+            max_atom = max(max_atom, int(np.max(ring)))
+    ring_id = np.full(max_atom + 1 if max_atom >= 0 else 0, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        if not ring:
+            continue
+        arr = np.asarray(ring, dtype=dtype)
+        # Ensure ring_id is long enough
+        mx = int(arr.max())
+        if mx >= ring_id.shape[0]:
+            ring_id = np.pad(ring_id, (0, mx - ring_id.shape[0] + 1), constant_values=-1)
+        ring_id[arr] = rid
+    return ring_id
 
 
 @timeit
@@ -251,6 +292,8 @@ def find_bead_pos(
     arrangement with best energy score. Return all possible arrangements sorted by energy score."""
 
     logger.debug("Entering find_bead_pos()")
+    print(conformer)
+    exit()
 
     # Check number of heavy atoms
     if len(list_heavy_atoms) == 0:
@@ -276,6 +319,11 @@ def find_bead_pos(
             ):
                 list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
 
+    # Precompute NumPy versions for the Cython accelerator.
+    # (If the extension isn't available, these are harmless.)
+    list_bonds_np = np.asarray(list_bonds, dtype=np.int32)
+    ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms)
+
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
     max_beads = int(len(list_heavy_atoms) / 2.0)
     min_beads = int(len(list_heavy_atoms) / 4.0)
@@ -300,9 +348,17 @@ def find_bead_pos(
         energies = []
 
         logger.info("Filtering Acceptable Trials")
-        acceptable_trials = find_acceptable_trials(seq_one_beads, 
-            molecule, list_heavy_atoms, heavyatom_coords, ring_atoms, list_bonds,
-            allatom_coords, force_map)
+        acceptable_trials = find_acceptable_trials(
+            seq_one_beads,
+            molecule,
+            list_heavy_atoms,
+            heavyatom_coords,
+            ring_atoms,
+            list_bonds,
+            allatom_coords,
+            force_map,
+        )
+        logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
         # Trial positions: any heavy atom
         for trial_comb in acceptable_trials:
