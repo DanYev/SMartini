@@ -28,143 +28,16 @@ and LICENSE files.
 """
 
 from sys import exit
-
 from .common import *
 from . import topology # AutoM3 change
-
 from reforge.utils import timeit
+from .optimization_cy import (
+    check_beads_cy,
+    find_acceptable_trials_cy,
+    find_acceptable_trials_cy_np,
+)  
 
 logger = logging.getLogger(__name__)
-
-# Optional Cython accelerators (compiled extension). Safe fallback to pure Python.
-try:
-    from .optimization_cy import (
-        check_beads_cy,
-        find_acceptable_trials_cy,
-        find_acceptable_trials_cy_np,
-    )  # type: ignore
-except Exception:  # pragma: no cover
-    check_beads_cy = None
-    find_acceptable_trials_cy = None
-    find_acceptable_trials_cy_np = None
-
-
-def read_bead_params():
-    """Returns bead parameter dictionary
-    CG Bead vdw radius (in Angstroem)"""
-    bead_params = dict()
-    bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
-    bead_params["rvdw_aromatic"] = 4.1 / 2.0 #AutoM3 change: was 4.3 / 2.0    #sigma for ring
-    bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
-    bead_params["offset_bd_weight"] =20.0 #AutoM3 change: was 50.0    #penalty weight for nonring beads
-    bead_params["offset_bd_aromatic_weight"] = 5.0 #AutoM3 change: was 20.0    #penalty weight for ring beads
-    bead_params["lonely_atom_penalize"] = 0.28  #AutoM3 change: was 0.20
-    bead_params["bd_bd_overlap_coeff"] = 1.0 #AutoM3 change: was 9.0
-    bead_params["at_in_bd_coeff"] = 0.9
-    return bead_params
-
-
-def gaussian_overlap(conformer, bead1, bead2, ringatoms):
-    """ "Returns overlap coefficient between two gaussians
-    given distance dist"""
-    logger.debug("Entering gaussian_overlap()")
-    dist = Chem.rdMolTransforms.GetBondLength(conformer, int(bead1), int(bead2))
-    bead_params = read_bead_params()
-    sigma = bead_params["rvdw"]
-    if bead1 in ringatoms and bead2 in ringatoms:
-        sigma = bead_params["rvdw_aromatic"]
-    if (
-        bead1 in ringatoms
-        and bead2 not in ringatoms
-        or bead1 not in ringatoms
-        and bead2 in ringatoms
-    ):
-        sigma = bead_params["rvdw_cross"]
-    return bead_params["bd_bd_overlap_coeff"] * math.exp(-(dist**2) / 4.0 / sigma**2)
-
-
-def atoms_in_gaussian(molecule, conformer, bead_id, ringatoms):
-    """Returns weighted sum of atoms contained in bead bead_id"""
-    logger.debug("Entering atoms_in_gaussian()")
-    weight_sum = 0.0
-    bead_params = read_bead_params()
-    sigma = bead_params["rvdw"]
-    lumped_atoms = []
-    if bead_id in ringatoms:
-        sigma = bead_params["rvdw_aromatic"]
-    for i in range(conformer.GetNumAtoms()):
-        dist_bd_at = Chem.rdMolTransforms.GetBondLength(conformer, i, int(bead_id))
-        if dist_bd_at < sigma:
-            lumped_atoms.append(i)
-        weight_sum -= molecule.GetAtomWithIdx(i).GetMass() * math.exp(
-            -(dist_bd_at**2) / 2 / sigma**2
-        )
-    return bead_params["at_in_bd_coeff"] * weight_sum, lumped_atoms
-
-
-def penalize_lonely_atoms(molecule, conformer, lumped_atoms):
-    """Penalizes configuration if atoms aren't included
-    in any CG bead"""
-    logger.debug("Entering penalize_lonely_atoms()")
-    weight_sum = 0.0
-    bead_params = read_bead_params()
-    num_atoms = conformer.GetNumAtoms()
-    atoms_array = np.arange(num_atoms)
-    for i in np.nditer(np.arange(atoms_array.size)):
-        if atoms_array[i] not in lumped_atoms:
-            weight_sum += molecule.GetAtomWithIdx(int(atoms_array[i])).GetMass()
-    return bead_params["lonely_atom_penalize"] * weight_sum
-
-
-# @timeit
-def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
-    """From collection of CG beads placed on mol, evaluate
-    objective function of interacting beads"""
-    logger.debug("Entering eval_gaussian_interac()")
-
-    weight_sum = 0.0
-    weight_overlap = 0.0
-    weight_at_in_bd = 0.0
-    bead_params = read_bead_params()
-
-    # Offset energy for every new CG bead.
-    # Distinguish between aromatics and others.
-    num_aromatics = 0
-    lumped_atoms = []
-
-    # Creat list_beads array and loop over indices
-    list_beads_array = np.asarray(list_beads)
-    for i in np.nditer(np.arange(list_beads_array.size)):
-        if list_beads_array[i] in ringatoms:
-            num_aromatics += 1
-    weight_offset_bd_weights = (
-        bead_params["offset_bd_weight"] * (list_beads_array.size - num_aromatics)
-        + bead_params["offset_bd_aromatic_weight"] * num_aromatics
-    )
-    weight_sum += weight_offset_bd_weights
-
-    # Repulsive overlap between CG beads
-    for i in np.nditer(np.arange(list_beads_array.size)):
-        if i < list_beads_array.size - 1:
-            for j in np.nditer(np.arange(i + 1, list_beads_array.size)):
-                weight_overlap += gaussian_overlap(
-                    conformer, list_beads_array[i], list_beads_array[j], ringatoms
-                )
-    weight_sum += weight_overlap
-
-    # Attraction between atoms nearby to CG bead
-    for i in np.nditer(np.arange(list_beads_array.size)):
-        weight, lumped = atoms_in_gaussian(molecule, conformer, list_beads_array[i], ringatoms)
-        weight_at_in_bd += weight
-        lumped_array = np.asarray(lumped)
-        for j in np.nditer(np.arange(lumped_array.size)):
-            if lumped_array[j] not in lumped_atoms:
-                lumped_atoms.append(lumped_array[j])
-    weight_sum += weight_at_in_bd
-    # Penalty for excluding atoms
-    weight_lonely_atoms = penalize_lonely_atoms(molecule, conformer, lumped_atoms)
-    weight_sum += weight_lonely_atoms
-    return weight_sum
 
 
 def check_beads(molecule, list_heavyatoms, heavyatom_coords, trial_comb, ring_atoms, listbonds):
@@ -284,6 +157,160 @@ def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
     return ring_id
 
 
+def read_bead_params():
+    """Returns bead parameter dictionary
+    CG Bead vdw radius (in Angstroem)"""
+    bead_params = dict()
+    bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
+    bead_params["rvdw_aromatic"] = 4.1 / 2.0 #AutoM3 change: was 4.3 / 2.0    #sigma for ring
+    bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
+    bead_params["offset_bd_weight"] =20.0 #AutoM3 change: was 50.0    #penalty weight for nonring beads
+    bead_params["offset_bd_aromatic_weight"] = 5.0 #AutoM3 change: was 20.0    #penalty weight for ring beads
+    bead_params["lonely_atom_penalize"] = 0.28  #AutoM3 change: was 0.20
+    bead_params["bd_bd_overlap_coeff"] = 1.0 #AutoM3 change: was 9.0
+    bead_params["at_in_bd_coeff"] = 0.9
+    return bead_params
+
+
+def gaussian_overlap(conformer, bead1, bead2, ringatoms):
+    """ "Returns overlap coefficient between two gaussians
+    given distance dist"""
+    logger.debug("Entering gaussian_overlap()")
+    dist = Chem.rdMolTransforms.GetBondLength(conformer, int(bead1), int(bead2))
+    bead_params = read_bead_params()
+    sigma = bead_params["rvdw"]
+    if bead1 in ringatoms and bead2 in ringatoms:
+        sigma = bead_params["rvdw_aromatic"]
+    if (
+        bead1 in ringatoms
+        and bead2 not in ringatoms
+        or bead1 not in ringatoms
+        and bead2 in ringatoms
+    ):
+        sigma = bead_params["rvdw_cross"]
+    return bead_params["bd_bd_overlap_coeff"] * math.exp(-(dist**2) / 4.0 / sigma**2)
+
+
+def atoms_in_gaussian(molecule, conformer, bead_id, ringatoms):
+    """Returns weighted sum of atoms contained in bead bead_id"""
+    logger.debug("Entering atoms_in_gaussian()")
+    weight_sum = 0.0
+    bead_params = read_bead_params()
+    sigma = bead_params["rvdw"]
+    lumped_atoms = []
+    if bead_id in ringatoms:
+        sigma = bead_params["rvdw_aromatic"]
+    for i in range(conformer.GetNumAtoms()):
+        dist_bd_at = Chem.rdMolTransforms.GetBondLength(conformer, i, int(bead_id))
+        if dist_bd_at < sigma:
+            lumped_atoms.append(i)
+        weight_sum -= molecule.GetAtomWithIdx(i).GetMass() * math.exp(
+            -(dist_bd_at**2) / 2 / sigma**2
+        )
+    return bead_params["at_in_bd_coeff"] * weight_sum, lumped_atoms
+
+
+def penalize_lonely_atoms(molecule, conformer, lumped_atoms):
+    """Penalizes configuration if atoms aren't included
+    in any CG bead"""
+    logger.debug("Entering penalize_lonely_atoms()")
+    weight_sum = 0.0
+    bead_params = read_bead_params()
+    num_atoms = conformer.GetNumAtoms()
+    atoms_array = np.arange(num_atoms)
+    for i in np.nditer(np.arange(atoms_array.size)):
+        if atoms_array[i] not in lumped_atoms:
+            weight_sum += molecule.GetAtomWithIdx(int(atoms_array[i])).GetMass()
+    return bead_params["lonely_atom_penalize"] * weight_sum
+
+
+def eval_gaussian_interac(molecule, conformer, list_beads, ringatoms):
+    """From collection of CG beads placed on mol, evaluate
+    objective function of interacting beads"""
+    logger.debug("Entering eval_gaussian_interac()")
+
+    weight_sum = 0.0
+    weight_overlap = 0.0
+    weight_at_in_bd = 0.0
+    bead_params = read_bead_params()
+
+    # Offset energy for every new CG bead.
+    # Distinguish between aromatics and others.
+    num_aromatics = 0
+    lumped_atoms = []
+
+    # Creat list_beads array and loop over indices
+    list_beads_array = np.asarray(list_beads)
+    for bead in list_beads_array:
+        if bead in ringatoms:
+            num_aromatics += 1
+    weight_offset_bd_weights = (
+        bead_params["offset_bd_weight"] * (list_beads_array.size - num_aromatics)
+        + bead_params["offset_bd_aromatic_weight"] * num_aromatics
+    )
+    weight_sum += weight_offset_bd_weights
+
+    # Repulsive overlap between CG beads
+    for i in np.nditer(np.arange(list_beads_array.size)):
+        if i < list_beads_array.size - 1:
+            for j in np.nditer(np.arange(i + 1, list_beads_array.size)):
+                weight_overlap += gaussian_overlap(
+                    conformer, list_beads_array[i], list_beads_array[j], ringatoms
+                )
+    weight_sum += weight_overlap
+
+    # Attraction between atoms nearby to CG bead
+    for i in np.nditer(np.arange(list_beads_array.size)):
+        weight, lumped = atoms_in_gaussian(molecule, conformer, list_beads_array[i], ringatoms)
+        weight_at_in_bd += weight
+        lumped_array = np.asarray(lumped)
+        for j in np.nditer(np.arange(lumped_array.size)):
+            if lumped_array[j] not in lumped_atoms:
+                lumped_atoms.append(lumped_array[j])
+    weight_sum += weight_at_in_bd
+    # Penalty for excluding atoms
+    weight_lonely_atoms = penalize_lonely_atoms(molecule, conformer, lumped_atoms)
+    weight_sum += weight_lonely_atoms
+    return weight_sum
+
+
+
+@timeit
+def collect_energies_and_combs(
+    molecule,
+    conformer,
+    acceptable_trials,
+    ringatoms_flat,
+    ene_best_trial,
+    best_trial_comb,
+    list_trial_comb,
+    combs,
+    energies,
+):
+    """Collect energies and combinations for all acceptable trials"""
+    logger.debug("Entering collect_energies_and_combs()") 
+    # Trial positions: any heavy atom
+    for trial_comb in acceptable_trials:
+        # Do the energy evaluation
+        trial_ene = eval_gaussian_interac(molecule, conformer, trial_comb, ringatoms_flat)
+        combs.append(trial_comb)
+        energies.append(trial_ene)
+        logger.debug("; %s %s", trial_comb, trial_ene)
+        # Accept the move
+        if trial_ene < ene_best_trial:
+            ene_best_trial = trial_ene
+            best_trial_comb = sorted(trial_comb)
+        # Get bead positions
+        beadpos = [[0] * 3 for l in range(len(trial_comb))]
+        for l in range(len(trial_comb)):
+            beadpos[l] = [
+                conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
+                for m in range(3)
+            ]
+        # Store configuration
+        list_trial_comb.append([trial_comb, beadpos, trial_ene])
+
+
 @timeit
 def find_bead_pos(
     molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map
@@ -292,8 +319,6 @@ def find_bead_pos(
     arrangement with best energy score. Return all possible arrangements sorted by energy score."""
 
     logger.debug("Entering find_bead_pos()")
-    print(conformer)
-    exit()
 
     # Check number of heavy atoms
     if len(list_heavy_atoms) == 0:
@@ -338,8 +363,8 @@ def find_bead_pos(
     list_combs = []
     list_energies = []
 
-    for num_beads in range(min_beads, min_beads+3):
-        logger.info("Trying %d beads" % num_beads)
+    for num_beads in range(min_beads, min_beads+2):
+        logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
         if num_beads==0: num_beads=1
@@ -347,7 +372,7 @@ def find_bead_pos(
         combs = []
         energies = []
 
-        logger.info("Filtering Acceptable Trials")
+        logger.info("Filtering Acceptable Trials...")
         acceptable_trials = find_acceptable_trials(
             seq_one_beads,
             molecule,
@@ -360,31 +385,22 @@ def find_bead_pos(
         )
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
-        # Trial positions: any heavy atom
-        for trial_comb in acceptable_trials:
-            # Do the energy evaluation
-            trial_ene = eval_gaussian_interac(molecule, conformer, trial_comb, ringatoms_flat)
-            combs.append(trial_comb)
-            energies.append(trial_ene)
-            logger.debug("; %s %s", trial_comb, trial_ene)
-                
-            # Accept the move
-            if trial_ene < ene_best_trial:
-                ene_best_trial = trial_ene
-                best_trial_comb = sorted(trial_comb)
-            # Get bead positions
-            beadpos = [[0] * 3 for l in range(len(trial_comb))]
-            for l in range(len(trial_comb)):
-                beadpos[l] = [
-                    conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
-                    for m in range(3)
-                ]
-            # Store configuration
-            list_trial_comb.append([trial_comb, beadpos, trial_ene])
+        logger.info("Collecting Energies and Combinations...")
+        collect_energies_and_combs(
+            molecule,
+            conformer,
+            acceptable_trials,
+            ringatoms_flat,
+            ene_best_trial,
+            best_trial_comb,
+            list_trial_comb,
+            combs,
+            energies,
+        )
 
-        if last_best_trial_comb == best_trial_comb:
-            break
-        last_best_trial_comb = best_trial_comb
+        # if last_best_trial_comb == best_trial_comb:
+        #     break
+        # last_best_trial_comb = best_trial_comb
         list_combs.append(combs)
         list_energies.append(energies)
 
