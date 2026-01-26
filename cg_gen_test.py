@@ -11,8 +11,8 @@ logging.getLogger("auto_martiniM3").setLevel(logging.INFO)  # or DEBUG
 
 if __name__ == "__main__":
     molname = "TEST"
-    # smiles = "N=Cc1ccccc1"
-    smiles = "CC(=O)OC1=CC=CC=C1C(=O)O"
+    smiles = "N=Cc1ccccc1"
+    # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O"
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     mol_am, _ = am.topology.gen_molecule_smi(smiles)

@@ -115,7 +115,7 @@ def find_acceptable_trials(seq_one_beads,
     molecule, list_heavy_atoms, heavyatom_coords, ring_atoms, list_bonds,
     allatom_coords, force_map):
     # Find all acceptable trials for a given sequence of one bead
-    return find_acceptable_trials_cy(
+    return np.asarray(find_acceptable_trials_cy(
         seq_one_beads,
         molecule,
         list_heavy_atoms,
@@ -124,7 +124,7 @@ def find_acceptable_trials(seq_one_beads,
         list_bonds,
         allatom_coords,
         force_map,
-    )
+    ))
     # acceptable_trials = []
     # for trial_comb in seq_one_beads:
     #     acceptable_trial = check_beads(
@@ -202,7 +202,7 @@ def _get_masses(molecule):
     for i in range(molecule.GetNumAtoms()):
         mass = molecule.GetAtomWithIdx(i).GetMass()
         masses.append(mass)
-    return np.array(masses)
+    return np.array(masses).astype(np.float32)
 
 
 @timeit
@@ -246,10 +246,10 @@ def collect_energies_and_combs(
         # Do the energy evaluation
         trial_ene = float(
             eval_gaussian_interac_np(
-                np.asarray(trial_comb, dtype=np.int32),
+                trial_comb,
                 is_ring,
                 bond_dists,
-                masses.astype(np.float32, copy=False),
+                masses,
                 p_offset,
                 p_offset_ar,
                 p_lonely,
@@ -276,6 +276,7 @@ def collect_energies_and_combs(
             ]
         # Store configuration
         list_trial_comb.append([trial_comb, beadpos, trial_ene])
+    return ene_best_trial, best_trial_comb
 
 
 @timeit
@@ -326,9 +327,9 @@ def find_bead_pos(
     ene_best_trial = 1e6
     last_best_trial_comb = []
 
-    # Keep track of all combinations and scores
-    list_combs = []
-    list_energies = []
+    # # Keep track of all combinations and scores
+    # list_combs = []
+    # list_energies = []
 
     for num_beads in range(min_beads, max_beads+1):
         logger.info("Trying %d beads..." % num_beads)
@@ -352,8 +353,8 @@ def find_bead_pos(
         )
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
-        logger.info("Collecting Energies and Combinations...")
-        collect_energies_and_combs(
+        logger.info("Collecting Combinations And Their Energies...")
+        ene_best_trial, best_trial_comb = collect_energies_and_combs(
             molecule,
             conformer,
             acceptable_trials,
@@ -368,9 +369,8 @@ def find_bead_pos(
         if last_best_trial_comb == best_trial_comb:
             break
         last_best_trial_comb = best_trial_comb
-        list_combs.append(combs)
-        list_energies.append(energies)
-
+        # list_combs.append(combs)
+        # list_energies.append(energies)
     sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(2)), dtype="object")
     return sorted_combs[:, 0], sorted_combs[:, 1]
 
