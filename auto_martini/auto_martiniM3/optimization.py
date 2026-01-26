@@ -46,13 +46,13 @@ logger = logging.getLogger(__name__)
 def check_beads(molecule, list_heavyatoms, heavyatom_coords, trial_comb, ring_atoms, listbonds):
     """Check if CG bead positions in trailComb are acceptable"""
     logger.debug("Entering check_beads()")
-    # # Check for beads at the same place
-    # count = Counter(trial_comb)
-    # for val in count.values():
-    #     if val != 1:
-    #         acceptable_trial = False
-    #         logger.debug("Error. Multiple beads on the same atom position for %s" % trial_comb)
-    #         return acceptable_trial
+    # Check for beads at the same place
+    count = Counter(trial_comb)
+    for val in count.values():
+        if val != 1:
+            acceptable_trial = False
+            logger.debug("Error. Multiple beads on the same atom position for %s" % trial_comb)
+            return acceptable_trial
 
     # Check for beads linked by chemical bond (except in rings)
     bonds_in_rings = [0] * len(ring_atoms)
@@ -330,7 +330,7 @@ def find_bead_pos(
     list_combs = []
     list_energies = []
 
-    for num_beads in range(min_beads, max_beads -2):
+    for num_beads in range(min_beads, max_beads+1):
         logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
@@ -365,9 +365,9 @@ def find_bead_pos(
             energies,
         )
 
-        # if last_best_trial_comb == best_trial_comb:
-        #     break
-        # last_best_trial_comb = best_trial_comb
+        if last_best_trial_comb == best_trial_comb:
+            break
+        last_best_trial_comb = best_trial_comb
         list_combs.append(combs)
         list_energies.append(energies)
 
