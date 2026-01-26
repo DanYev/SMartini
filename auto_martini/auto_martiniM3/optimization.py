@@ -214,8 +214,6 @@ def collect_energies_and_combs(
     ene_best_trial,
     best_trial_comb,
     list_trial_comb,
-    combs,
-    energies,
 ):
     """Collect energies and combinations for all acceptable trials"""
     logger.debug("Entering collect_energies_and_combs()") 
@@ -260,8 +258,6 @@ def collect_energies_and_combs(
                 p_rvdw_cross,
             )
         )
-        combs.append(trial_comb)
-        energies.append(trial_ene)
         logger.debug("; %s %s", trial_comb, trial_ene)
         # Accept the move
         if trial_ene < ene_best_trial:
@@ -285,9 +281,6 @@ def find_bead_pos(
 ):
     """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
     arrangement with best energy score. Return all possible arrangements sorted by energy score."""
-
-    logger.debug("Entering find_bead_pos()")
-
     # Check number of heavy atoms
     if len(list_heavy_atoms) == 0:
         print("Error. No heavy atom found.")
@@ -337,8 +330,6 @@ def find_bead_pos(
         # combinations of CG bead positions.
         if num_beads==0: num_beads=1
         seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)))
-        combs = []
-        energies = []
 
         logger.info("Filtering Acceptable Trials...")
         acceptable_trials = find_acceptable_trials(
@@ -362,23 +353,20 @@ def find_bead_pos(
             ene_best_trial,
             best_trial_comb,
             list_trial_comb,
-            combs,
-            energies,
         )
 
         if last_best_trial_comb == best_trial_comb:
             break
         last_best_trial_comb = best_trial_comb
-        # list_combs.append(combs)
-        # list_energies.append(energies)
+
     sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(2)), dtype="object")
+    logger.info("%d total acceptable bead arrangements found.", len(sorted_combs))
     return sorted_combs[:, 0], sorted_combs[:, 1]
 
 
 def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, list_heavyatoms, bondlist, mol, allatom_coords, force_map): #AutoM3 change: added mol, force_map
     """Make sure all atoms within one CG bead are connected to at least
     one other atom in that bead"""
-    logger.debug("Entering all_atoms_in_beads_connected()")
     # Bead coordinates are given by heavy atoms themselves
     cgbead_coords = []
 
