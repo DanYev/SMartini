@@ -305,7 +305,7 @@ def find_bead_pos(
     if len(list_heavy_atoms) > 50:
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
-        
+
     list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms)
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms)
 
@@ -323,7 +323,7 @@ def find_bead_pos(
     # list_combs = []
     # list_energies = []
 
-    for num_beads in range(min_beads, max_beads+1):
+    for num_beads in range(min_beads, min_beads+3):
         logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
