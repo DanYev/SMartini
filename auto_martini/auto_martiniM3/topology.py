@@ -1,4 +1,4 @@
-"""
+r"""
 Created on March 13, 2019 by Andrew Abi-Mansour
 Updated to Martini 3 force field on January 31, 2025 by Magdalena Szczuka
 
@@ -61,9 +61,9 @@ def read_delta_f_types():
                      }
     return delta_f_types
 
+
 def gen_molecule_smi(smi):
     """Generate mol object from smiles string"""
-    logger.info("Entering gen_molecule_smi()")
     logger.debug("Input SMILES: %s", smi)
     errval = 0
     if "." in smi:
@@ -120,6 +120,7 @@ def gen_molecule_smi(smi):
     logger.info("Successfully generated molecule from SMILES")
     return molecule, errval
 
+
 def gen_molecule_sdf(sdf):
     """Generate mol object from SD file"""
     logger.info("Entering gen_molecule_sdf()")
@@ -146,6 +147,7 @@ def gen_molecule_sdf(sdf):
     logger.info("Successfully generated molecule from SDF")
     return molecule
 
+
 def print_header(molname, mol_smi):
     """Print topology header"""
     text = "; GENERATED WITH Auto_Martini M3FF for {}\n".format(molname)
@@ -163,9 +165,9 @@ def print_header(molname, mol_smi):
     ) # AutoM3 : added mass and additionnal comments
     return text + info
 
+
 def letter_occurrences(string):
     """Count letter occurences"""
-    logger.debug("Entering letter_occurrences()")
     frequencies = defaultdict(lambda: 0)
     for character in string:
         if character.isalnum():
@@ -174,12 +176,10 @@ def letter_occurrences(string):
 
 def get_charge(molecule):
     """Get net charge of molecule"""
-    logger.debug("Entering get_charge()")
     return Chem.rdmolops.GetFormalCharge(molecule)
 
 def get_hbond_a(features):
     """Get Hbond acceptor information"""
-    logger.debug("Entering get_hbond_a()")
     hbond = []
     for feat in features:
         if feat.GetFamily() == "Acceptor":
@@ -190,7 +190,6 @@ def get_hbond_a(features):
 
 def get_hbond_d(features):
     """Get Hbond donor information"""
-    logger.debug("Entering get_hbond_d()")
     hbond = []
     for feat in features:
         if feat.GetFamily() == "Donor":
@@ -201,7 +200,6 @@ def get_hbond_d(features):
 
 def get_atoms(molecule):
     """List all heavy atoms"""
-    logger.debug("Entering get_atoms()")
     conformer = molecule.GetConformer()
     num_atoms = conformer.GetNumAtoms()
     list_heavyatoms = []
@@ -241,10 +239,12 @@ def get_ring_atoms(mol):
 
     return [list(ring) for ring in ring_systems]
 
+
 def is_aromatic(mol): # AutoM3 function
     aromatic_atoms = [atom.GetIsAromatic() for atom in mol.GetAtoms()]
     num_aromatic_atoms = sum(aromatic_atoms)
     return (num_aromatic_atoms > 0, num_aromatic_atoms)
+
 
 def get_heavy_atom_coords(molecule):
     """Extract atomic coordinates of heavy atoms in molecule mol"""

@@ -205,6 +205,16 @@ def _get_masses(molecule):
     return np.array(masses).astype(np.float32)
 
 
+def _get_heavy_atom_bonds(molecule, list_heavy_atoms):
+    # List of bonds between heavy atoms
+    list_bonds = []
+    for i in range(len(list_heavy_atoms)):
+        for j in range(i + 1, len(list_heavy_atoms)):
+            if molecule.GetBondBetweenAtoms(int(list_heavy_atoms[i]), int(list_heavy_atoms[j])) is not None:
+                list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
+    return list_bonds
+
+
 @timeit
 def collect_energies_and_combs(
     molecule,
@@ -295,19 +305,8 @@ def find_bead_pos(
     if len(list_heavy_atoms) > 50:
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
-    # List of bonds between heavy atoms
-    list_bonds = []
-    for i in range(len(list_heavy_atoms)):
-        for j in range(i + 1, len(list_heavy_atoms)):
-            if (
-                molecule.GetBondBetweenAtoms(int(list_heavy_atoms[i]), int(list_heavy_atoms[j]))
-                is not None
-            ):
-                list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
-
-    # Precompute NumPy versions for the Cython accelerator.
-    # (If the extension isn't available, these are harmless.)
-    list_bonds_np = np.asarray(list_bonds, dtype=np.int32)
+        
+    list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms)
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms)
 
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
@@ -360,7 +359,6 @@ def find_bead_pos(
         last_best_trial_comb = best_trial_comb
 
     sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(2)), dtype="object")
-    logger.info("%d total acceptable bead arrangements found.", len(sorted_combs))
     return sorted_combs[:, 0], sorted_combs[:, 1]
 
 

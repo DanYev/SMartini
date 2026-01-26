@@ -34,10 +34,8 @@ logger = logging.getLogger(__name__)
 
 def get_coords(conformer, sites, avg_pos, ringatoms_flat):
     """Extract coordinates of CG beads"""
-    logger.debug("Entering get_coords()")
     # CG beads are averaged over best trial combinations for all
     # non-aromatic atoms.
-    logger.debug("Entering get_coords()")
     site_coords = []
     for i in range(len(sites)):
         if sites[i] in ringatoms_flat:
@@ -48,6 +46,16 @@ def get_coords(conformer, sites, avg_pos, ringatoms_flat):
             # Use average
             site_coords.append(np.array(avg_pos[i]))
     return site_coords
+
+
+def get_heavy_atom_bonds(molecule, list_heavy_atoms):
+    # List of bonds between heavy atoms
+    list_bonds = []
+    for i in range(len(list_heavy_atoms)):
+        for j in range(i + 1, len(list_heavy_atoms)):
+            if molecule.GetBondBetweenAtoms(int(list_heavy_atoms[i]), int(list_heavy_atoms[j])) is not None:
+                list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
+    return list_bonds
 
 
 def check_additivity(forcepred, beadtypes, molecule, mol_smi): #AutoM3 change : added mol_smi argument
@@ -128,6 +136,9 @@ class Cg_molecule:
         hbond_a = topology.get_hbond_a(feats)
         hbond_d = topology.get_hbond_d(feats)
 
+        # List of bonds between heavy atoms
+        list_bonds = get_heavy_atom_bonds(molecule, list_heavy_atoms)
+
         # Flatten list of ring atoms
         ring_atoms_flat = list(chain.from_iterable(ring_atoms))
 
@@ -164,14 +175,22 @@ class Cg_molecule:
                 and (len(list_heavy_atoms) - (5 * len(cg_beads))) > 3
             ):
                 success = False
-
+            
+            if not optimization.all_atoms_in_beads_connected(
+                    cg_beads, self.heavy_atom_coords, list_heavy_atoms, list_bonds, molecule, self.atom_coords, force_map
+                ): # AutoM3 change : Added molecule and force_map arguments
+                success = False
+                attempt += 1
+                continue
+                
             # Extract position of coarse-grained beads
+            logger.debug("Extracting coordinates for CG beads")
             cg_bead_coords = get_coords(conf, cg_beads, bead_pos, ring_atoms_flat)
 
             ### AutoM3 change : different partition of atoms into coarse-grained beads, depending on the number of aromatic cycles ###
             _, num_arom = topology.is_aromatic(molecule)
 
-            if not force_map and num_arom<7: # AutoM3
+            if not force_map and num_arom < 7: # AutoM3
                 self.atom_partitioning, self.cg_bead_coords = optimization.voronoi_atoms_new( 
                     cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
                 )
@@ -183,13 +202,12 @@ class Cg_molecule:
 
             logger.debug("Partitioned atoms into %d beads", len(self.cg_bead_coords))
             
-            
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
             #    Max 2 aromatic atoms per bead ; 
             #    Holding Functional groups together in bead ;
-            
-            max_fails=1
-            fails=0
+
+            max_fails = 1
+            fails = 0
 
             if is_arom and (num_arom % 2) == 0: #only for pair number of aromatic atoms (actual code prevents sharing/mismatch)
                 if not optimization.max2arperbead(self.atom_partitioning, ring_atoms):

@@ -9,7 +9,7 @@ logging.basicConfig(
     format="%(levelname)s [%(filename)s:%(lineno)d %(name)s] %(message)s",
     force=True,  # override any prior logging config set by imported libs
 )
-logging.getLogger("auto_martiniM3").setLevel(logging.INFO)  # or DEBUG
+logging.getLogger("auto_martiniM3").setLevel(logging.DEBUG)  # or DEBUG
 
 if __name__ == "__main__":
     molname = "TEST"
