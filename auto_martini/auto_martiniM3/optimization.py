@@ -287,7 +287,8 @@ def collect_energies_and_combs(
 
 @timeit
 def find_bead_pos(
-    molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map
+    molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
+    min_beads=None, max_beads=None,
 ):
     """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
     arrangement with best energy score. Return all possible arrangements sorted by energy score."""
@@ -310,8 +311,10 @@ def find_bead_pos(
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms)
 
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
-    max_beads = int(len(list_heavy_atoms) / 2.0)
-    min_beads = int(len(list_heavy_atoms) / 4.0)
+    if not min_beads:
+        min_beads = int(len(list_heavy_atoms) / 4.0)
+    if not max_beads:
+        max_beads = int(len(list_heavy_atoms) / 2.0)
 
     # Collect all possible combinations of bead positions
     best_trial_comb = []
@@ -323,7 +326,7 @@ def find_bead_pos(
     # list_combs = []
     # list_energies = []
 
-    for num_beads in range(min_beads, min_beads+3):
+    for num_beads in range(min_beads, max_beads + 1):
         logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.

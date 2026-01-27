@@ -13,14 +13,14 @@ logging.getLogger("auto_martiniM3").setLevel(logging.INFO)  # or DEBUG
 
 if __name__ == "__main__":
     molname = "TEST"
-    smiles = "N=Cc1ccccc1"
+    # smiles = "N=Cc1ccccc1"
     # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O"
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
-    mol_am, _ = am.topology.gen_molecule_smi(smiles)
-    # sdf_file = "atp.sdf"
-    # mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
-    # smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
+    # mol_am, _ = am.topology.gen_molecule_smi(smiles)
+    sdf_file = "atp.sdf"
+    mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
+    smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -33,10 +33,15 @@ if __name__ == "__main__":
     
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname.lower()}.itp"
-    cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True)
+    cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, min_beads=10, max_beads=12)
     print(f"Wrote: {itp_path}")
 
     # Save CG structure (.gro)
     gro_path = outdir / f"{molname.lower()}.gro"
     cg.output_cg(str(gro_path))
+    print(f"Wrote: {gro_path}")
+
+    # Save A structure (.gro)
+    gro_path = outdir / f"{molname.lower()}_aa.gro"
+    cg.output_aa(str(gro_path))
     print(f"Wrote: {gro_path}")

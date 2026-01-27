@@ -95,7 +95,9 @@ def check_additivity(forcepred, beadtypes, molecule, mol_smi): #AutoM3 change : 
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
-    def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, bartenderfname=None, bartender=None, logp_file=None, forcepred=True):
+    def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
+        bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
+        min_beads=None, max_beads=None,):
         # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
 
         self.heavy_atom_coords = None
@@ -152,7 +154,9 @@ class Cg_molecule:
             self.atom_coords,
             ring_atoms,
             ring_atoms_flat, 
-            force_map # AutoM3 new argument
+            force_map, # AutoM3 new argument
+            min_beads=min_beads, 
+            max_beads=max_beads,
         )
         logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
 
@@ -348,8 +352,8 @@ class Cg_molecule:
                         errval = 7
 
 
-                self.topout, bartender_input_info = topology.topout(header_write,atoms_write,bonds_write,angles_write) # AutoM3 change : possible simple output w/o dihedrals, virtual sites
-                
+                self.topout, bartender_input_info = topology.topout(header_write, atoms_write, bonds_write, angles_write) # AutoM3 change : possible simple output w/o dihedrals, virtual sites
+
                 # check if fusion of cycles
                 common = False
                 if len(ring_atoms)>1:
@@ -362,8 +366,8 @@ class Cg_molecule:
 
                 ### AutoM3 outputs ###
 
-                if len(ring_atoms_flat)>0 and not simple_model:
-                    if len(ring_atoms_flat)>7 and common:
+                if len(ring_atoms_flat) > 0 and not simple_model:
+                    if len(ring_atoms_flat) > 7 and common:
                         vs_write, virtual_sites, rigid_dih  = topology.print_virtualsites(ring_atoms,self.cg_bead_coords,self.atom_partitioning,molecule)
                         
                         self.topout, vs_bead_names, bartender_input_info  = topology.topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites,vs_write,rigid_dih,simple_model)
