@@ -35,10 +35,8 @@ from .optimization_cy import (
     check_beads_cy,
     find_acceptable_trials_cy,
     find_acceptable_trials_cy_np,
+    eval_gaussian_interac_np,
 )  
-
-# Energy kernel (Cython)
-from .energy_cy import eval_gaussian_interac_np
 
 logger = logging.getLogger(__name__)
 
