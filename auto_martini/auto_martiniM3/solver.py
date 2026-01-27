@@ -118,7 +118,7 @@ class Cg_molecule:
         ### AutoM3 : MINIMIZATION with RDkit ###
         molecule = Chem.Mol(molecule)
         logger.debug("Embedding + MMFF optimization")
-        AllChem.EmbedMolecule(molecule)
+        AllChem.EmbedMolecule(molecule, randomSeed=1)
         AllChem.MMFFOptimizeMolecule(molecule, maxIters=1000, mmffVariant='MMFF94s')
         #AllChem.NormalizeDepiction(molecule, scaleFactor=1.12) 
 
