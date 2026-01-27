@@ -27,7 +27,8 @@ If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """ 
 
-from . import optimization, output, topology
+from . import output, topology
+from . import optimization as optimization
 from .common import *
 
 logger = logging.getLogger(__name__)
