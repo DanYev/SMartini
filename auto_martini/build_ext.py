@@ -24,7 +24,7 @@ setup(
     ext_modules=cythonize(extensions),
 )
 
-# python setup.py build_ext --inplace
+# python build_ext.py build_ext --inplace
 """
 
 """Poetry build hook for compiling Cython extensions.
