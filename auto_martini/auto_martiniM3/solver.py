@@ -28,7 +28,7 @@ and LICENSE files.
 """ 
 
 from . import output, topology
-from . import optimization as optimization
+from . import optimization
 from .common import *
 
 logger = logging.getLogger(__name__)
@@ -154,9 +154,9 @@ class Cg_molecule:
             self.heavy_atom_coords,
             self.atom_coords,
             ring_atoms,
-            ring_atoms_flat, 
-            force_map, # AutoM3 new argument
-            min_beads=min_beads, 
+            ring_atoms_flat,
+            force_map,  # AutoM3 new argument
+            min_beads=min_beads,
             max_beads=max_beads,
         )
         logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
