@@ -1526,14 +1526,15 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
                 bead_type = "SD"
             if count_letters(str(smi_frag)) > 3:
                 bead_type = "D"
-        # The compound has a +/- charge -> Q type
-        if count_letters(str(smi_frag)) == 2:
-            other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
-        if count_letters(str(smi_frag)) == 3:
-            othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
-        if count_letters(str(smi_frag)) > 3:
-            othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5",]
-        bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
+        else:
+            # The compound has a +/- charge -> Q type
+            if count_letters(str(smi_frag)) == 2:
+                other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
+            if count_letters(str(smi_frag)) == 3:
+                othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
+            if count_letters(str(smi_frag)) > 3:
+                othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5",]
+            bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
 
     else:
         # Neutral group
