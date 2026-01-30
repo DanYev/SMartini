@@ -129,7 +129,9 @@ cpdef F32 eval_gaussian_interac(
     F32 rvdw,
     F32 rvdw_aromatic,
     F32 rvdw_cross,
-):
+    U8[::1] lumped_mask,
+    U8[::1] local_mask,
+) nogil:
     cdef Py_ssize_t nb = list_beads.shape[0]
     cdef Py_ssize_t i, j
     cdef int bead1, bead2
@@ -137,6 +139,7 @@ cpdef F32 eval_gaussian_interac(
     cdef F32 weight_sum = 0.0
     cdef F32 weight_overlap = 0.0
     cdef F32 weight_at_in_bd = 0.0
+    cdef Py_ssize_t n_atoms = masses.shape[0]
 
     for i in range(nb):
         bead1 = <int>list_beads[i]
@@ -160,14 +163,13 @@ cpdef F32 eval_gaussian_interac(
                 rvdw_cross,
             )
     weight_sum += weight_overlap
-
-    cdef Py_ssize_t n_atoms = masses.shape[0]
-    cdef cnp.ndarray[cnp.uint8_t, ndim=1] lumped_mask = np.zeros(n_atoms, dtype=np.uint8)
-    cdef cnp.ndarray[cnp.uint8_t, ndim=1] local_mask = np.zeros(n_atoms, dtype=np.uint8)
     
     for i in range(nb):
         bead1 = <int>list_beads[i]
-        local_mask[:] = 0  # Reset mask
+        # Reset local mask
+        for j in range(n_atoms):
+            local_mask[j] = 0
+        
         weight_at_in_bd += atoms_in_gaussian(
             bead1,
             in_ring,
@@ -418,49 +420,62 @@ cpdef tuple collect_energies_cy(
         return ene_best_trial, best_trial_comb_full, energies_array, trials_array
     
     n_beads = acceptable_trials.shape[1]
+    cdef Py_ssize_t n_atoms = masses.shape[0]
     
-    # Pre-allocate output arrays
+    # Pre-allocate output arrays and work arrays
     energies_array = np.zeros(n_trials, dtype=np.float32)
     trials_array = np.zeros((n_trials, n_beads), dtype=np.int32)
+    cdef cnp.ndarray[cnp.uint8_t, ndim=1] lumped_mask = np.zeros(n_atoms, dtype=np.uint8)
+    cdef cnp.ndarray[cnp.uint8_t, ndim=1] local_mask = np.zeros(n_atoms, dtype=np.uint8)
     
     cdef const I32[::1] trial_mv
     cdef F32[::1] energies_view = energies_array
     cdef I32[:, ::1] trials_view = trials_array
+    cdef U8[::1] lumped_mask_view = lumped_mask
+    cdef U8[::1] local_mask_view = local_mask
     
     # Main loop over all acceptable trials - with nogil
-    for i in range(n_trials):
-        # Get memoryview of this trial directly
-        trial_mv = acceptable_trials[i, :]
-        
-        # Evaluate energy for this trial
-        trial_ene = eval_gaussian_interac(
-            trial_mv,
-            in_ring,
-            bond_dists,
-            masses,
-            offset_bd_weight,
-            offset_bd_aromatic_weight,
-            lonely_atom_penalize,
-            bd_bd_overlap_coeff,
-            at_in_bd_coeff,
-            rvdw,
-            rvdw_aromatic,
-            rvdw_cross,
-        )
-        
-        # Store energy
-        energies_view[i] = trial_ene
-        
-        # Copy trial to output array
-        for j in range(n_beads):
-            trials_view[i, j] = trial_mv[j]
-        
-        # Track best energy and combination
-        if trial_ene < ene_best_trial:
-            ene_best_trial = trial_ene
-            # Store the best trial indices for sorting later
+    with nogil:
+        for i in range(n_trials):
+            # Reset masks for this iteration
+            for j in range(n_atoms):
+                lumped_mask_view[j] = 0
+                local_mask_view[j] = 0
+            
+            # Get memoryview of this trial directly
+            trial_mv = acceptable_trials[i, :]
+            
+            # Evaluate energy for this trial
+            trial_ene = eval_gaussian_interac(
+                trial_mv,
+                in_ring,
+                bond_dists,
+                masses,
+                offset_bd_weight,
+                offset_bd_aromatic_weight,
+                lonely_atom_penalize,
+                bd_bd_overlap_coeff,
+                at_in_bd_coeff,
+                rvdw,
+                rvdw_aromatic,
+                rvdw_cross,
+                lumped_mask_view,
+                local_mask_view,
+            )
+            
+            # Store energy
+            energies_view[i] = trial_ene
+            
+            # Copy trial to output array
             for j in range(n_beads):
                 trials_view[i, j] = trial_mv[j]
+            
+            # Track best energy and combination
+            if trial_ene < ene_best_trial:
+                ene_best_trial = trial_ene
+                # Store the best trial indices for sorting later
+                for j in range(n_beads):
+                    trials_view[i, j] = trial_mv[j]
     
     # Outside nogil block, find and sort best trial combination
     cdef I32[::1] best_trial_mv
