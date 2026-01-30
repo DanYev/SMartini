@@ -1148,7 +1148,6 @@ static int __Pyx_init_co_variables(void) {
 #define __PYX_HAVE__auto_martiniM3__optimization_cy
 #define __PYX_HAVE_API__auto_martiniM3__optimization_cy
 /* Early includes */
-#include <stdint.h>
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -1808,7 +1807,7 @@ typedef npy_double __pyx_t_5numpy_double_t;
 */
 typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
 
-/* "auto_martiniM3/optimization_cy.pyx":34
+/* "auto_martiniM3/optimization_cy.pyx":33
  * 
  * 
  * ctypedef cnp.int32_t I32             # <<<<<<<<<<<<<<
@@ -1817,7 +1816,7 @@ typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
 */
 typedef __pyx_t_5numpy_int32_t __pyx_t_14auto_martiniM3_15optimization_cy_I32;
 
-/* "auto_martiniM3/optimization_cy.pyx":35
+/* "auto_martiniM3/optimization_cy.pyx":34
  * 
  * ctypedef cnp.int32_t I32
  * ctypedef cnp.float32_t F32             # <<<<<<<<<<<<<<
@@ -1826,7 +1825,7 @@ typedef __pyx_t_5numpy_int32_t __pyx_t_14auto_martiniM3_15optimization_cy_I32;
 */
 typedef __pyx_t_5numpy_float32_t __pyx_t_14auto_martiniM3_15optimization_cy_F32;
 
-/* "auto_martiniM3/optimization_cy.pyx":36
+/* "auto_martiniM3/optimization_cy.pyx":35
  * ctypedef cnp.int32_t I32
  * ctypedef cnp.float32_t F32
  * ctypedef cnp.uint8_t U8             # <<<<<<<<<<<<<<
@@ -3081,9 +3080,6 @@ static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_d_dc_n
 static CYTHON_INLINE PyObject *__pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(const char *itemp);
 static CYTHON_INLINE int __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(char *itemp, PyObject *obj);
 
-/* ObjectToMemviewSlice.proto */
-static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_dc_nn_int32_t(PyObject *, int writable_flag);
-
 /* RealImag.proto */
 #if CYTHON_CCOMPLEX
   #ifdef __cplusplus
@@ -3377,8 +3373,6 @@ static CYTHON_INLINE char *__pyx_f_5numpy_7ndarray_4data_data(PyArrayObject *__p
 
 /* Module declarations from "cython" */
 
-/* Module declarations from "libc.stdint" */
-
 /* Module declarations from "libc.math" */
 
 /* Module declarations from "libc.string" */
@@ -3459,7 +3453,6 @@ static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_14auto_martiniM3_15optimiz
 static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__ = { "const F32", NULL, sizeof(__pyx_t_14auto_martiniM3_15optimization_cy_F32 const ), { 0 }, 0, 'R', 0, 0 };
 static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32__const__ = { "const I32", NULL, sizeof(__pyx_t_14auto_martiniM3_15optimization_cy_I32 const ), { 0 }, 0, __PYX_IS_UNSIGNED(__pyx_t_14auto_martiniM3_15optimization_cy_I32 const ) ? 'U' : 'I', __PYX_IS_UNSIGNED(__pyx_t_14auto_martiniM3_15optimization_cy_I32 const ), 0 };
 static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32 = { "I32", NULL, sizeof(__pyx_t_14auto_martiniM3_15optimization_cy_I32), { 0 }, 0, __PYX_IS_UNSIGNED(__pyx_t_14auto_martiniM3_15optimization_cy_I32) ? 'U' : 'I', __PYX_IS_UNSIGNED(__pyx_t_14auto_martiniM3_15optimization_cy_I32), 0 };
-static const __Pyx_TypeInfo __Pyx_TypeInfo_nn_int32_t = { "int32_t", NULL, sizeof(int32_t), { 0 }, 0, __PYX_IS_UNSIGNED(int32_t) ? 'U' : 'I', __PYX_IS_UNSIGNED(int32_t), 0 };
 /* #### Code section: before_global_var ### */
 #define __Pyx_MODULE_NAME "auto_martiniM3.optimization_cy"
 extern int __pyx_module_is_main_auto_martiniM3__optimization_cy;
@@ -18893,7 +18886,7 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":44
+/* "auto_martiniM3/optimization_cy.pyx":43
  * 
  * 
  * cdef inline F32 _sigma_for_pair(             # <<<<<<<<<<<<<<
@@ -18908,7 +18901,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   Py_ssize_t __pyx_t_1;
   int __pyx_t_2;
 
-  /* "auto_martiniM3/optimization_cy.pyx":52
+  /* "auto_martiniM3/optimization_cy.pyx":51
  *     F32 rvdw_cross,
  * ) nogil:
  *     cdef bint b1 = in_ring[bead1] != 0             # <<<<<<<<<<<<<<
@@ -18918,7 +18911,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   __pyx_t_1 = __pyx_v_bead1;
   __pyx_v_b1 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) __pyx_v_in_ring.data) + __pyx_t_1)) ))) != 0);
 
-  /* "auto_martiniM3/optimization_cy.pyx":53
+  /* "auto_martiniM3/optimization_cy.pyx":52
  * ) nogil:
  *     cdef bint b1 = in_ring[bead1] != 0
  *     cdef bint b2 = in_ring[bead2] != 0             # <<<<<<<<<<<<<<
@@ -18928,7 +18921,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   __pyx_t_1 = __pyx_v_bead2;
   __pyx_v_b2 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) __pyx_v_in_ring.data) + __pyx_t_1)) ))) != 0);
 
-  /* "auto_martiniM3/optimization_cy.pyx":54
+  /* "auto_martiniM3/optimization_cy.pyx":53
  *     cdef bint b1 = in_ring[bead1] != 0
  *     cdef bint b2 = in_ring[bead2] != 0
  *     if b1 and b2:             # <<<<<<<<<<<<<<
@@ -18944,7 +18937,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_2) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":55
+    /* "auto_martiniM3/optimization_cy.pyx":54
  *     cdef bint b2 = in_ring[bead2] != 0
  *     if b1 and b2:
  *         return rvdw_aromatic             # <<<<<<<<<<<<<<
@@ -18954,7 +18947,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
     __pyx_r = __pyx_v_rvdw_aromatic;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":54
+    /* "auto_martiniM3/optimization_cy.pyx":53
  *     cdef bint b1 = in_ring[bead1] != 0
  *     cdef bint b2 = in_ring[bead2] != 0
  *     if b1 and b2:             # <<<<<<<<<<<<<<
@@ -18963,7 +18956,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":56
+  /* "auto_martiniM3/optimization_cy.pyx":55
  *     if b1 and b2:
  *         return rvdw_aromatic
  *     if b1 != b2:             # <<<<<<<<<<<<<<
@@ -18973,7 +18966,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   __pyx_t_2 = (__pyx_v_b1 != __pyx_v_b2);
   if (__pyx_t_2) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":57
+    /* "auto_martiniM3/optimization_cy.pyx":56
  *         return rvdw_aromatic
  *     if b1 != b2:
  *         return rvdw_cross             # <<<<<<<<<<<<<<
@@ -18983,7 +18976,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
     __pyx_r = __pyx_v_rvdw_cross;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":56
+    /* "auto_martiniM3/optimization_cy.pyx":55
  *     if b1 and b2:
  *         return rvdw_aromatic
  *     if b1 != b2:             # <<<<<<<<<<<<<<
@@ -18992,7 +18985,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":58
+  /* "auto_martiniM3/optimization_cy.pyx":57
  *     if b1 != b2:
  *         return rvdw_cross
  *     return rvdw             # <<<<<<<<<<<<<<
@@ -19002,7 +18995,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   __pyx_r = __pyx_v_rvdw;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":44
+  /* "auto_martiniM3/optimization_cy.pyx":43
  * 
  * 
  * cdef inline F32 _sigma_for_pair(             # <<<<<<<<<<<<<<
@@ -19015,7 +19008,7 @@ static CYTHON_INLINE __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14au
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":61
+/* "auto_martiniM3/optimization_cy.pyx":60
  * 
  * 
  * cpdef F32 gaussian_overlap_np(             # <<<<<<<<<<<<<<
@@ -19038,17 +19031,17 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":71
+  /* "auto_martiniM3/optimization_cy.pyx":70
  *     F32 rvdw_cross,
  * ):
  *     cdef F32 sigma = _sigma_for_pair(bead1, bead2, in_ring, rvdw, rvdw_aromatic, rvdw_cross)             # <<<<<<<<<<<<<<
  *     return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))
  * 
 */
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__sigma_for_pair(__pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__sigma_for_pair(__pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 70, __pyx_L1_error)
   __pyx_v_sigma = __pyx_t_1;
 
-  /* "auto_martiniM3/optimization_cy.pyx":72
+  /* "auto_martiniM3/optimization_cy.pyx":71
  * ):
  *     cdef F32 sigma = _sigma_for_pair(bead1, bead2, in_ring, rvdw, rvdw_aromatic, rvdw_cross)
  *     return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))             # <<<<<<<<<<<<<<
@@ -19058,7 +19051,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   __pyx_r = (__pyx_v_bd_bd_overlap_coeff * exp((((double)(-(__pyx_v_dist * __pyx_v_dist))) / ((4.0 * __pyx_v_sigma) * __pyx_v_sigma))));
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":61
+  /* "auto_martiniM3/optimization_cy.pyx":60
  * 
  * 
  * cpdef F32 gaussian_overlap_np(             # <<<<<<<<<<<<<<
@@ -19120,81 +19113,81 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_dist,&__pyx_mstate_global->__pyx_n_u_bead1,&__pyx_mstate_global->__pyx_n_u_bead2,&__pyx_mstate_global->__pyx_n_u_in_ring,&__pyx_mstate_global->__pyx_n_u_bd_bd_overlap_coeff,&__pyx_mstate_global->__pyx_n_u_rvdw,&__pyx_mstate_global->__pyx_n_u_rvdw_aromatic,&__pyx_mstate_global->__pyx_n_u_rvdw_cross,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 61, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 60, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  8:
         values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  7:
         values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 61, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 60, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "gaussian_overlap_np", 0) < (0)) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "gaussian_overlap_np", 0) < (0)) __PYX_ERR(0, 60, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 8; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("gaussian_overlap_np", 1, 8, 8, i); __PYX_ERR(0, 61, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("gaussian_overlap_np", 1, 8, 8, i); __PYX_ERR(0, 60, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 8)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 60, __pyx_L3_error)
       values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 61, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 60, __pyx_L3_error)
     }
-    __pyx_v_dist = __Pyx_PyFloat_AsFloat(values[0]); if (unlikely((__pyx_v_dist == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 62, __pyx_L3_error)
-    __pyx_v_bead1 = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_bead1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 63, __pyx_L3_error)
-    __pyx_v_bead2 = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_bead2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 64, __pyx_L3_error)
-    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[3], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 65, __pyx_L3_error)
-    __pyx_v_bd_bd_overlap_coeff = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_bd_bd_overlap_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 66, __pyx_L3_error)
-    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 67, __pyx_L3_error)
-    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 68, __pyx_L3_error)
-    __pyx_v_rvdw_cross = __Pyx_PyFloat_AsFloat(values[7]); if (unlikely((__pyx_v_rvdw_cross == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 69, __pyx_L3_error)
+    __pyx_v_dist = __Pyx_PyFloat_AsFloat(values[0]); if (unlikely((__pyx_v_dist == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_bead1 = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_bead1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 62, __pyx_L3_error)
+    __pyx_v_bead2 = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_bead2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 63, __pyx_L3_error)
+    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[3], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 64, __pyx_L3_error)
+    __pyx_v_bd_bd_overlap_coeff = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_bd_bd_overlap_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 65, __pyx_L3_error)
+    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 66, __pyx_L3_error)
+    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 67, __pyx_L3_error)
+    __pyx_v_rvdw_cross = __Pyx_PyFloat_AsFloat(values[7]); if (unlikely((__pyx_v_rvdw_cross == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 68, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("gaussian_overlap_np", 1, 8, 8, __pyx_nargs); __PYX_ERR(0, 61, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("gaussian_overlap_np", 1, 8, 8, __pyx_nargs); __PYX_ERR(0, 60, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -19227,9 +19220,9 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_gaussian_overlap_np
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("gaussian_overlap_np", 0);
   __Pyx_XDECREF(__pyx_r);
-  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 61, __pyx_L1_error) }
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_gaussian_overlap_np(__pyx_v_dist, __pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_bd_bd_overlap_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L1_error)
-  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 61, __pyx_L1_error)
+  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 60, __pyx_L1_error) }
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_gaussian_overlap_np(__pyx_v_dist, __pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_bd_bd_overlap_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 60, __pyx_L1_error)
+  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
@@ -19246,7 +19239,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_gaussian_overlap_np
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":75
+/* "auto_martiniM3/optimization_cy.pyx":74
  * 
  * 
  * cpdef tuple atoms_in_gaussian_np(             # <<<<<<<<<<<<<<
@@ -19286,7 +19279,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("atoms_in_gaussian_np", 0);
 
-  /* "auto_martiniM3/optimization_cy.pyx":84
+  /* "auto_martiniM3/optimization_cy.pyx":83
  *     F32 rvdw_aromatic,
  * ):
  *     cdef Py_ssize_t n = bond_dists.shape[0]             # <<<<<<<<<<<<<<
@@ -19295,7 +19288,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
 */
   __pyx_v_n = (__pyx_v_bond_dists.shape[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":86
+  /* "auto_martiniM3/optimization_cy.pyx":85
  *     cdef Py_ssize_t n = bond_dists.shape[0]
  *     cdef Py_ssize_t i
  *     cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw             # <<<<<<<<<<<<<<
@@ -19311,7 +19304,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
   }
   __pyx_v_sigma = __pyx_t_1;
 
-  /* "auto_martiniM3/optimization_cy.pyx":87
+  /* "auto_martiniM3/optimization_cy.pyx":86
  *     cdef Py_ssize_t i
  *     cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw
  *     cdef F32 sigma2 = sigma * sigma             # <<<<<<<<<<<<<<
@@ -19320,7 +19313,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
 */
   __pyx_v_sigma2 = (__pyx_v_sigma * __pyx_v_sigma);
 
-  /* "auto_martiniM3/optimization_cy.pyx":88
+  /* "auto_martiniM3/optimization_cy.pyx":87
  *     cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw
  *     cdef F32 sigma2 = sigma * sigma
  *     cdef F32 weight_sum = 0.0             # <<<<<<<<<<<<<<
@@ -19329,19 +19322,19 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
 */
   __pyx_v_weight_sum = 0.0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":89
+  /* "auto_martiniM3/optimization_cy.pyx":88
  *     cdef F32 sigma2 = sigma * sigma
  *     cdef F32 weight_sum = 0.0
  *     lumped_atoms = []             # <<<<<<<<<<<<<<
  *     cdef F32 dist
  * 
 */
-  __pyx_t_4 = PyList_New(0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_t_4 = PyList_New(0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 88, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __pyx_v_lumped_atoms = ((PyObject*)__pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":92
+  /* "auto_martiniM3/optimization_cy.pyx":91
  *     cdef F32 dist
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -19353,7 +19346,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
   for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
     __pyx_v_i = __pyx_t_7;
 
-    /* "auto_martiniM3/optimization_cy.pyx":93
+    /* "auto_martiniM3/optimization_cy.pyx":92
  * 
  *     for i in range(n):
  *         dist = bond_dists[i, bead_id]             # <<<<<<<<<<<<<<
@@ -19364,7 +19357,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
     __pyx_t_8 = __pyx_v_bead_id;
     __pyx_v_dist = (*((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=0 */ (__pyx_v_bond_dists.data + __pyx_t_2 * __pyx_v_bond_dists.strides[0]) )) + __pyx_t_8)) )));
 
-    /* "auto_martiniM3/optimization_cy.pyx":94
+    /* "auto_martiniM3/optimization_cy.pyx":93
  *     for i in range(n):
  *         dist = bond_dists[i, bead_id]
  *         if dist < sigma:             # <<<<<<<<<<<<<<
@@ -19374,19 +19367,19 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
     __pyx_t_3 = (__pyx_v_dist < __pyx_v_sigma);
     if (__pyx_t_3) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":95
+      /* "auto_martiniM3/optimization_cy.pyx":94
  *         dist = bond_dists[i, bead_id]
  *         if dist < sigma:
  *             lumped_atoms.append(i)             # <<<<<<<<<<<<<<
  *         weight_sum -= masses[i] * exp(-(dist * dist) / (2.0 * sigma2))
  * 
 */
-      __pyx_t_4 = PyLong_FromSsize_t(__pyx_v_i); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_4 = PyLong_FromSsize_t(__pyx_v_i); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 94, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_lumped_atoms, __pyx_t_4); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_lumped_atoms, __pyx_t_4); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 94, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":94
+      /* "auto_martiniM3/optimization_cy.pyx":93
  *     for i in range(n):
  *         dist = bond_dists[i, bead_id]
  *         if dist < sigma:             # <<<<<<<<<<<<<<
@@ -19395,7 +19388,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
 */
     }
 
-    /* "auto_martiniM3/optimization_cy.pyx":96
+    /* "auto_martiniM3/optimization_cy.pyx":95
  *         if dist < sigma:
  *             lumped_atoms.append(i)
  *         weight_sum -= masses[i] * exp(-(dist * dist) / (2.0 * sigma2))             # <<<<<<<<<<<<<<
@@ -19406,7 +19399,7 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
     __pyx_v_weight_sum = (__pyx_v_weight_sum - ((*((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) __pyx_v_masses.data) + __pyx_t_8)) ))) * exp((((double)(-(__pyx_v_dist * __pyx_v_dist))) / (2.0 * __pyx_v_sigma2)))));
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":98
+  /* "auto_martiniM3/optimization_cy.pyx":97
  *         weight_sum -= masses[i] * exp(-(dist * dist) / (2.0 * sigma2))
  * 
  *     return at_in_bd_coeff * weight_sum, lumped_atoms             # <<<<<<<<<<<<<<
@@ -19414,21 +19407,21 @@ static PyObject *__pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_4 = PyFloat_FromDouble((__pyx_v_at_in_bd_coeff * __pyx_v_weight_sum)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 98, __pyx_L1_error)
+  __pyx_t_4 = PyFloat_FromDouble((__pyx_v_at_in_bd_coeff * __pyx_v_weight_sum)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 97, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_10 = PyTuple_New(2); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 98, __pyx_L1_error)
+  __pyx_t_10 = PyTuple_New(2); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 97, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_10);
   __Pyx_GIVEREF(__pyx_t_4);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_4) != (0)) __PYX_ERR(0, 98, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_4) != (0)) __PYX_ERR(0, 97, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_lumped_atoms);
   __Pyx_GIVEREF(__pyx_v_lumped_atoms);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_v_lumped_atoms) != (0)) __PYX_ERR(0, 98, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_v_lumped_atoms) != (0)) __PYX_ERR(0, 97, __pyx_L1_error);
   __pyx_t_4 = 0;
   __pyx_r = ((PyObject*)__pyx_t_10);
   __pyx_t_10 = 0;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":75
+  /* "auto_martiniM3/optimization_cy.pyx":74
  * 
  * 
  * cpdef tuple atoms_in_gaussian_np(             # <<<<<<<<<<<<<<
@@ -19494,74 +19487,74 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_bead_id,&__pyx_mstate_global->__pyx_n_u_in_ring,&__pyx_mstate_global->__pyx_n_u_bond_dists,&__pyx_mstate_global->__pyx_n_u_masses,&__pyx_mstate_global->__pyx_n_u_at_in_bd_coeff,&__pyx_mstate_global->__pyx_n_u_rvdw,&__pyx_mstate_global->__pyx_n_u_rvdw_aromatic,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 75, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 74, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  7:
         values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 75, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 74, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "atoms_in_gaussian_np", 0) < (0)) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "atoms_in_gaussian_np", 0) < (0)) __PYX_ERR(0, 74, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 7; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("atoms_in_gaussian_np", 1, 7, 7, i); __PYX_ERR(0, 75, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("atoms_in_gaussian_np", 1, 7, 7, i); __PYX_ERR(0, 74, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 7)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 74, __pyx_L3_error)
       values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 75, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 74, __pyx_L3_error)
     }
-    __pyx_v_bead_id = __Pyx_PyLong_As_int(values[0]); if (unlikely((__pyx_v_bead_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 76, __pyx_L3_error)
-    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[1], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 77, __pyx_L3_error)
-    __pyx_v_bond_dists = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[2], 0); if (unlikely(!__pyx_v_bond_dists.memview)) __PYX_ERR(0, 78, __pyx_L3_error)
-    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[3], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 79, __pyx_L3_error)
-    __pyx_v_at_in_bd_coeff = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_at_in_bd_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L3_error)
-    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 81, __pyx_L3_error)
-    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 82, __pyx_L3_error)
+    __pyx_v_bead_id = __Pyx_PyLong_As_int(values[0]); if (unlikely((__pyx_v_bead_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 75, __pyx_L3_error)
+    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[1], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 76, __pyx_L3_error)
+    __pyx_v_bond_dists = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[2], 0); if (unlikely(!__pyx_v_bond_dists.memview)) __PYX_ERR(0, 77, __pyx_L3_error)
+    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[3], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 78, __pyx_L3_error)
+    __pyx_v_at_in_bd_coeff = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_at_in_bd_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 79, __pyx_L3_error)
+    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L3_error)
+    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 81, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("atoms_in_gaussian_np", 1, 7, 7, __pyx_nargs); __PYX_ERR(0, 75, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("atoms_in_gaussian_np", 1, 7, 7, __pyx_nargs); __PYX_ERR(0, 74, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -19597,10 +19590,10 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_2atoms_in_gaussian_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("atoms_in_gaussian_np", 0);
   __Pyx_XDECREF(__pyx_r);
-  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 75, __pyx_L1_error) }
-  if (unlikely(!__pyx_v_bond_dists.memview)) { __Pyx_RaiseUnboundLocalError("bond_dists"); __PYX_ERR(0, 75, __pyx_L1_error) }
-  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 75, __pyx_L1_error) }
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np(__pyx_v_bead_id, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 75, __pyx_L1_error)
+  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 74, __pyx_L1_error) }
+  if (unlikely(!__pyx_v_bond_dists.memview)) { __Pyx_RaiseUnboundLocalError("bond_dists"); __PYX_ERR(0, 74, __pyx_L1_error) }
+  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 74, __pyx_L1_error) }
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np(__pyx_v_bead_id, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -19617,7 +19610,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_2atoms_in_gaussian_
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":101
+/* "auto_martiniM3/optimization_cy.pyx":100
  * 
  * 
  * cpdef F32 penalize_lonely_atoms_np(             # <<<<<<<<<<<<<<
@@ -19662,7 +19655,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   __pyx_pybuffernd_mask.data = NULL;
   __pyx_pybuffernd_mask.rcbuffer = &__pyx_pybuffer_mask;
 
-  /* "auto_martiniM3/optimization_cy.pyx":106
+  /* "auto_martiniM3/optimization_cy.pyx":105
  *     F32 lonely_atom_penalize,
  * ):
  *     cdef Py_ssize_t n = masses.shape[0]             # <<<<<<<<<<<<<<
@@ -19671,7 +19664,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_n = (__pyx_v_masses.shape[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":108
+  /* "auto_martiniM3/optimization_cy.pyx":107
  *     cdef Py_ssize_t n = masses.shape[0]
  *     cdef Py_ssize_t i
  *     cdef F32 weight_sum = 0.0             # <<<<<<<<<<<<<<
@@ -19680,7 +19673,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_sum = 0.0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":110
+  /* "auto_martiniM3/optimization_cy.pyx":109
  *     cdef F32 weight_sum = 0.0
  * 
  *     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n, dtype=np.uint8)             # <<<<<<<<<<<<<<
@@ -19688,16 +19681,16 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
  *         if 0 <= i < n:
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = PyLong_FromSsize_t(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __pyx_t_3 = PyLong_FromSsize_t(__pyx_v_n); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_uint8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_uint8); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_7 = 1;
@@ -19714,31 +19707,31 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, __pyx_t_3};
-    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 110, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 109, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 110, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_5, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 109, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_5);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 110, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 109, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 110, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 109, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_mask.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_1), &__Pyx_TypeInfo_nn___pyx_t_5numpy_uint8_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 1, 0, __pyx_stack) == -1)) {
       __pyx_v_mask = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_mask.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 110, __pyx_L1_error)
+      __PYX_ERR(0, 109, __pyx_L1_error)
     } else {__pyx_pybuffernd_mask.diminfo[0].strides = __pyx_pybuffernd_mask.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_mask.diminfo[0].shape = __pyx_pybuffernd_mask.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_v_mask = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":111
+  /* "auto_martiniM3/optimization_cy.pyx":110
  * 
  *     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n, dtype=np.uint8)
  *     for i in lumped_atoms:             # <<<<<<<<<<<<<<
@@ -19747,7 +19740,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   if (unlikely(__pyx_v_lumped_atoms == Py_None)) {
     PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
-    __PYX_ERR(0, 111, __pyx_L1_error)
+    __PYX_ERR(0, 110, __pyx_L1_error)
   }
   __pyx_t_1 = __pyx_v_lumped_atoms; __Pyx_INCREF(__pyx_t_1);
   __pyx_t_8 = 0;
@@ -19755,19 +19748,19 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     {
       Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_1);
       #if !CYTHON_ASSUME_SAFE_SIZE
-      if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 111, __pyx_L1_error)
+      if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 110, __pyx_L1_error)
       #endif
       if (__pyx_t_8 >= __pyx_temp) break;
     }
     __pyx_t_4 = __Pyx_PyList_GetItemRefFast(__pyx_t_1, __pyx_t_8, __Pyx_ReferenceSharing_OwnStrongReference);
     ++__pyx_t_8;
-    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 111, __pyx_L1_error)
+    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    __pyx_t_9 = __Pyx_PyIndex_AsSsize_t(__pyx_t_4); if (unlikely((__pyx_t_9 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 111, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyIndex_AsSsize_t(__pyx_t_4); if (unlikely((__pyx_t_9 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_i = __pyx_t_9;
 
-    /* "auto_martiniM3/optimization_cy.pyx":112
+    /* "auto_martiniM3/optimization_cy.pyx":111
  *     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n, dtype=np.uint8)
  *     for i in lumped_atoms:
  *         if 0 <= i < n:             # <<<<<<<<<<<<<<
@@ -19780,7 +19773,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     }
     if (__pyx_t_10) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":113
+      /* "auto_martiniM3/optimization_cy.pyx":112
  *     for i in lumped_atoms:
  *         if 0 <= i < n:
  *             mask[i] = 1             # <<<<<<<<<<<<<<
@@ -19790,7 +19783,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_11 = __pyx_v_i;
       *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_uint8_t *, __pyx_pybuffernd_mask.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_mask.diminfo[0].strides) = 1;
 
-      /* "auto_martiniM3/optimization_cy.pyx":112
+      /* "auto_martiniM3/optimization_cy.pyx":111
  *     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n, dtype=np.uint8)
  *     for i in lumped_atoms:
  *         if 0 <= i < n:             # <<<<<<<<<<<<<<
@@ -19799,7 +19792,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
     }
 
-    /* "auto_martiniM3/optimization_cy.pyx":111
+    /* "auto_martiniM3/optimization_cy.pyx":110
  * 
  *     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n, dtype=np.uint8)
  *     for i in lumped_atoms:             # <<<<<<<<<<<<<<
@@ -19809,7 +19802,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":115
+  /* "auto_martiniM3/optimization_cy.pyx":114
  *             mask[i] = 1
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -19821,7 +19814,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_9; __pyx_t_12+=1) {
     __pyx_v_i = __pyx_t_12;
 
-    /* "auto_martiniM3/optimization_cy.pyx":116
+    /* "auto_martiniM3/optimization_cy.pyx":115
  * 
  *     for i in range(n):
  *         if mask[i] == 0:             # <<<<<<<<<<<<<<
@@ -19832,7 +19825,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __pyx_t_10 = ((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_uint8_t *, __pyx_pybuffernd_mask.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_mask.diminfo[0].strides)) == 0);
     if (__pyx_t_10) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":117
+      /* "auto_martiniM3/optimization_cy.pyx":116
  *     for i in range(n):
  *         if mask[i] == 0:
  *             weight_sum += masses[i]             # <<<<<<<<<<<<<<
@@ -19842,7 +19835,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_11 = __pyx_v_i;
       __pyx_v_weight_sum = (__pyx_v_weight_sum + (*((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) __pyx_v_masses.data) + __pyx_t_11)) ))));
 
-      /* "auto_martiniM3/optimization_cy.pyx":116
+      /* "auto_martiniM3/optimization_cy.pyx":115
  * 
  *     for i in range(n):
  *         if mask[i] == 0:             # <<<<<<<<<<<<<<
@@ -19852,7 +19845,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":119
+  /* "auto_martiniM3/optimization_cy.pyx":118
  *             weight_sum += masses[i]
  * 
  *     return lonely_atom_penalize * weight_sum             # <<<<<<<<<<<<<<
@@ -19862,7 +19855,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   __pyx_r = (__pyx_v_lonely_atom_penalize * __pyx_v_weight_sum);
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":101
+  /* "auto_martiniM3/optimization_cy.pyx":100
  * 
  * 
  * cpdef F32 penalize_lonely_atoms_np(             # <<<<<<<<<<<<<<
@@ -19936,46 +19929,46 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_lumped_atoms,&__pyx_mstate_global->__pyx_n_u_masses,&__pyx_mstate_global->__pyx_n_u_lonely_atom_penalize,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 101, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 100, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 101, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 100, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 101, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 100, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 101, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 100, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "penalize_lonely_atoms_np", 0) < (0)) __PYX_ERR(0, 101, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "penalize_lonely_atoms_np", 0) < (0)) __PYX_ERR(0, 100, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("penalize_lonely_atoms_np", 1, 3, 3, i); __PYX_ERR(0, 101, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("penalize_lonely_atoms_np", 1, 3, 3, i); __PYX_ERR(0, 100, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 101, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 100, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 101, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 100, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 101, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 100, __pyx_L3_error)
     }
     __pyx_v_lumped_atoms = ((PyObject*)values[0]);
-    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[1], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 103, __pyx_L3_error)
-    __pyx_v_lonely_atom_penalize = __Pyx_PyFloat_AsFloat(values[2]); if (unlikely((__pyx_v_lonely_atom_penalize == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 104, __pyx_L3_error)
+    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[1], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 102, __pyx_L3_error)
+    __pyx_v_lonely_atom_penalize = __Pyx_PyFloat_AsFloat(values[2]); if (unlikely((__pyx_v_lonely_atom_penalize == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 103, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("penalize_lonely_atoms_np", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 101, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("penalize_lonely_atoms_np", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 100, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -19987,7 +19980,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_lumped_atoms), (&PyList_Type), 1, "lumped_atoms", 1))) __PYX_ERR(0, 102, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_lumped_atoms), (&PyList_Type), 1, "lumped_atoms", 1))) __PYX_ERR(0, 101, __pyx_L1_error)
   __pyx_r = __pyx_pf_14auto_martiniM3_15optimization_cy_4penalize_lonely_atoms_np(__pyx_self, __pyx_v_lumped_atoms, __pyx_v_masses, __pyx_v_lonely_atom_penalize);
 
   /* function exit code */
@@ -20018,9 +20011,9 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_4penalize_lonely_at
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("penalize_lonely_atoms_np", 0);
   __Pyx_XDECREF(__pyx_r);
-  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 101, __pyx_L1_error) }
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_penalize_lonely_atoms_np(__pyx_v_lumped_atoms, __pyx_v_masses, __pyx_v_lonely_atom_penalize, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 101, __pyx_L1_error)
-  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 101, __pyx_L1_error)
+  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 100, __pyx_L1_error) }
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_penalize_lonely_atoms_np(__pyx_v_lumped_atoms, __pyx_v_masses, __pyx_v_lonely_atom_penalize, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 100, __pyx_L1_error)
+  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
@@ -20037,7 +20030,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_4penalize_lonely_at
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":122
+/* "auto_martiniM3/optimization_cy.pyx":121
  * 
  * 
  * cpdef F32 eval_gaussian_interac_np(             # <<<<<<<<<<<<<<
@@ -20087,7 +20080,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("eval_gaussian_interac_np", 0);
 
-  /* "auto_martiniM3/optimization_cy.pyx":137
+  /* "auto_martiniM3/optimization_cy.pyx":136
  *     F32 rvdw_cross,
  * ):
  *     cdef Py_ssize_t nb = list_beads.shape[0]             # <<<<<<<<<<<<<<
@@ -20096,7 +20089,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_nb = (__pyx_v_list_beads.shape[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":140
+  /* "auto_martiniM3/optimization_cy.pyx":139
  *     cdef Py_ssize_t i, j
  *     cdef int bead1, bead2
  *     cdef int num_aromatics = 0             # <<<<<<<<<<<<<<
@@ -20105,7 +20098,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_num_aromatics = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":141
+  /* "auto_martiniM3/optimization_cy.pyx":140
  *     cdef int bead1, bead2
  *     cdef int num_aromatics = 0
  *     cdef F32 weight_sum = 0.0             # <<<<<<<<<<<<<<
@@ -20114,7 +20107,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_sum = 0.0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":142
+  /* "auto_martiniM3/optimization_cy.pyx":141
  *     cdef int num_aromatics = 0
  *     cdef F32 weight_sum = 0.0
  *     cdef F32 weight_overlap = 0.0             # <<<<<<<<<<<<<<
@@ -20123,7 +20116,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_overlap = 0.0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":143
+  /* "auto_martiniM3/optimization_cy.pyx":142
  *     cdef F32 weight_sum = 0.0
  *     cdef F32 weight_overlap = 0.0
  *     cdef F32 weight_at_in_bd = 0.0             # <<<<<<<<<<<<<<
@@ -20132,7 +20125,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_at_in_bd = 0.0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":145
+  /* "auto_martiniM3/optimization_cy.pyx":144
  *     cdef F32 weight_at_in_bd = 0.0
  * 
  *     for i in range(nb):             # <<<<<<<<<<<<<<
@@ -20144,7 +20137,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":146
+    /* "auto_martiniM3/optimization_cy.pyx":145
  * 
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]             # <<<<<<<<<<<<<<
@@ -20154,7 +20147,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __pyx_t_4 = __pyx_v_i;
     __pyx_v_bead1 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) __pyx_v_list_beads.data) + __pyx_t_4)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":147
+    /* "auto_martiniM3/optimization_cy.pyx":146
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]
  *         if in_ring[bead1] != 0:             # <<<<<<<<<<<<<<
@@ -20165,7 +20158,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __pyx_t_5 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_U8 const  *) __pyx_v_in_ring.data) + __pyx_t_4)) ))) != 0);
     if (__pyx_t_5) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":148
+      /* "auto_martiniM3/optimization_cy.pyx":147
  *         bead1 = <int>list_beads[i]
  *         if in_ring[bead1] != 0:
  *             num_aromatics += 1             # <<<<<<<<<<<<<<
@@ -20174,7 +20167,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
       __pyx_v_num_aromatics = (__pyx_v_num_aromatics + 1);
 
-      /* "auto_martiniM3/optimization_cy.pyx":147
+      /* "auto_martiniM3/optimization_cy.pyx":146
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]
  *         if in_ring[bead1] != 0:             # <<<<<<<<<<<<<<
@@ -20184,7 +20177,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":150
+  /* "auto_martiniM3/optimization_cy.pyx":149
  *             num_aromatics += 1
  * 
  *     weight_sum += offset_bd_weight * (nb - num_aromatics) + offset_bd_aromatic_weight * num_aromatics             # <<<<<<<<<<<<<<
@@ -20193,7 +20186,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_sum = (__pyx_v_weight_sum + ((__pyx_v_offset_bd_weight * (__pyx_v_nb - __pyx_v_num_aromatics)) + (__pyx_v_offset_bd_aromatic_weight * __pyx_v_num_aromatics)));
 
-  /* "auto_martiniM3/optimization_cy.pyx":152
+  /* "auto_martiniM3/optimization_cy.pyx":151
  *     weight_sum += offset_bd_weight * (nb - num_aromatics) + offset_bd_aromatic_weight * num_aromatics
  * 
  *     for i in range(nb):             # <<<<<<<<<<<<<<
@@ -20205,7 +20198,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":153
+    /* "auto_martiniM3/optimization_cy.pyx":152
  * 
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]             # <<<<<<<<<<<<<<
@@ -20215,7 +20208,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __pyx_t_4 = __pyx_v_i;
     __pyx_v_bead1 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) __pyx_v_list_beads.data) + __pyx_t_4)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":154
+    /* "auto_martiniM3/optimization_cy.pyx":153
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]
  *         for j in range(i + 1, nb):             # <<<<<<<<<<<<<<
@@ -20227,7 +20220,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     for (__pyx_t_8 = (__pyx_v_i + 1); __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
       __pyx_v_j = __pyx_t_8;
 
-      /* "auto_martiniM3/optimization_cy.pyx":155
+      /* "auto_martiniM3/optimization_cy.pyx":154
  *         bead1 = <int>list_beads[i]
  *         for j in range(i + 1, nb):
  *             bead2 = <int>list_beads[j]             # <<<<<<<<<<<<<<
@@ -20237,7 +20230,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_4 = __pyx_v_j;
       __pyx_v_bead2 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) __pyx_v_list_beads.data) + __pyx_t_4)) ))));
 
-      /* "auto_martiniM3/optimization_cy.pyx":157
+      /* "auto_martiniM3/optimization_cy.pyx":156
  *             bead2 = <int>list_beads[j]
  *             weight_overlap += gaussian_overlap_np(
  *                 bond_dists[bead1, bead2],             # <<<<<<<<<<<<<<
@@ -20247,19 +20240,19 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_4 = __pyx_v_bead1;
       __pyx_t_9 = __pyx_v_bead2;
 
-      /* "auto_martiniM3/optimization_cy.pyx":156
+      /* "auto_martiniM3/optimization_cy.pyx":155
  *         for j in range(i + 1, nb):
  *             bead2 = <int>list_beads[j]
  *             weight_overlap += gaussian_overlap_np(             # <<<<<<<<<<<<<<
  *                 bond_dists[bead1, bead2],
  *                 bead1,
 */
-      __pyx_t_10 = __pyx_f_14auto_martiniM3_15optimization_cy_gaussian_overlap_np((*((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=0 */ (__pyx_v_bond_dists.data + __pyx_t_4 * __pyx_v_bond_dists.strides[0]) )) + __pyx_t_9)) ))), __pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_bd_bd_overlap_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 0); if (unlikely(__pyx_t_10 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 156, __pyx_L1_error)
+      __pyx_t_10 = __pyx_f_14auto_martiniM3_15optimization_cy_gaussian_overlap_np((*((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_F32 const  *) ( /* dim=0 */ (__pyx_v_bond_dists.data + __pyx_t_4 * __pyx_v_bond_dists.strides[0]) )) + __pyx_t_9)) ))), __pyx_v_bead1, __pyx_v_bead2, __pyx_v_in_ring, __pyx_v_bd_bd_overlap_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 0); if (unlikely(__pyx_t_10 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 155, __pyx_L1_error)
       __pyx_v_weight_overlap = (__pyx_v_weight_overlap + __pyx_t_10);
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":166
+  /* "auto_martiniM3/optimization_cy.pyx":165
  *                 rvdw_cross,
  *             )
  *     weight_sum += weight_overlap             # <<<<<<<<<<<<<<
@@ -20268,19 +20261,19 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_sum = (__pyx_v_weight_sum + __pyx_v_weight_overlap);
 
-  /* "auto_martiniM3/optimization_cy.pyx":168
+  /* "auto_martiniM3/optimization_cy.pyx":167
  *     weight_sum += weight_overlap
  * 
  *     lumped_atoms_all = []             # <<<<<<<<<<<<<<
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]
 */
-  __pyx_t_11 = PyList_New(0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 168, __pyx_L1_error)
+  __pyx_t_11 = PyList_New(0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 167, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_11);
   __pyx_v_lumped_atoms_all = ((PyObject*)__pyx_t_11);
   __pyx_t_11 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":169
+  /* "auto_martiniM3/optimization_cy.pyx":168
  * 
  *     lumped_atoms_all = []
  *     for i in range(nb):             # <<<<<<<<<<<<<<
@@ -20292,7 +20285,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":170
+    /* "auto_martiniM3/optimization_cy.pyx":169
  *     lumped_atoms_all = []
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]             # <<<<<<<<<<<<<<
@@ -20302,14 +20295,14 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __pyx_t_9 = __pyx_v_i;
     __pyx_v_bead1 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 const  *) __pyx_v_list_beads.data) + __pyx_t_9)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":171
+    /* "auto_martiniM3/optimization_cy.pyx":170
  *     for i in range(nb):
  *         bead1 = <int>list_beads[i]
  *         weight, lumped = atoms_in_gaussian_np(             # <<<<<<<<<<<<<<
  *             bead1,
  *             in_ring,
 */
-    __pyx_t_11 = __pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np(__pyx_v_bead1, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, 0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 171, __pyx_L1_error)
+    __pyx_t_11 = __pyx_f_14auto_martiniM3_15optimization_cy_atoms_in_gaussian_np(__pyx_v_bead1, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, 0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 170, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_11);
     if (likely(__pyx_t_11 != Py_None)) {
       PyObject* sequence = __pyx_t_11;
@@ -20317,7 +20310,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       if (unlikely(size != 2)) {
         if (size > 2) __Pyx_RaiseTooManyValuesError(2);
         else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-        __PYX_ERR(0, 171, __pyx_L1_error)
+        __PYX_ERR(0, 170, __pyx_L1_error)
       }
       #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
       __pyx_t_12 = PyTuple_GET_ITEM(sequence, 0);
@@ -20325,37 +20318,37 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_13 = PyTuple_GET_ITEM(sequence, 1);
       __Pyx_INCREF(__pyx_t_13);
       #else
-      __pyx_t_12 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 171, __pyx_L1_error)
+      __pyx_t_12 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_12);
-      __pyx_t_13 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 171, __pyx_L1_error)
+      __pyx_t_13 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_13);
       #endif
       __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
     } else {
-      __Pyx_RaiseNoneNotIterableError(); __PYX_ERR(0, 171, __pyx_L1_error)
+      __Pyx_RaiseNoneNotIterableError(); __PYX_ERR(0, 170, __pyx_L1_error)
     }
     __Pyx_XDECREF_SET(__pyx_v_weight, __pyx_t_12);
     __pyx_t_12 = 0;
     __Pyx_XDECREF_SET(__pyx_v_lumped, __pyx_t_13);
     __pyx_t_13 = 0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":180
+    /* "auto_martiniM3/optimization_cy.pyx":179
  *             rvdw_aromatic,
  *         )
  *         weight_at_in_bd += weight             # <<<<<<<<<<<<<<
  *         for j in lumped:
  *             if j not in lumped_atoms_all:
 */
-    __pyx_t_11 = PyFloat_FromDouble(__pyx_v_weight_at_in_bd); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 180, __pyx_L1_error)
+    __pyx_t_11 = PyFloat_FromDouble(__pyx_v_weight_at_in_bd); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 179, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_11);
-    __pyx_t_13 = PyNumber_InPlaceAdd(__pyx_t_11, __pyx_v_weight); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 180, __pyx_L1_error)
+    __pyx_t_13 = PyNumber_InPlaceAdd(__pyx_t_11, __pyx_v_weight); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 179, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_13);
     __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-    __pyx_t_10 = __Pyx_PyFloat_AsFloat(__pyx_t_13); if (unlikely((__pyx_t_10 == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 180, __pyx_L1_error)
+    __pyx_t_10 = __Pyx_PyFloat_AsFloat(__pyx_t_13); if (unlikely((__pyx_t_10 == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 179, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
     __pyx_v_weight_at_in_bd = __pyx_t_10;
 
-    /* "auto_martiniM3/optimization_cy.pyx":181
+    /* "auto_martiniM3/optimization_cy.pyx":180
  *         )
  *         weight_at_in_bd += weight
  *         for j in lumped:             # <<<<<<<<<<<<<<
@@ -20367,9 +20360,9 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
       __pyx_t_6 = 0;
       __pyx_t_14 = NULL;
     } else {
-      __pyx_t_6 = -1; __pyx_t_13 = PyObject_GetIter(__pyx_v_lumped); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 181, __pyx_L1_error)
+      __pyx_t_6 = -1; __pyx_t_13 = PyObject_GetIter(__pyx_v_lumped); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 180, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_13);
-      __pyx_t_14 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_13); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 181, __pyx_L1_error)
+      __pyx_t_14 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_13); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 180, __pyx_L1_error)
     }
     for (;;) {
       if (likely(!__pyx_t_14)) {
@@ -20377,7 +20370,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
           {
             Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_13);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 181, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 180, __pyx_L1_error)
             #endif
             if (__pyx_t_6 >= __pyx_temp) break;
           }
@@ -20387,7 +20380,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
           {
             Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_13);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 181, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 180, __pyx_L1_error)
             #endif
             if (__pyx_t_6 >= __pyx_temp) break;
           }
@@ -20398,49 +20391,49 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
           #endif
           ++__pyx_t_6;
         }
-        if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 181, __pyx_L1_error)
+        if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 180, __pyx_L1_error)
       } else {
         __pyx_t_11 = __pyx_t_14(__pyx_t_13);
         if (unlikely(!__pyx_t_11)) {
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
-            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 181, __pyx_L1_error)
+            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 180, __pyx_L1_error)
             PyErr_Clear();
           }
           break;
         }
       }
       __Pyx_GOTREF(__pyx_t_11);
-      __pyx_t_7 = __Pyx_PyIndex_AsSsize_t(__pyx_t_11); if (unlikely((__pyx_t_7 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 181, __pyx_L1_error)
+      __pyx_t_7 = __Pyx_PyIndex_AsSsize_t(__pyx_t_11); if (unlikely((__pyx_t_7 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 180, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
       __pyx_v_j = __pyx_t_7;
 
-      /* "auto_martiniM3/optimization_cy.pyx":182
+      /* "auto_martiniM3/optimization_cy.pyx":181
  *         weight_at_in_bd += weight
  *         for j in lumped:
  *             if j not in lumped_atoms_all:             # <<<<<<<<<<<<<<
  *                 lumped_atoms_all.append(j)
  * 
 */
-      __pyx_t_11 = PyLong_FromSsize_t(__pyx_v_j); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 182, __pyx_L1_error)
+      __pyx_t_11 = PyLong_FromSsize_t(__pyx_v_j); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 181, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_11);
-      __pyx_t_5 = (__Pyx_PySequence_ContainsTF(__pyx_t_11, __pyx_v_lumped_atoms_all, Py_NE)); if (unlikely((__pyx_t_5 < 0))) __PYX_ERR(0, 182, __pyx_L1_error)
+      __pyx_t_5 = (__Pyx_PySequence_ContainsTF(__pyx_t_11, __pyx_v_lumped_atoms_all, Py_NE)); if (unlikely((__pyx_t_5 < 0))) __PYX_ERR(0, 181, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
       if (__pyx_t_5) {
 
-        /* "auto_martiniM3/optimization_cy.pyx":183
+        /* "auto_martiniM3/optimization_cy.pyx":182
  *         for j in lumped:
  *             if j not in lumped_atoms_all:
  *                 lumped_atoms_all.append(j)             # <<<<<<<<<<<<<<
  * 
  *     weight_sum += weight_at_in_bd
 */
-        __pyx_t_11 = PyLong_FromSsize_t(__pyx_v_j); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 183, __pyx_L1_error)
+        __pyx_t_11 = PyLong_FromSsize_t(__pyx_v_j); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 182, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_11);
-        __pyx_t_15 = __Pyx_PyList_Append(__pyx_v_lumped_atoms_all, __pyx_t_11); if (unlikely(__pyx_t_15 == ((int)-1))) __PYX_ERR(0, 183, __pyx_L1_error)
+        __pyx_t_15 = __Pyx_PyList_Append(__pyx_v_lumped_atoms_all, __pyx_t_11); if (unlikely(__pyx_t_15 == ((int)-1))) __PYX_ERR(0, 182, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
 
-        /* "auto_martiniM3/optimization_cy.pyx":182
+        /* "auto_martiniM3/optimization_cy.pyx":181
  *         weight_at_in_bd += weight
  *         for j in lumped:
  *             if j not in lumped_atoms_all:             # <<<<<<<<<<<<<<
@@ -20449,7 +20442,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
       }
 
-      /* "auto_martiniM3/optimization_cy.pyx":181
+      /* "auto_martiniM3/optimization_cy.pyx":180
  *         )
  *         weight_at_in_bd += weight
  *         for j in lumped:             # <<<<<<<<<<<<<<
@@ -20460,7 +20453,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
     __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":185
+  /* "auto_martiniM3/optimization_cy.pyx":184
  *                 lumped_atoms_all.append(j)
  * 
  *     weight_sum += weight_at_in_bd             # <<<<<<<<<<<<<<
@@ -20469,17 +20462,17 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
 */
   __pyx_v_weight_sum = (__pyx_v_weight_sum + __pyx_v_weight_at_in_bd);
 
-  /* "auto_martiniM3/optimization_cy.pyx":186
+  /* "auto_martiniM3/optimization_cy.pyx":185
  * 
  *     weight_sum += weight_at_in_bd
  *     weight_sum += penalize_lonely_atoms_np(lumped_atoms_all, masses, lonely_atom_penalize)             # <<<<<<<<<<<<<<
  *     return weight_sum
  * 
 */
-  __pyx_t_10 = __pyx_f_14auto_martiniM3_15optimization_cy_penalize_lonely_atoms_np(__pyx_v_lumped_atoms_all, __pyx_v_masses, __pyx_v_lonely_atom_penalize, 0); if (unlikely(__pyx_t_10 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 186, __pyx_L1_error)
+  __pyx_t_10 = __pyx_f_14auto_martiniM3_15optimization_cy_penalize_lonely_atoms_np(__pyx_v_lumped_atoms_all, __pyx_v_masses, __pyx_v_lonely_atom_penalize, 0); if (unlikely(__pyx_t_10 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 185, __pyx_L1_error)
   __pyx_v_weight_sum = (__pyx_v_weight_sum + __pyx_t_10);
 
-  /* "auto_martiniM3/optimization_cy.pyx":187
+  /* "auto_martiniM3/optimization_cy.pyx":186
  *     weight_sum += weight_at_in_bd
  *     weight_sum += penalize_lonely_atoms_np(lumped_atoms_all, masses, lonely_atom_penalize)
  *     return weight_sum             # <<<<<<<<<<<<<<
@@ -20489,7 +20482,7 @@ static __pyx_t_14auto_martiniM3_15optimization_cy_F32 __pyx_f_14auto_martiniM3_1
   __pyx_r = __pyx_v_weight_sum;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":122
+  /* "auto_martiniM3/optimization_cy.pyx":121
  * 
  * 
  * cpdef F32 eval_gaussian_interac_np(             # <<<<<<<<<<<<<<
@@ -20562,109 +20555,109 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_list_beads,&__pyx_mstate_global->__pyx_n_u_in_ring,&__pyx_mstate_global->__pyx_n_u_bond_dists,&__pyx_mstate_global->__pyx_n_u_masses,&__pyx_mstate_global->__pyx_n_u_offset_bd_weight,&__pyx_mstate_global->__pyx_n_u_offset_bd_aromatic_weight,&__pyx_mstate_global->__pyx_n_u_lonely_atom_penalize,&__pyx_mstate_global->__pyx_n_u_bd_bd_overlap_coeff,&__pyx_mstate_global->__pyx_n_u_at_in_bd_coeff,&__pyx_mstate_global->__pyx_n_u_rvdw,&__pyx_mstate_global->__pyx_n_u_rvdw_aromatic,&__pyx_mstate_global->__pyx_n_u_rvdw_cross,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 122, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 121, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case 12:
         values[11] = __Pyx_ArgRef_FASTCALL(__pyx_args, 11);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[11])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[11])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case 11:
         values[10] = __Pyx_ArgRef_FASTCALL(__pyx_args, 10);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[10])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[10])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case 10:
         values[9] = __Pyx_ArgRef_FASTCALL(__pyx_args, 9);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[9])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[9])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  9:
         values[8] = __Pyx_ArgRef_FASTCALL(__pyx_args, 8);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[8])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[8])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  8:
         values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  7:
         values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 122, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 121, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "eval_gaussian_interac_np", 0) < (0)) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "eval_gaussian_interac_np", 0) < (0)) __PYX_ERR(0, 121, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 12; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("eval_gaussian_interac_np", 1, 12, 12, i); __PYX_ERR(0, 122, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("eval_gaussian_interac_np", 1, 12, 12, i); __PYX_ERR(0, 121, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 12)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[8] = __Pyx_ArgRef_FASTCALL(__pyx_args, 8);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[8])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[8])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[9] = __Pyx_ArgRef_FASTCALL(__pyx_args, 9);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[9])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[9])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[10] = __Pyx_ArgRef_FASTCALL(__pyx_args, 10);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[10])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[10])) __PYX_ERR(0, 121, __pyx_L3_error)
       values[11] = __Pyx_ArgRef_FASTCALL(__pyx_args, 11);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[11])) __PYX_ERR(0, 122, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[11])) __PYX_ERR(0, 121, __pyx_L3_error)
     }
-    __pyx_v_list_beads = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32__const__(values[0], 0); if (unlikely(!__pyx_v_list_beads.memview)) __PYX_ERR(0, 123, __pyx_L3_error)
-    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[1], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 124, __pyx_L3_error)
-    __pyx_v_bond_dists = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[2], 0); if (unlikely(!__pyx_v_bond_dists.memview)) __PYX_ERR(0, 125, __pyx_L3_error)
-    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[3], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 126, __pyx_L3_error)
-    __pyx_v_offset_bd_weight = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_offset_bd_weight == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 128, __pyx_L3_error)
-    __pyx_v_offset_bd_aromatic_weight = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_offset_bd_aromatic_weight == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 129, __pyx_L3_error)
-    __pyx_v_lonely_atom_penalize = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_lonely_atom_penalize == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 130, __pyx_L3_error)
-    __pyx_v_bd_bd_overlap_coeff = __Pyx_PyFloat_AsFloat(values[7]); if (unlikely((__pyx_v_bd_bd_overlap_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 131, __pyx_L3_error)
-    __pyx_v_at_in_bd_coeff = __Pyx_PyFloat_AsFloat(values[8]); if (unlikely((__pyx_v_at_in_bd_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 132, __pyx_L3_error)
-    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[9]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 133, __pyx_L3_error)
-    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[10]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 134, __pyx_L3_error)
-    __pyx_v_rvdw_cross = __Pyx_PyFloat_AsFloat(values[11]); if (unlikely((__pyx_v_rvdw_cross == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 135, __pyx_L3_error)
+    __pyx_v_list_beads = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32__const__(values[0], 0); if (unlikely(!__pyx_v_list_beads.memview)) __PYX_ERR(0, 122, __pyx_L3_error)
+    __pyx_v_in_ring = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_U8__const__(values[1], 0); if (unlikely(!__pyx_v_in_ring.memview)) __PYX_ERR(0, 123, __pyx_L3_error)
+    __pyx_v_bond_dists = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[2], 0); if (unlikely(!__pyx_v_bond_dists.memview)) __PYX_ERR(0, 124, __pyx_L3_error)
+    __pyx_v_masses = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_F32__const__(values[3], 0); if (unlikely(!__pyx_v_masses.memview)) __PYX_ERR(0, 125, __pyx_L3_error)
+    __pyx_v_offset_bd_weight = __Pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_offset_bd_weight == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 127, __pyx_L3_error)
+    __pyx_v_offset_bd_aromatic_weight = __Pyx_PyFloat_AsFloat(values[5]); if (unlikely((__pyx_v_offset_bd_aromatic_weight == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 128, __pyx_L3_error)
+    __pyx_v_lonely_atom_penalize = __Pyx_PyFloat_AsFloat(values[6]); if (unlikely((__pyx_v_lonely_atom_penalize == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 129, __pyx_L3_error)
+    __pyx_v_bd_bd_overlap_coeff = __Pyx_PyFloat_AsFloat(values[7]); if (unlikely((__pyx_v_bd_bd_overlap_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 130, __pyx_L3_error)
+    __pyx_v_at_in_bd_coeff = __Pyx_PyFloat_AsFloat(values[8]); if (unlikely((__pyx_v_at_in_bd_coeff == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 131, __pyx_L3_error)
+    __pyx_v_rvdw = __Pyx_PyFloat_AsFloat(values[9]); if (unlikely((__pyx_v_rvdw == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 132, __pyx_L3_error)
+    __pyx_v_rvdw_aromatic = __Pyx_PyFloat_AsFloat(values[10]); if (unlikely((__pyx_v_rvdw_aromatic == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 133, __pyx_L3_error)
+    __pyx_v_rvdw_cross = __Pyx_PyFloat_AsFloat(values[11]); if (unlikely((__pyx_v_rvdw_cross == ((npy_float32)-1)) && PyErr_Occurred())) __PYX_ERR(0, 134, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("eval_gaussian_interac_np", 1, 12, 12, __pyx_nargs); __PYX_ERR(0, 122, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("eval_gaussian_interac_np", 1, 12, 12, __pyx_nargs); __PYX_ERR(0, 121, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -20703,12 +20696,12 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_6eval_gaussian_inte
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("eval_gaussian_interac_np", 0);
   __Pyx_XDECREF(__pyx_r);
-  if (unlikely(!__pyx_v_list_beads.memview)) { __Pyx_RaiseUnboundLocalError("list_beads"); __PYX_ERR(0, 122, __pyx_L1_error) }
-  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 122, __pyx_L1_error) }
-  if (unlikely(!__pyx_v_bond_dists.memview)) { __Pyx_RaiseUnboundLocalError("bond_dists"); __PYX_ERR(0, 122, __pyx_L1_error) }
-  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 122, __pyx_L1_error) }
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_eval_gaussian_interac_np(__pyx_v_list_beads, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_offset_bd_weight, __pyx_v_offset_bd_aromatic_weight, __pyx_v_lonely_atom_penalize, __pyx_v_bd_bd_overlap_coeff, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 122, __pyx_L1_error)
-  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 122, __pyx_L1_error)
+  if (unlikely(!__pyx_v_list_beads.memview)) { __Pyx_RaiseUnboundLocalError("list_beads"); __PYX_ERR(0, 121, __pyx_L1_error) }
+  if (unlikely(!__pyx_v_in_ring.memview)) { __Pyx_RaiseUnboundLocalError("in_ring"); __PYX_ERR(0, 121, __pyx_L1_error) }
+  if (unlikely(!__pyx_v_bond_dists.memview)) { __Pyx_RaiseUnboundLocalError("bond_dists"); __PYX_ERR(0, 121, __pyx_L1_error) }
+  if (unlikely(!__pyx_v_masses.memview)) { __Pyx_RaiseUnboundLocalError("masses"); __PYX_ERR(0, 121, __pyx_L1_error) }
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy_eval_gaussian_interac_np(__pyx_v_list_beads, __pyx_v_in_ring, __pyx_v_bond_dists, __pyx_v_masses, __pyx_v_offset_bd_weight, __pyx_v_offset_bd_aromatic_weight, __pyx_v_lonely_atom_penalize, __pyx_v_bd_bd_overlap_coeff, __pyx_v_at_in_bd_coeff, __pyx_v_rvdw, __pyx_v_rvdw_aromatic, __pyx_v_rvdw_cross, 1); if (unlikely(__pyx_t_1 == ((__pyx_t_14auto_martiniM3_15optimization_cy_F32)-1) && PyErr_Occurred())) __PYX_ERR(0, 121, __pyx_L1_error)
+  __pyx_t_2 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 121, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
@@ -20725,7 +20718,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_6eval_gaussian_inte
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":190
+/* "auto_martiniM3/optimization_cy.pyx":189
  * 
  * 
  * cdef inline bint _is_bond_mv(int a, int b, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -20744,7 +20737,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
   Py_ssize_t __pyx_t_6;
   int __pyx_t_7;
 
-  /* "auto_martiniM3/optimization_cy.pyx":193
+  /* "auto_martiniM3/optimization_cy.pyx":192
  *     """Return True if (a,b) appears in bonds (either direction)."""
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):             # <<<<<<<<<<<<<<
@@ -20756,7 +20749,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_k = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":194
+    /* "auto_martiniM3/optimization_cy.pyx":193
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if (bonds[k, 0] == a and bonds[k, 1] == b) or (bonds[k, 0] == b and bonds[k, 1] == a):             # <<<<<<<<<<<<<<
@@ -20794,7 +20787,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
     __pyx_L6_bool_binop_done:;
     if (__pyx_t_4) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":195
+      /* "auto_martiniM3/optimization_cy.pyx":194
  *     for k in range(bonds.shape[0]):
  *         if (bonds[k, 0] == a and bonds[k, 1] == b) or (bonds[k, 0] == b and bonds[k, 1] == a):
  *             return True             # <<<<<<<<<<<<<<
@@ -20804,7 +20797,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
       __pyx_r = 1;
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":194
+      /* "auto_martiniM3/optimization_cy.pyx":193
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if (bonds[k, 0] == a and bonds[k, 1] == b) or (bonds[k, 0] == b and bonds[k, 1] == a):             # <<<<<<<<<<<<<<
@@ -20814,7 +20807,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":196
+  /* "auto_martiniM3/optimization_cy.pyx":195
  *         if (bonds[k, 0] == a and bonds[k, 1] == b) or (bonds[k, 0] == b and bonds[k, 1] == a):
  *             return True
  *     return False             # <<<<<<<<<<<<<<
@@ -20824,7 +20817,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
   __pyx_r = 0;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":190
+  /* "auto_martiniM3/optimization_cy.pyx":189
  * 
  * 
  * cdef inline bint _is_bond_mv(int a, int b, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -20837,7 +20830,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":199
+/* "auto_martiniM3/optimization_cy.pyx":198
  * 
  * 
  * cdef inline int _degree_in_bonds_mv(int atom, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -20857,7 +20850,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
   Py_ssize_t __pyx_t_6;
   int __pyx_t_7;
 
-  /* "auto_martiniM3/optimization_cy.pyx":201
+  /* "auto_martiniM3/optimization_cy.pyx":200
  * cdef inline int _degree_in_bonds_mv(int atom, I32[:, ::1] bonds) nogil:
  *     """Count occurrences of `atom` in bonds."""
  *     cdef int deg = 0             # <<<<<<<<<<<<<<
@@ -20866,7 +20859,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
 */
   __pyx_v_deg = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":203
+  /* "auto_martiniM3/optimization_cy.pyx":202
  *     cdef int deg = 0
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):             # <<<<<<<<<<<<<<
@@ -20878,7 +20871,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_k = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":204
+    /* "auto_martiniM3/optimization_cy.pyx":203
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == atom or bonds[k, 1] == atom:             # <<<<<<<<<<<<<<
@@ -20900,7 +20893,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
     __pyx_L6_bool_binop_done:;
     if (__pyx_t_4) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":205
+      /* "auto_martiniM3/optimization_cy.pyx":204
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == atom or bonds[k, 1] == atom:
  *             deg += 1             # <<<<<<<<<<<<<<
@@ -20909,7 +20902,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
 */
       __pyx_v_deg = (__pyx_v_deg + 1);
 
-      /* "auto_martiniM3/optimization_cy.pyx":204
+      /* "auto_martiniM3/optimization_cy.pyx":203
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == atom or bonds[k, 1] == atom:             # <<<<<<<<<<<<<<
@@ -20919,7 +20912,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":206
+  /* "auto_martiniM3/optimization_cy.pyx":205
  *         if bonds[k, 0] == atom or bonds[k, 1] == atom:
  *             deg += 1
  *     return deg             # <<<<<<<<<<<<<<
@@ -20929,7 +20922,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
   __pyx_r = __pyx_v_deg;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":199
+  /* "auto_martiniM3/optimization_cy.pyx":198
  * 
  * 
  * cdef inline int _degree_in_bonds_mv(int atom, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -20942,7 +20935,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_b
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":209
+/* "auto_martiniM3/optimization_cy.pyx":208
  * 
  * 
  * cdef inline int _partner_for_terminal_mv(int terminal_atom, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -20960,7 +20953,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
   Py_ssize_t __pyx_t_5;
   int __pyx_t_6;
 
-  /* "auto_martiniM3/optimization_cy.pyx":212
+  /* "auto_martiniM3/optimization_cy.pyx":211
  *     """Return the partner atom bonded to a terminal atom (degree==1)."""
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):             # <<<<<<<<<<<<<<
@@ -20972,7 +20965,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_k = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":213
+    /* "auto_martiniM3/optimization_cy.pyx":212
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == terminal_atom:             # <<<<<<<<<<<<<<
@@ -20984,7 +20977,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
     __pyx_t_6 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ (__pyx_v_bonds.data + __pyx_t_4 * __pyx_v_bonds.strides[0]) )) + __pyx_t_5)) ))) == __pyx_v_terminal_atom);
     if (__pyx_t_6) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":214
+      /* "auto_martiniM3/optimization_cy.pyx":213
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == terminal_atom:
  *             return <int>bonds[k, 1]             # <<<<<<<<<<<<<<
@@ -20996,7 +20989,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
       __pyx_r = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ (__pyx_v_bonds.data + __pyx_t_5 * __pyx_v_bonds.strides[0]) )) + __pyx_t_4)) ))));
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":213
+      /* "auto_martiniM3/optimization_cy.pyx":212
  *     cdef Py_ssize_t k
  *     for k in range(bonds.shape[0]):
  *         if bonds[k, 0] == terminal_atom:             # <<<<<<<<<<<<<<
@@ -21005,7 +20998,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
 */
     }
 
-    /* "auto_martiniM3/optimization_cy.pyx":215
+    /* "auto_martiniM3/optimization_cy.pyx":214
  *         if bonds[k, 0] == terminal_atom:
  *             return <int>bonds[k, 1]
  *         if bonds[k, 1] == terminal_atom:             # <<<<<<<<<<<<<<
@@ -21017,7 +21010,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
     __pyx_t_6 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ (__pyx_v_bonds.data + __pyx_t_4 * __pyx_v_bonds.strides[0]) )) + __pyx_t_5)) ))) == __pyx_v_terminal_atom);
     if (__pyx_t_6) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":216
+      /* "auto_martiniM3/optimization_cy.pyx":215
  *             return <int>bonds[k, 1]
  *         if bonds[k, 1] == terminal_atom:
  *             return <int>bonds[k, 0]             # <<<<<<<<<<<<<<
@@ -21029,7 +21022,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
       __pyx_r = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=1 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ (__pyx_v_bonds.data + __pyx_t_5 * __pyx_v_bonds.strides[0]) )) + __pyx_t_4)) ))));
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":215
+      /* "auto_martiniM3/optimization_cy.pyx":214
  *         if bonds[k, 0] == terminal_atom:
  *             return <int>bonds[k, 1]
  *         if bonds[k, 1] == terminal_atom:             # <<<<<<<<<<<<<<
@@ -21039,7 +21032,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":217
+  /* "auto_martiniM3/optimization_cy.pyx":216
  *         if bonds[k, 1] == terminal_atom:
  *             return <int>bonds[k, 0]
  *     return -1             # <<<<<<<<<<<<<<
@@ -21049,7 +21042,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
   __pyx_r = -1;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":209
+  /* "auto_martiniM3/optimization_cy.pyx":208
  * 
  * 
  * cdef inline int _partner_for_terminal_mv(int terminal_atom, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -21062,7 +21055,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__partner_for
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":220
+/* "auto_martiniM3/optimization_cy.pyx":219
  * 
  * 
  * cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -21094,7 +21087,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
   int __pyx_clineno = 0;
   PyGILState_STATE __pyx_gilstate_save;
 
-  /* "auto_martiniM3/optimization_cy.pyx":225
+  /* "auto_martiniM3/optimization_cy.pyx":224
  *     cdef int ai, aj
  *     cdef int partneri, partnerj
  *     cdef int n_trial = <int>trial_comb.shape[0]             # <<<<<<<<<<<<<<
@@ -21103,7 +21096,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
   __pyx_v_n_trial = ((int)(__pyx_v_trial_comb.shape[0]));
 
-  /* "auto_martiniM3/optimization_cy.pyx":226
+  /* "auto_martiniM3/optimization_cy.pyx":225
  *     cdef int partneri, partnerj
  *     cdef int n_trial = <int>trial_comb.shape[0]
  *     for bi in range(n_trial):             # <<<<<<<<<<<<<<
@@ -21115,7 +21108,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_bi = __pyx_t_3;
 
-    /* "auto_martiniM3/optimization_cy.pyx":227
+    /* "auto_martiniM3/optimization_cy.pyx":226
  *     cdef int n_trial = <int>trial_comb.shape[0]
  *     for bi in range(n_trial):
  *         ai = <int>trial_comb[bi]             # <<<<<<<<<<<<<<
@@ -21125,18 +21118,18 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
     __pyx_t_4 = __pyx_v_bi;
     __pyx_v_ai = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_4)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":228
+    /* "auto_martiniM3/optimization_cy.pyx":227
  *     for bi in range(n_trial):
  *         ai = <int>trial_comb[bi]
  *         if _degree_in_bonds_mv(ai, bonds) != 1:             # <<<<<<<<<<<<<<
  *             continue
  *         partneri = _partner_for_terminal_mv(ai, bonds)
 */
-    __pyx_t_5 = __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_bonds_mv(__pyx_v_ai, __pyx_v_bonds); if (unlikely(__pyx_t_5 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 228, __pyx_L1_error)
+    __pyx_t_5 = __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_bonds_mv(__pyx_v_ai, __pyx_v_bonds); if (unlikely(__pyx_t_5 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 227, __pyx_L1_error)
     __pyx_t_6 = (__pyx_t_5 != 1);
     if (__pyx_t_6) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":229
+      /* "auto_martiniM3/optimization_cy.pyx":228
  *         ai = <int>trial_comb[bi]
  *         if _degree_in_bonds_mv(ai, bonds) != 1:
  *             continue             # <<<<<<<<<<<<<<
@@ -21145,7 +21138,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
       goto __pyx_L3_continue;
 
-      /* "auto_martiniM3/optimization_cy.pyx":228
+      /* "auto_martiniM3/optimization_cy.pyx":227
  *     for bi in range(n_trial):
  *         ai = <int>trial_comb[bi]
  *         if _degree_in_bonds_mv(ai, bonds) != 1:             # <<<<<<<<<<<<<<
@@ -21154,17 +21147,17 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
     }
 
-    /* "auto_martiniM3/optimization_cy.pyx":230
+    /* "auto_martiniM3/optimization_cy.pyx":229
  *         if _degree_in_bonds_mv(ai, bonds) != 1:
  *             continue
  *         partneri = _partner_for_terminal_mv(ai, bonds)             # <<<<<<<<<<<<<<
  *         if partneri == -1:
  *             continue
 */
-    __pyx_t_5 = __pyx_f_14auto_martiniM3_15optimization_cy__partner_for_terminal_mv(__pyx_v_ai, __pyx_v_bonds); if (unlikely(__pyx_t_5 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 230, __pyx_L1_error)
+    __pyx_t_5 = __pyx_f_14auto_martiniM3_15optimization_cy__partner_for_terminal_mv(__pyx_v_ai, __pyx_v_bonds); if (unlikely(__pyx_t_5 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 229, __pyx_L1_error)
     __pyx_v_partneri = __pyx_t_5;
 
-    /* "auto_martiniM3/optimization_cy.pyx":231
+    /* "auto_martiniM3/optimization_cy.pyx":230
  *             continue
  *         partneri = _partner_for_terminal_mv(ai, bonds)
  *         if partneri == -1:             # <<<<<<<<<<<<<<
@@ -21174,7 +21167,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
     __pyx_t_6 = (__pyx_v_partneri == -1L);
     if (__pyx_t_6) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":232
+      /* "auto_martiniM3/optimization_cy.pyx":231
  *         partneri = _partner_for_terminal_mv(ai, bonds)
  *         if partneri == -1:
  *             continue             # <<<<<<<<<<<<<<
@@ -21183,7 +21176,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
       goto __pyx_L3_continue;
 
-      /* "auto_martiniM3/optimization_cy.pyx":231
+      /* "auto_martiniM3/optimization_cy.pyx":230
  *             continue
  *         partneri = _partner_for_terminal_mv(ai, bonds)
  *         if partneri == -1:             # <<<<<<<<<<<<<<
@@ -21192,7 +21185,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
     }
 
-    /* "auto_martiniM3/optimization_cy.pyx":233
+    /* "auto_martiniM3/optimization_cy.pyx":232
  *         if partneri == -1:
  *             continue
  *         for bj in range(bi + 1, n_trial):             # <<<<<<<<<<<<<<
@@ -21204,7 +21197,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
     for (__pyx_t_8 = (__pyx_v_bi + 1); __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
       __pyx_v_bj = __pyx_t_8;
 
-      /* "auto_martiniM3/optimization_cy.pyx":234
+      /* "auto_martiniM3/optimization_cy.pyx":233
  *             continue
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]             # <<<<<<<<<<<<<<
@@ -21214,18 +21207,18 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
       __pyx_t_4 = __pyx_v_bj;
       __pyx_v_aj = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_4)) ))));
 
-      /* "auto_martiniM3/optimization_cy.pyx":235
+      /* "auto_martiniM3/optimization_cy.pyx":234
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]
  *             if _degree_in_bonds_mv(aj, bonds) != 1:             # <<<<<<<<<<<<<<
  *                 continue
  *             partnerj = _partner_for_terminal_mv(aj, bonds)
 */
-      __pyx_t_9 = __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_bonds_mv(__pyx_v_aj, __pyx_v_bonds); if (unlikely(__pyx_t_9 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 235, __pyx_L1_error)
+      __pyx_t_9 = __pyx_f_14auto_martiniM3_15optimization_cy__degree_in_bonds_mv(__pyx_v_aj, __pyx_v_bonds); if (unlikely(__pyx_t_9 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 234, __pyx_L1_error)
       __pyx_t_6 = (__pyx_t_9 != 1);
       if (__pyx_t_6) {
 
-        /* "auto_martiniM3/optimization_cy.pyx":236
+        /* "auto_martiniM3/optimization_cy.pyx":235
  *             aj = <int>trial_comb[bj]
  *             if _degree_in_bonds_mv(aj, bonds) != 1:
  *                 continue             # <<<<<<<<<<<<<<
@@ -21234,7 +21227,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
         goto __pyx_L7_continue;
 
-        /* "auto_martiniM3/optimization_cy.pyx":235
+        /* "auto_martiniM3/optimization_cy.pyx":234
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]
  *             if _degree_in_bonds_mv(aj, bonds) != 1:             # <<<<<<<<<<<<<<
@@ -21243,17 +21236,17 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
 */
       }
 
-      /* "auto_martiniM3/optimization_cy.pyx":237
+      /* "auto_martiniM3/optimization_cy.pyx":236
  *             if _degree_in_bonds_mv(aj, bonds) != 1:
  *                 continue
  *             partnerj = _partner_for_terminal_mv(aj, bonds)             # <<<<<<<<<<<<<<
  *             if partnerj != -1 and partneri == partnerj:
  *                 return True
 */
-      __pyx_t_9 = __pyx_f_14auto_martiniM3_15optimization_cy__partner_for_terminal_mv(__pyx_v_aj, __pyx_v_bonds); if (unlikely(__pyx_t_9 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 237, __pyx_L1_error)
+      __pyx_t_9 = __pyx_f_14auto_martiniM3_15optimization_cy__partner_for_terminal_mv(__pyx_v_aj, __pyx_v_bonds); if (unlikely(__pyx_t_9 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 236, __pyx_L1_error)
       __pyx_v_partnerj = __pyx_t_9;
 
-      /* "auto_martiniM3/optimization_cy.pyx":238
+      /* "auto_martiniM3/optimization_cy.pyx":237
  *                 continue
  *             partnerj = _partner_for_terminal_mv(aj, bonds)
  *             if partnerj != -1 and partneri == partnerj:             # <<<<<<<<<<<<<<
@@ -21271,7 +21264,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
       __pyx_L11_bool_binop_done:;
       if (__pyx_t_6) {
 
-        /* "auto_martiniM3/optimization_cy.pyx":239
+        /* "auto_martiniM3/optimization_cy.pyx":238
  *             partnerj = _partner_for_terminal_mv(aj, bonds)
  *             if partnerj != -1 and partneri == partnerj:
  *                 return True             # <<<<<<<<<<<<<<
@@ -21281,7 +21274,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
         __pyx_r = 1;
         goto __pyx_L0;
 
-        /* "auto_martiniM3/optimization_cy.pyx":238
+        /* "auto_martiniM3/optimization_cy.pyx":237
  *                 continue
  *             partnerj = _partner_for_terminal_mv(aj, bonds)
  *             if partnerj != -1 and partneri == partnerj:             # <<<<<<<<<<<<<<
@@ -21294,7 +21287,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
     __pyx_L3_continue:;
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":240
+  /* "auto_martiniM3/optimization_cy.pyx":239
  *             if partnerj != -1 and partneri == partnerj:
  *                 return True
  *     return False             # <<<<<<<<<<<<<<
@@ -21304,7 +21297,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
   __pyx_r = 0;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":220
+  /* "auto_martiniM3/optimization_cy.pyx":219
  * 
  * 
  * cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, ::1] bonds) nogil:             # <<<<<<<<<<<<<<
@@ -21322,7 +21315,7 @@ static CYTHON_INLINE int __pyx_f_14auto_martiniM3_15optimization_cy__has_termina
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":243
+/* "auto_martiniM3/optimization_cy.pyx":242
  * 
  * 
  * def check_beads(             # <<<<<<<<<<<<<<
@@ -21372,46 +21365,46 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_trial_comb,&__pyx_mstate_global->__pyx_n_u_listbonds,&__pyx_mstate_global->__pyx_n_u_ring_id_of_atom,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 243, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 242, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 243, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 242, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 243, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 242, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 243, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 242, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "check_beads", 0) < (0)) __PYX_ERR(0, 243, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "check_beads", 0) < (0)) __PYX_ERR(0, 242, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("check_beads", 1, 3, 3, i); __PYX_ERR(0, 243, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("check_beads", 1, 3, 3, i); __PYX_ERR(0, 242, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 243, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 242, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 243, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 242, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 243, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 242, __pyx_L3_error)
     }
-    __pyx_v_trial_comb = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_trial_comb.memview)) __PYX_ERR(0, 244, __pyx_L3_error)
-    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 245, __pyx_L3_error)
-    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 246, __pyx_L3_error)
+    __pyx_v_trial_comb = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_trial_comb.memview)) __PYX_ERR(0, 243, __pyx_L3_error)
+    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 244, __pyx_L3_error)
+    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 245, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("check_beads", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 243, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("check_beads", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 242, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -21483,7 +21476,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   __pyx_pybuffernd_tmp.data = NULL;
   __pyx_pybuffernd_tmp.rcbuffer = &__pyx_pybuffer_tmp;
 
-  /* "auto_martiniM3/optimization_cy.pyx":265
+  /* "auto_martiniM3/optimization_cy.pyx":264
  *     cdef Py_ssize_t bi, bj
  *     cdef int ai, aj
  *     cdef int n_trial = trial_comb.shape[0]             # <<<<<<<<<<<<<<
@@ -21492,7 +21485,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
 */
   __pyx_v_n_trial = (__pyx_v_trial_comb.shape[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":268
+  /* "auto_martiniM3/optimization_cy.pyx":267
  *     cdef int rid_i, rid_j
  * 
  *     if n_trial <= 1:             # <<<<<<<<<<<<<<
@@ -21502,7 +21495,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   __pyx_t_1 = (__pyx_v_n_trial <= 1);
   if (__pyx_t_1) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":269
+    /* "auto_martiniM3/optimization_cy.pyx":268
  * 
  *     if n_trial <= 1:
  *         return True             # <<<<<<<<<<<<<<
@@ -21514,7 +21507,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_r = Py_True;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":268
+    /* "auto_martiniM3/optimization_cy.pyx":267
  *     cdef int rid_i, rid_j
  * 
  *     if n_trial <= 1:             # <<<<<<<<<<<<<<
@@ -21523,7 +21516,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":273
+  /* "auto_martiniM3/optimization_cy.pyx":272
  *     # Check for beads at the same place (duplicates)
  *     # Fast path: sort a copy and check adjacent values.
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()             # <<<<<<<<<<<<<<
@@ -21531,16 +21524,16 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
  *     for bi in range(1, n_trial):
 */
   __pyx_t_5 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 273, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 272, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 273, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 272, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_trial_comb, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 273, __pyx_L1_error)
+  __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_trial_comb, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 272, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 273, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 272, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
-  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 273, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 272, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_t_10 = 1;
@@ -21557,16 +21550,16 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_5, __pyx_t_6};
-    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 273, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 272, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 273, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 272, __pyx_L1_error)
     __pyx_t_4 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_10, (2-__pyx_t_10) | (__pyx_t_10*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_8);
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 273, __pyx_L1_error)
+    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 272, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
   }
   __pyx_t_3 = __pyx_t_4;
@@ -21577,22 +21570,22 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_copy, __pyx_callargs+__pyx_t_10, (1-__pyx_t_10) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 273, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 272, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
-  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 273, __pyx_L1_error)
+  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 272, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tmp.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_2), &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) {
       __pyx_v_tmp = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 273, __pyx_L1_error)
+      __PYX_ERR(0, 272, __pyx_L1_error)
     } else {__pyx_pybuffernd_tmp.diminfo[0].strides = __pyx_pybuffernd_tmp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tmp.diminfo[0].shape = __pyx_pybuffernd_tmp.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_v_tmp = ((PyArrayObject *)__pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":274
+  /* "auto_martiniM3/optimization_cy.pyx":273
  *     # Fast path: sort a copy and check adjacent values.
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
  *     tmp.sort()             # <<<<<<<<<<<<<<
@@ -21606,12 +21599,12 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     PyObject *__pyx_callargs[2] = {__pyx_t_4, NULL};
     __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_sort, __pyx_callargs+__pyx_t_10, (1-__pyx_t_10) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 274, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 273, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":275
+  /* "auto_martiniM3/optimization_cy.pyx":274
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
  *     tmp.sort()
  *     for bi in range(1, n_trial):             # <<<<<<<<<<<<<<
@@ -21623,7 +21616,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   for (__pyx_t_13 = 1; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":276
+    /* "auto_martiniM3/optimization_cy.pyx":275
  *     tmp.sort()
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:             # <<<<<<<<<<<<<<
@@ -21635,7 +21628,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_t_1 = ((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_tmp.diminfo[0].strides)) == (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_tmp.diminfo[0].strides)));
     if (__pyx_t_1) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":277
+      /* "auto_martiniM3/optimization_cy.pyx":276
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:
  *             return False             # <<<<<<<<<<<<<<
@@ -21647,7 +21640,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
       __pyx_r = Py_False;
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":276
+      /* "auto_martiniM3/optimization_cy.pyx":275
  *     tmp.sort()
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:             # <<<<<<<<<<<<<<
@@ -21657,7 +21650,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":280
+  /* "auto_martiniM3/optimization_cy.pyx":279
  * 
  *     # Track if any bond is found fully within the same ring; reject if so.
  *     cdef int nrings = 0             # <<<<<<<<<<<<<<
@@ -21666,7 +21659,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
 */
   __pyx_v_nrings = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":282
+  /* "auto_martiniM3/optimization_cy.pyx":281
  *     cdef int nrings = 0
  *     cdef int rid
  *     for bi in range(n_trial):             # <<<<<<<<<<<<<<
@@ -21678,7 +21671,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":283
+    /* "auto_martiniM3/optimization_cy.pyx":282
  *     cdef int rid
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]             # <<<<<<<<<<<<<<
@@ -21689,53 +21682,53 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_t_14 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
     __pyx_v_rid = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_14)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":284
+    /* "auto_martiniM3/optimization_cy.pyx":283
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:             # <<<<<<<<<<<<<<
  *             nrings = rid + 1
- *     cdef int32_t[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
+ *     cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
 */
     __pyx_t_1 = (__pyx_v_rid >= __pyx_v_nrings);
     if (__pyx_t_1) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":285
+      /* "auto_martiniM3/optimization_cy.pyx":284
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:
  *             nrings = rid + 1             # <<<<<<<<<<<<<<
- *     cdef int32_t[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
+ *     cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
  * 
 */
       __pyx_v_nrings = (__pyx_v_rid + 1);
 
-      /* "auto_martiniM3/optimization_cy.pyx":284
+      /* "auto_martiniM3/optimization_cy.pyx":283
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:             # <<<<<<<<<<<<<<
  *             nrings = rid + 1
- *     cdef int32_t[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
+ *     cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
 */
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":286
+  /* "auto_martiniM3/optimization_cy.pyx":285
  *         if rid >= nrings:
  *             nrings = rid + 1
- *     cdef int32_t[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)             # <<<<<<<<<<<<<<
+ *     cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)             # <<<<<<<<<<<<<<
  * 
  *     # Check for beads linked by chemical bond (except in rings)
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_nrings); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_nrings); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
-  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_t_10 = 1;
@@ -21752,25 +21745,25 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_3};
-    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 286, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 285, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 286, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 285, __pyx_L1_error)
     __pyx_t_2 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_10, (2-__pyx_t_10) | (__pyx_t_10*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_8);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 286, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 285, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
-  __pyx_t_16 = __Pyx_PyObject_to_MemoryviewSlice_dc_nn_int32_t(__pyx_t_2, PyBUF_WRITABLE); if (unlikely(!__pyx_t_16.memview)) __PYX_ERR(0, 286, __pyx_L1_error)
+  __pyx_t_16 = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(__pyx_t_2, PyBUF_WRITABLE); if (unlikely(!__pyx_t_16.memview)) __PYX_ERR(0, 285, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __pyx_v_bonds_in_rings = __pyx_t_16;
   __pyx_t_16.memview = NULL;
   __pyx_t_16.data = NULL;
 
-  /* "auto_martiniM3/optimization_cy.pyx":289
+  /* "auto_martiniM3/optimization_cy.pyx":288
  * 
  *     # Check for beads linked by chemical bond (except in rings)
  *     for bi in range(n_trial):             # <<<<<<<<<<<<<<
@@ -21782,7 +21775,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":290
+    /* "auto_martiniM3/optimization_cy.pyx":289
  *     # Check for beads linked by chemical bond (except in rings)
  *     for bi in range(n_trial):
  *         ai = <int>trial_comb[bi]             # <<<<<<<<<<<<<<
@@ -21792,7 +21785,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_t_15 = __pyx_v_bi;
     __pyx_v_ai = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":291
+    /* "auto_martiniM3/optimization_cy.pyx":290
  *     for bi in range(n_trial):
  *         ai = <int>trial_comb[bi]
  *         for bj in range(bi + 1, n_trial):             # <<<<<<<<<<<<<<
@@ -21804,7 +21797,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     for (__pyx_t_19 = (__pyx_v_bi + 1); __pyx_t_19 < __pyx_t_18; __pyx_t_19+=1) {
       __pyx_v_bj = __pyx_t_19;
 
-      /* "auto_martiniM3/optimization_cy.pyx":292
+      /* "auto_martiniM3/optimization_cy.pyx":291
  *         ai = <int>trial_comb[bi]
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]             # <<<<<<<<<<<<<<
@@ -21814,17 +21807,17 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
       __pyx_t_15 = __pyx_v_bj;
       __pyx_v_aj = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
 
-      /* "auto_martiniM3/optimization_cy.pyx":293
+      /* "auto_martiniM3/optimization_cy.pyx":292
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]
  *             if _is_bond_mv(ai, aj, listbonds):             # <<<<<<<<<<<<<<
  *                 rid_i = <int>ring_id_of_atom[ai]
  *                 rid_j = <int>ring_id_of_atom[aj]
 */
-      __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(__pyx_v_ai, __pyx_v_aj, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 293, __pyx_L1_error)
+      __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(__pyx_v_ai, __pyx_v_aj, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 292, __pyx_L1_error)
       if (__pyx_t_1) {
 
-        /* "auto_martiniM3/optimization_cy.pyx":294
+        /* "auto_martiniM3/optimization_cy.pyx":293
  *             aj = <int>trial_comb[bj]
  *             if _is_bond_mv(ai, aj, listbonds):
  *                 rid_i = <int>ring_id_of_atom[ai]             # <<<<<<<<<<<<<<
@@ -21834,7 +21827,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
         __pyx_t_15 = __pyx_v_ai;
         __pyx_v_rid_i = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_15)) ))));
 
-        /* "auto_martiniM3/optimization_cy.pyx":295
+        /* "auto_martiniM3/optimization_cy.pyx":294
  *             if _is_bond_mv(ai, aj, listbonds):
  *                 rid_i = <int>ring_id_of_atom[ai]
  *                 rid_j = <int>ring_id_of_atom[aj]             # <<<<<<<<<<<<<<
@@ -21844,7 +21837,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
         __pyx_t_15 = __pyx_v_aj;
         __pyx_v_rid_j = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_15)) ))));
 
-        /* "auto_martiniM3/optimization_cy.pyx":296
+        /* "auto_martiniM3/optimization_cy.pyx":295
  *                 rid_i = <int>ring_id_of_atom[ai]
  *                 rid_j = <int>ring_id_of_atom[aj]
  *                 if rid_i != -1 and rid_i == rid_j:             # <<<<<<<<<<<<<<
@@ -21862,7 +21855,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
         __pyx_L16_bool_binop_done:;
         if (__pyx_t_1) {
 
-          /* "auto_martiniM3/optimization_cy.pyx":297
+          /* "auto_martiniM3/optimization_cy.pyx":296
  *                 rid_j = <int>ring_id_of_atom[aj]
  *                 if rid_i != -1 and rid_i == rid_j:
  *                     if rid_i >= 0 and rid_i < nrings:             # <<<<<<<<<<<<<<
@@ -21880,7 +21873,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
           __pyx_L19_bool_binop_done:;
           if (__pyx_t_1) {
 
-            /* "auto_martiniM3/optimization_cy.pyx":298
+            /* "auto_martiniM3/optimization_cy.pyx":297
  *                 if rid_i != -1 and rid_i == rid_j:
  *                     if rid_i >= 0 and rid_i < nrings:
  *                         bonds_in_rings[rid_i] += 1             # <<<<<<<<<<<<<<
@@ -21888,9 +21881,9 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
  *                     return False
 */
             __pyx_t_15 = __pyx_v_rid_i;
-            *((int32_t *) ( /* dim=0 */ ((char *) (((int32_t *) __pyx_v_bonds_in_rings.data) + __pyx_t_15)) )) += 1;
+            *((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_bonds_in_rings.data) + __pyx_t_15)) )) += 1;
 
-            /* "auto_martiniM3/optimization_cy.pyx":297
+            /* "auto_martiniM3/optimization_cy.pyx":296
  *                 rid_j = <int>ring_id_of_atom[aj]
  *                 if rid_i != -1 and rid_i == rid_j:
  *                     if rid_i >= 0 and rid_i < nrings:             # <<<<<<<<<<<<<<
@@ -21899,7 +21892,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
 */
           }
 
-          /* "auto_martiniM3/optimization_cy.pyx":296
+          /* "auto_martiniM3/optimization_cy.pyx":295
  *                 rid_i = <int>ring_id_of_atom[ai]
  *                 rid_j = <int>ring_id_of_atom[aj]
  *                 if rid_i != -1 and rid_i == rid_j:             # <<<<<<<<<<<<<<
@@ -21909,7 +21902,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
           goto __pyx_L15;
         }
 
-        /* "auto_martiniM3/optimization_cy.pyx":300
+        /* "auto_martiniM3/optimization_cy.pyx":299
  *                         bonds_in_rings[rid_i] += 1
  *                 else:
  *                     return False             # <<<<<<<<<<<<<<
@@ -21924,7 +21917,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
         }
         __pyx_L15:;
 
-        /* "auto_martiniM3/optimization_cy.pyx":293
+        /* "auto_martiniM3/optimization_cy.pyx":292
  *         for bj in range(bi + 1, n_trial):
  *             aj = <int>trial_comb[bj]
  *             if _is_bond_mv(ai, aj, listbonds):             # <<<<<<<<<<<<<<
@@ -21935,7 +21928,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":302
+  /* "auto_martiniM3/optimization_cy.pyx":301
  *                     return False
  * 
  *     for bi in range(nrings):             # <<<<<<<<<<<<<<
@@ -21947,7 +21940,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":303
+    /* "auto_martiniM3/optimization_cy.pyx":302
  * 
  *     for bi in range(nrings):
  *         if bonds_in_rings[bi] > 0:             # <<<<<<<<<<<<<<
@@ -21955,10 +21948,10 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
  * 
 */
     __pyx_t_15 = __pyx_v_bi;
-    __pyx_t_1 = ((*((int32_t *) ( /* dim=0 */ ((char *) (((int32_t *) __pyx_v_bonds_in_rings.data) + __pyx_t_15)) ))) > 0);
+    __pyx_t_1 = ((*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_bonds_in_rings.data) + __pyx_t_15)) ))) > 0);
     if (__pyx_t_1) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":304
+      /* "auto_martiniM3/optimization_cy.pyx":303
  *     for bi in range(nrings):
  *         if bonds_in_rings[bi] > 0:
  *             return False             # <<<<<<<<<<<<<<
@@ -21970,7 +21963,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
       __pyx_r = Py_False;
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":303
+      /* "auto_martiniM3/optimization_cy.pyx":302
  * 
  *     for bi in range(nrings):
  *         if bonds_in_rings[bi] > 0:             # <<<<<<<<<<<<<<
@@ -21980,17 +21973,17 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":307
+  /* "auto_martiniM3/optimization_cy.pyx":306
  * 
  *     # Check for two terminal beads linked to the same atom
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):             # <<<<<<<<<<<<<<
  *         return False
  * 
 */
-  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__has_terminal_partner_collision_mv(__pyx_v_trial_comb, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 307, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__has_terminal_partner_collision_mv(__pyx_v_trial_comb, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 306, __pyx_L1_error)
   if (__pyx_t_1) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":308
+    /* "auto_martiniM3/optimization_cy.pyx":307
  *     # Check for two terminal beads linked to the same atom
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):
  *         return False             # <<<<<<<<<<<<<<
@@ -22002,7 +21995,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
     __pyx_r = Py_False;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":307
+    /* "auto_martiniM3/optimization_cy.pyx":306
  * 
  *     # Check for two terminal beads linked to the same atom
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):             # <<<<<<<<<<<<<<
@@ -22011,7 +22004,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":310
+  /* "auto_martiniM3/optimization_cy.pyx":309
  *         return False
  * 
  *     return True             # <<<<<<<<<<<<<<
@@ -22023,7 +22016,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   __pyx_r = Py_True;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":243
+  /* "auto_martiniM3/optimization_cy.pyx":242
  * 
  * 
  * def check_beads(             # <<<<<<<<<<<<<<
@@ -22061,7 +22054,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_8check_beads(CYTHON
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":313
+/* "auto_martiniM3/optimization_cy.pyx":312
  * 
  * 
  * def check_beads_omp(             # <<<<<<<<<<<<<<
@@ -22111,46 +22104,46 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_trial_comb,&__pyx_mstate_global->__pyx_n_u_listbonds,&__pyx_mstate_global->__pyx_n_u_ring_id_of_atom,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 313, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 312, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 313, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 312, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 313, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 312, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 313, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 312, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "check_beads_omp", 0) < (0)) __PYX_ERR(0, 313, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "check_beads_omp", 0) < (0)) __PYX_ERR(0, 312, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("check_beads_omp", 1, 3, 3, i); __PYX_ERR(0, 313, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("check_beads_omp", 1, 3, 3, i); __PYX_ERR(0, 312, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 313, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 312, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 313, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 312, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 313, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 312, __pyx_L3_error)
     }
-    __pyx_v_trial_comb = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_trial_comb.memview)) __PYX_ERR(0, 314, __pyx_L3_error)
-    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 315, __pyx_L3_error)
-    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 316, __pyx_L3_error)
+    __pyx_v_trial_comb = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_trial_comb.memview)) __PYX_ERR(0, 313, __pyx_L3_error)
+    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 314, __pyx_L3_error)
+    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 315, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("check_beads_omp", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 313, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("check_beads_omp", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 312, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -22221,7 +22214,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
   __pyx_pybuffernd_tmp.data = NULL;
   __pyx_pybuffernd_tmp.rcbuffer = &__pyx_pybuffer_tmp;
 
-  /* "auto_martiniM3/optimization_cy.pyx":332
+  /* "auto_martiniM3/optimization_cy.pyx":331
  *     cdef int ai, aj
  *     cdef int rid_i, rid_j
  *     cdef int n_trial = trial_comb.shape[0]             # <<<<<<<<<<<<<<
@@ -22230,7 +22223,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
   __pyx_v_n_trial = (__pyx_v_trial_comb.shape[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":334
+  /* "auto_martiniM3/optimization_cy.pyx":333
  *     cdef int n_trial = trial_comb.shape[0]
  * 
  *     if n_trial <= 1:             # <<<<<<<<<<<<<<
@@ -22240,7 +22233,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
   __pyx_t_1 = (__pyx_v_n_trial <= 1);
   if (__pyx_t_1) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":335
+    /* "auto_martiniM3/optimization_cy.pyx":334
  * 
  *     if n_trial <= 1:
  *         return True             # <<<<<<<<<<<<<<
@@ -22252,7 +22245,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     __pyx_r = Py_True;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":334
+    /* "auto_martiniM3/optimization_cy.pyx":333
  *     cdef int n_trial = trial_comb.shape[0]
  * 
  *     if n_trial <= 1:             # <<<<<<<<<<<<<<
@@ -22261,7 +22254,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":338
+  /* "auto_martiniM3/optimization_cy.pyx":337
  * 
  *     # duplicates check (serial)
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()             # <<<<<<<<<<<<<<
@@ -22269,16 +22262,16 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
  *     for bi in range(1, n_trial):
 */
   __pyx_t_5 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 338, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 337, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 338, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 337, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_trial_comb, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 338, __pyx_L1_error)
+  __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_trial_comb, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 337, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 338, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 337, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
-  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 338, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 337, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_t_10 = 1;
@@ -22295,16 +22288,16 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_5, __pyx_t_6};
-    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 338, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 337, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 338, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_9, __pyx_t_8, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 337, __pyx_L1_error)
     __pyx_t_4 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_10, (2-__pyx_t_10) | (__pyx_t_10*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_8);
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 338, __pyx_L1_error)
+    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 337, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
   }
   __pyx_t_3 = __pyx_t_4;
@@ -22315,22 +22308,22 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_copy, __pyx_callargs+__pyx_t_10, (1-__pyx_t_10) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 338, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 337, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
-  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 338, __pyx_L1_error)
+  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 337, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tmp.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_2), &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) {
       __pyx_v_tmp = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 338, __pyx_L1_error)
+      __PYX_ERR(0, 337, __pyx_L1_error)
     } else {__pyx_pybuffernd_tmp.diminfo[0].strides = __pyx_pybuffernd_tmp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tmp.diminfo[0].shape = __pyx_pybuffernd_tmp.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_v_tmp = ((PyArrayObject *)__pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":339
+  /* "auto_martiniM3/optimization_cy.pyx":338
  *     # duplicates check (serial)
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
  *     tmp.sort()             # <<<<<<<<<<<<<<
@@ -22344,12 +22337,12 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     PyObject *__pyx_callargs[2] = {__pyx_t_4, NULL};
     __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_sort, __pyx_callargs+__pyx_t_10, (1-__pyx_t_10) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 339, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 338, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":340
+  /* "auto_martiniM3/optimization_cy.pyx":339
  *     cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
  *     tmp.sort()
  *     for bi in range(1, n_trial):             # <<<<<<<<<<<<<<
@@ -22361,7 +22354,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
   for (__pyx_t_13 = 1; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":341
+    /* "auto_martiniM3/optimization_cy.pyx":340
  *     tmp.sort()
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:             # <<<<<<<<<<<<<<
@@ -22373,7 +22366,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     __pyx_t_1 = ((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_tmp.diminfo[0].strides)) == (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_tmp.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_tmp.diminfo[0].strides)));
     if (__pyx_t_1) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":342
+      /* "auto_martiniM3/optimization_cy.pyx":341
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:
  *             return False             # <<<<<<<<<<<<<<
@@ -22385,7 +22378,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
       __pyx_r = Py_False;
       goto __pyx_L0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":341
+      /* "auto_martiniM3/optimization_cy.pyx":340
  *     tmp.sort()
  *     for bi in range(1, n_trial):
  *         if tmp[bi] == tmp[bi - 1]:             # <<<<<<<<<<<<<<
@@ -22395,7 +22388,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":345
+  /* "auto_martiniM3/optimization_cy.pyx":344
  * 
  *     # ring count (serial)
  *     cdef int nrings = 0             # <<<<<<<<<<<<<<
@@ -22404,7 +22397,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
   __pyx_v_nrings = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":347
+  /* "auto_martiniM3/optimization_cy.pyx":346
  *     cdef int nrings = 0
  *     cdef int rid
  *     for bi in range(n_trial):             # <<<<<<<<<<<<<<
@@ -22416,7 +22409,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
   for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
     __pyx_v_bi = __pyx_t_13;
 
-    /* "auto_martiniM3/optimization_cy.pyx":348
+    /* "auto_martiniM3/optimization_cy.pyx":347
  *     cdef int rid
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]             # <<<<<<<<<<<<<<
@@ -22427,7 +22420,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     __pyx_t_14 = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
     __pyx_v_rid = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_14)) ))));
 
-    /* "auto_martiniM3/optimization_cy.pyx":349
+    /* "auto_martiniM3/optimization_cy.pyx":348
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:             # <<<<<<<<<<<<<<
@@ -22437,7 +22430,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     __pyx_t_1 = (__pyx_v_rid >= __pyx_v_nrings);
     if (__pyx_t_1) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":350
+      /* "auto_martiniM3/optimization_cy.pyx":349
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:
  *             nrings = rid + 1             # <<<<<<<<<<<<<<
@@ -22446,7 +22439,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
       __pyx_v_nrings = (__pyx_v_rid + 1);
 
-      /* "auto_martiniM3/optimization_cy.pyx":349
+      /* "auto_martiniM3/optimization_cy.pyx":348
  *     for bi in range(n_trial):
  *         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
  *         if rid >= nrings:             # <<<<<<<<<<<<<<
@@ -22456,7 +22449,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":353
+  /* "auto_martiniM3/optimization_cy.pyx":352
  * 
  *     # parallel bond rejection (ignore within-ring bonds)
  *     cdef int bad = 0             # <<<<<<<<<<<<<<
@@ -22465,7 +22458,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
   __pyx_v_bad = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":354
+  /* "auto_martiniM3/optimization_cy.pyx":353
  *     # parallel bond rejection (ignore within-ring bonds)
  *     cdef int bad = 0
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -22478,7 +22471,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
       __Pyx_FastGIL_Remember();
       /*try:*/ {
 
-        /* "auto_martiniM3/optimization_cy.pyx":355
+        /* "auto_martiniM3/optimization_cy.pyx":354
  *     cdef int bad = 0
  *     with nogil:
  *         for bi in prange(n_trial, schedule='static'):             # <<<<<<<<<<<<<<
@@ -22519,7 +22512,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                         {
                             __pyx_v_bi = (Py_ssize_t)(0 + 1 * __pyx_t_13);
 
-                            /* "auto_martiniM3/optimization_cy.pyx":356
+                            /* "auto_martiniM3/optimization_cy.pyx":355
  *     with nogil:
  *         for bi in prange(n_trial, schedule='static'):
  *             if bad:             # <<<<<<<<<<<<<<
@@ -22529,7 +22522,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                             __pyx_t_1 = (__pyx_v_bad != 0);
                             if (__pyx_t_1) {
 
-                              /* "auto_martiniM3/optimization_cy.pyx":357
+                              /* "auto_martiniM3/optimization_cy.pyx":356
  *         for bi in prange(n_trial, schedule='static'):
  *             if bad:
  *                 continue             # <<<<<<<<<<<<<<
@@ -22538,7 +22531,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                               goto __pyx_L13_continue;
 
-                              /* "auto_martiniM3/optimization_cy.pyx":356
+                              /* "auto_martiniM3/optimization_cy.pyx":355
  *     with nogil:
  *         for bi in prange(n_trial, schedule='static'):
  *             if bad:             # <<<<<<<<<<<<<<
@@ -22547,7 +22540,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                             }
 
-                            /* "auto_martiniM3/optimization_cy.pyx":358
+                            /* "auto_martiniM3/optimization_cy.pyx":357
  *             if bad:
  *                 continue
  *             ai = <int>trial_comb[bi]             # <<<<<<<<<<<<<<
@@ -22557,7 +22550,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                             __pyx_t_15 = __pyx_v_bi;
                             __pyx_v_ai = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
 
-                            /* "auto_martiniM3/optimization_cy.pyx":359
+                            /* "auto_martiniM3/optimization_cy.pyx":358
  *                 continue
  *             ai = <int>trial_comb[bi]
  *             for bj in range(bi + 1, n_trial):             # <<<<<<<<<<<<<<
@@ -22569,7 +22562,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                             for (__pyx_t_18 = (__pyx_v_bi + 1); __pyx_t_18 < __pyx_t_17; __pyx_t_18+=1) {
                               __pyx_v_bj = __pyx_t_18;
 
-                              /* "auto_martiniM3/optimization_cy.pyx":360
+                              /* "auto_martiniM3/optimization_cy.pyx":359
  *             ai = <int>trial_comb[bi]
  *             for bj in range(bi + 1, n_trial):
  *                 if bad:             # <<<<<<<<<<<<<<
@@ -22579,7 +22572,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                               __pyx_t_1 = (__pyx_v_bad != 0);
                               if (__pyx_t_1) {
 
-                                /* "auto_martiniM3/optimization_cy.pyx":361
+                                /* "auto_martiniM3/optimization_cy.pyx":360
  *             for bj in range(bi + 1, n_trial):
  *                 if bad:
  *                     break             # <<<<<<<<<<<<<<
@@ -22588,7 +22581,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                                 goto __pyx_L19_break;
 
-                                /* "auto_martiniM3/optimization_cy.pyx":360
+                                /* "auto_martiniM3/optimization_cy.pyx":359
  *             ai = <int>trial_comb[bi]
  *             for bj in range(bi + 1, n_trial):
  *                 if bad:             # <<<<<<<<<<<<<<
@@ -22597,7 +22590,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                               }
 
-                              /* "auto_martiniM3/optimization_cy.pyx":362
+                              /* "auto_martiniM3/optimization_cy.pyx":361
  *                 if bad:
  *                     break
  *                 aj = <int>trial_comb[bj]             # <<<<<<<<<<<<<<
@@ -22607,17 +22600,17 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                               __pyx_t_15 = __pyx_v_bj;
                               __pyx_v_aj = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_trial_comb.data) + __pyx_t_15)) ))));
 
-                              /* "auto_martiniM3/optimization_cy.pyx":363
+                              /* "auto_martiniM3/optimization_cy.pyx":362
  *                     break
  *                 aj = <int>trial_comb[bj]
  *                 if _is_bond_mv(ai, aj, listbonds):             # <<<<<<<<<<<<<<
  *                     rid_i = <int>ring_id_of_atom[ai]
  *                     rid_j = <int>ring_id_of_atom[aj]
 */
-                              __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(__pyx_v_ai, __pyx_v_aj, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 363, __pyx_L15_error)
+                              __pyx_t_1 = __pyx_f_14auto_martiniM3_15optimization_cy__is_bond_mv(__pyx_v_ai, __pyx_v_aj, __pyx_v_listbonds); if (unlikely(__pyx_t_1 == ((int)-1) && __Pyx_ErrOccurredWithGIL())) __PYX_ERR(0, 362, __pyx_L15_error)
                               if (__pyx_t_1) {
 
-                                /* "auto_martiniM3/optimization_cy.pyx":364
+                                /* "auto_martiniM3/optimization_cy.pyx":363
  *                 aj = <int>trial_comb[bj]
  *                 if _is_bond_mv(ai, aj, listbonds):
  *                     rid_i = <int>ring_id_of_atom[ai]             # <<<<<<<<<<<<<<
@@ -22627,7 +22620,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                                 __pyx_t_15 = __pyx_v_ai;
                                 __pyx_v_rid_i = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_15)) ))));
 
-                                /* "auto_martiniM3/optimization_cy.pyx":365
+                                /* "auto_martiniM3/optimization_cy.pyx":364
  *                 if _is_bond_mv(ai, aj, listbonds):
  *                     rid_i = <int>ring_id_of_atom[ai]
  *                     rid_j = <int>ring_id_of_atom[aj]             # <<<<<<<<<<<<<<
@@ -22637,7 +22630,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                                 __pyx_t_15 = __pyx_v_aj;
                                 __pyx_v_rid_j = ((int)(*((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) ( /* dim=0 */ ((char *) (((__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) __pyx_v_ring_id_of_atom.data) + __pyx_t_15)) ))));
 
-                                /* "auto_martiniM3/optimization_cy.pyx":366
+                                /* "auto_martiniM3/optimization_cy.pyx":365
  *                     rid_i = <int>ring_id_of_atom[ai]
  *                     rid_j = <int>ring_id_of_atom[aj]
  *                     if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):             # <<<<<<<<<<<<<<
@@ -22668,7 +22661,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
                                 __pyx_t_19 = (!__pyx_t_1);
                                 if (__pyx_t_19) {
 
-                                  /* "auto_martiniM3/optimization_cy.pyx":367
+                                  /* "auto_martiniM3/optimization_cy.pyx":366
  *                     rid_j = <int>ring_id_of_atom[aj]
  *                     if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):
  *                         bad = 1             # <<<<<<<<<<<<<<
@@ -22677,7 +22670,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                                   __pyx_v_bad = 1;
 
-                                  /* "auto_martiniM3/optimization_cy.pyx":368
+                                  /* "auto_martiniM3/optimization_cy.pyx":367
  *                     if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):
  *                         bad = 1
  *                         break             # <<<<<<<<<<<<<<
@@ -22686,7 +22679,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                                   goto __pyx_L19_break;
 
-                                  /* "auto_martiniM3/optimization_cy.pyx":366
+                                  /* "auto_martiniM3/optimization_cy.pyx":365
  *                     rid_i = <int>ring_id_of_atom[ai]
  *                     rid_j = <int>ring_id_of_atom[aj]
  *                     if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):             # <<<<<<<<<<<<<<
@@ -22695,7 +22688,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_10check_beads_omp(C
 */
                                 }
 
-                                /* "auto_martiniM3/optimization_cy.pyx":363
+                                /* "auto_martiniM3/optimization_cy.pyx":362
  *                     break
  *                 aj = <int>trial_comb[bj]
  *                 if _is_bond_mv(ai, aj, listbonds):             # <<<<<<<<<<<<<<
@@ -22780,7 +22773,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
         #endif
       }
 
-      /* "auto_martiniM3/optimization_cy.pyx":354
+      /* "auto_martiniM3/optimization_cy.pyx":353
  *     # parallel bond rejection (ignore within-ring bonds)
  *     cdef int bad = 0
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -22802,7 +22795,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
       }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":370
+  /* "auto_martiniM3/optimization_cy.pyx":369
  *                         break
  * 
  *     if bad:             # <<<<<<<<<<<<<<
@@ -22812,7 +22805,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
   __pyx_t_19 = (__pyx_v_bad != 0);
   if (__pyx_t_19) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":371
+    /* "auto_martiniM3/optimization_cy.pyx":370
  * 
  *     if bad:
  *         return False             # <<<<<<<<<<<<<<
@@ -22824,7 +22817,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
     __pyx_r = Py_False;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":370
+    /* "auto_martiniM3/optimization_cy.pyx":369
  *                         break
  * 
  *     if bad:             # <<<<<<<<<<<<<<
@@ -22833,17 +22826,17 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":374
+  /* "auto_martiniM3/optimization_cy.pyx":373
  * 
  *     # terminal-partner collision check (serial)
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):             # <<<<<<<<<<<<<<
  *         return False
  * 
 */
-  __pyx_t_19 = __pyx_f_14auto_martiniM3_15optimization_cy__has_terminal_partner_collision_mv(__pyx_v_trial_comb, __pyx_v_listbonds); if (unlikely(__pyx_t_19 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 374, __pyx_L1_error)
+  __pyx_t_19 = __pyx_f_14auto_martiniM3_15optimization_cy__has_terminal_partner_collision_mv(__pyx_v_trial_comb, __pyx_v_listbonds); if (unlikely(__pyx_t_19 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 373, __pyx_L1_error)
   if (__pyx_t_19) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":375
+    /* "auto_martiniM3/optimization_cy.pyx":374
  *     # terminal-partner collision check (serial)
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):
  *         return False             # <<<<<<<<<<<<<<
@@ -22855,7 +22848,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
     __pyx_r = Py_False;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":374
+    /* "auto_martiniM3/optimization_cy.pyx":373
  * 
  *     # terminal-partner collision check (serial)
  *     if _has_terminal_partner_collision_mv(trial_comb, listbonds):             # <<<<<<<<<<<<<<
@@ -22864,7 +22857,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":377
+  /* "auto_martiniM3/optimization_cy.pyx":376
  *         return False
  * 
  *     return True             # <<<<<<<<<<<<<<
@@ -22876,7 +22869,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
   __pyx_r = Py_True;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":313
+  /* "auto_martiniM3/optimization_cy.pyx":312
  * 
  * 
  * def check_beads_omp(             # <<<<<<<<<<<<<<
@@ -22912,7 +22905,7 @@ PyGILState_STATE __pyx_gilstate_save = __Pyx_PyGILState_Ensure();
   return __pyx_r;
 }
 
-/* "auto_martiniM3/optimization_cy.pyx":380
+/* "auto_martiniM3/optimization_cy.pyx":379
  * 
  * 
  * def find_acceptable_trials_cy(             # <<<<<<<<<<<<<<
@@ -22962,46 +22955,46 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_seq_one_beads,&__pyx_mstate_global->__pyx_n_u_listbonds,&__pyx_mstate_global->__pyx_n_u_ring_id_of_atom,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 380, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 379, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 380, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 379, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 380, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 379, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 380, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 379, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_acceptable_trials_cy", 0) < (0)) __PYX_ERR(0, 380, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_acceptable_trials_cy", 0) < (0)) __PYX_ERR(0, 379, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_acceptable_trials_cy", 1, 3, 3, i); __PYX_ERR(0, 380, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_acceptable_trials_cy", 1, 3, 3, i); __PYX_ERR(0, 379, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 380, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 379, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 380, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 379, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 380, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 379, __pyx_L3_error)
     }
-    __pyx_v_seq_one_beads = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_seq_one_beads.memview)) __PYX_ERR(0, 381, __pyx_L3_error)
-    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 382, __pyx_L3_error)
-    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 383, __pyx_L3_error)
+    __pyx_v_seq_one_beads = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_seq_one_beads.memview)) __PYX_ERR(0, 380, __pyx_L3_error)
+    __pyx_v_listbonds = __Pyx_PyObject_to_MemoryviewSlice_d_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_listbonds.memview)) __PYX_ERR(0, 381, __pyx_L3_error)
+    __pyx_v_ring_id_of_atom = __Pyx_PyObject_to_MemoryviewSlice_dc_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ring_id_of_atom.memview)) __PYX_ERR(0, 382, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_acceptable_trials_cy", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 380, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("find_acceptable_trials_cy", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 379, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -23052,19 +23045,19 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_12find_acceptable_t
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_acceptable_trials_cy", 0);
 
-  /* "auto_martiniM3/optimization_cy.pyx":388
+  /* "auto_martiniM3/optimization_cy.pyx":387
  *     cdef Py_ssize_t i
  *     # Return as a NumPy array (n_acceptable, num_beads)
  *     acceptable_trials = []             # <<<<<<<<<<<<<<
  *     for i in range(seq_one_beads.shape[0]):
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 388, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 387, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_acceptable_trials = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":389
+  /* "auto_martiniM3/optimization_cy.pyx":388
  *     # Return as a NumPy array (n_acceptable, num_beads)
  *     acceptable_trials = []
  *     for i in range(seq_one_beads.shape[0]):             # <<<<<<<<<<<<<<
@@ -23076,7 +23069,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_12find_acceptable_t
   for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
     __pyx_v_i = __pyx_t_4;
 
-    /* "auto_martiniM3/optimization_cy.pyx":390
+    /* "auto_martiniM3/optimization_cy.pyx":389
  *     acceptable_trials = []
  *     for i in range(seq_one_beads.shape[0]):
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):             # <<<<<<<<<<<<<<
@@ -23084,7 +23077,7 @@ static PyObject *__pyx_pf_14auto_martiniM3_15optimization_cy_12find_acceptable_t
  *     if not acceptable_trials:
 */
     __pyx_t_5 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_check_beads); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 390, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_check_beads); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 389, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __pyx_t_7.data = __pyx_v_seq_one_beads.data;
     __pyx_t_7.memview = __pyx_v_seq_one_beads.memview;
@@ -23099,13 +23092,13 @@ __pyx_t_7.shape[0] = __pyx_v_seq_one_beads.shape[1];
 __pyx_t_7.strides[0] = __pyx_v_seq_one_beads.strides[1];
     __pyx_t_7.suboffsets[0] = -1;
 
-__pyx_t_8 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 390, __pyx_L1_error)
+__pyx_t_8 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 389, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     __PYX_XCLEAR_MEMVIEW(&__pyx_t_7, 1);
     __pyx_t_7.memview = NULL; __pyx_t_7.data = NULL;
-    __pyx_t_9 = __pyx_memoryview_fromslice(__pyx_v_listbonds, 2, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 390, __pyx_L1_error)
+    __pyx_t_9 = __pyx_memoryview_fromslice(__pyx_v_listbonds, 2, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 389, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
-    __pyx_t_10 = __pyx_memoryview_fromslice(__pyx_v_ring_id_of_atom, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 390, __pyx_L1_error)
+    __pyx_t_10 = __pyx_memoryview_fromslice(__pyx_v_ring_id_of_atom, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 389, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
     __pyx_t_11 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -23127,14 +23120,14 @@ __pyx_t_8 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
       __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 390, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 389, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
-    __pyx_t_12 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_12 < 0))) __PYX_ERR(0, 390, __pyx_L1_error)
+    __pyx_t_12 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_12 < 0))) __PYX_ERR(0, 389, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     if (__pyx_t_12) {
 
-      /* "auto_martiniM3/optimization_cy.pyx":391
+      /* "auto_martiniM3/optimization_cy.pyx":390
  *     for i in range(seq_one_beads.shape[0]):
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
  *             acceptable_trials.append(seq_one_beads[i])             # <<<<<<<<<<<<<<
@@ -23154,14 +23147,14 @@ __pyx_t_7.shape[0] = __pyx_v_seq_one_beads.shape[1];
 __pyx_t_7.strides[0] = __pyx_v_seq_one_beads.strides[1];
     __pyx_t_7.suboffsets[0] = -1;
 
-__pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 391, __pyx_L1_error)
+__pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_14auto_martiniM3_15optimization_cy_I32, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 390, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
       __PYX_XCLEAR_MEMVIEW(&__pyx_t_7, 1);
       __pyx_t_7.memview = NULL; __pyx_t_7.data = NULL;
-      __pyx_t_13 = __Pyx_PyList_Append(__pyx_v_acceptable_trials, __pyx_t_1); if (unlikely(__pyx_t_13 == ((int)-1))) __PYX_ERR(0, 391, __pyx_L1_error)
+      __pyx_t_13 = __Pyx_PyList_Append(__pyx_v_acceptable_trials, __pyx_t_1); if (unlikely(__pyx_t_13 == ((int)-1))) __PYX_ERR(0, 390, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-      /* "auto_martiniM3/optimization_cy.pyx":390
+      /* "auto_martiniM3/optimization_cy.pyx":389
  *     acceptable_trials = []
  *     for i in range(seq_one_beads.shape[0]):
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):             # <<<<<<<<<<<<<<
@@ -23171,7 +23164,7 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
     }
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":392
+  /* "auto_martiniM3/optimization_cy.pyx":391
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
  *             acceptable_trials.append(seq_one_beads[i])
  *     if not acceptable_trials:             # <<<<<<<<<<<<<<
@@ -23180,14 +23173,14 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
   {
     Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_acceptable_trials);
-    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 392, __pyx_L1_error)
+    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 391, __pyx_L1_error)
     __pyx_t_12 = (__pyx_temp != 0);
   }
 
   __pyx_t_14 = (!__pyx_t_12);
   if (__pyx_t_14) {
 
-    /* "auto_martiniM3/optimization_cy.pyx":393
+    /* "auto_martiniM3/optimization_cy.pyx":392
  *             acceptable_trials.append(seq_one_beads[i])
  *     if not acceptable_trials:
  *         return np.empty((0, 0), dtype=np.int32)             # <<<<<<<<<<<<<<
@@ -23195,14 +23188,14 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
     __Pyx_XDECREF(__pyx_r);
     __pyx_t_6 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 392, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
-    __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 393, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_empty); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 392, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-    __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 392, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
-    __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 393, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 392, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
     __pyx_t_11 = 1;
@@ -23219,22 +23212,22 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
     #endif
     {
       PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_6, __pyx_mstate_global->__pyx_tuple[1]};
-      __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
+      __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 392, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_10);
-      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_8, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 393, __pyx_L1_error)
+      if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_8, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 392, __pyx_L1_error)
       __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_9, __pyx_callargs+__pyx_t_11, (2-__pyx_t_11) | (__pyx_t_11*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_10);
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
       __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 393, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 392, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __pyx_r = __pyx_t_1;
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "auto_martiniM3/optimization_cy.pyx":392
+    /* "auto_martiniM3/optimization_cy.pyx":391
  *         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
  *             acceptable_trials.append(seq_one_beads[i])
  *     if not acceptable_trials:             # <<<<<<<<<<<<<<
@@ -23243,21 +23236,21 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
   }
 
-  /* "auto_martiniM3/optimization_cy.pyx":394
+  /* "auto_martiniM3/optimization_cy.pyx":393
  *     if not acceptable_trials:
  *         return np.empty((0, 0), dtype=np.int32)
  *     return np.asarray(acceptable_trials, dtype=np.int32)             # <<<<<<<<<<<<<<
 */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_9 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 394, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_10);
-  __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 394, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_asarray); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 393, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 394, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_10);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 394, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_10, __pyx_mstate_global->__pyx_n_u_int32); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 393, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
   __pyx_t_11 = 1;
@@ -23274,22 +23267,22 @@ __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_9, __pyx_v_acceptable_trials};
-    __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 394, __pyx_L1_error)
+    __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 393, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 394, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_6, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 393, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_8, __pyx_callargs+__pyx_t_11, (2-__pyx_t_11) | (__pyx_t_11*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_10);
     __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 394, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 393, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":380
+  /* "auto_martiniM3/optimization_cy.pyx":379
  * 
  * 
  * def find_acceptable_trials_cy(             # <<<<<<<<<<<<<<
@@ -25306,131 +25299,131 @@ __Pyx_RefNannySetupContext("PyInit_optimization_cy", 0);
   if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_pyx_unpickle_Enum, __pyx_t_4) < (0)) __PYX_ERR(1, 4, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":29
+  /* "auto_martiniM3/optimization_cy.pyx":28
  * 
  * cimport numpy as cnp
  * import numpy as np             # <<<<<<<<<<<<<<
  * 
  * cnp.import_array()
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_numpy, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 29, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_numpy, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 28, __pyx_L1_error)
   __pyx_t_4 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_np, __pyx_t_4) < (0)) __PYX_ERR(0, 29, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_np, __pyx_t_4) < (0)) __PYX_ERR(0, 28, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":31
+  /* "auto_martiniM3/optimization_cy.pyx":30
  * import numpy as np
  * 
  * cnp.import_array()             # <<<<<<<<<<<<<<
  * 
  * 
 */
-  __pyx_t_9 = __pyx_f_5numpy_import_array(); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_9 = __pyx_f_5numpy_import_array(); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 30, __pyx_L1_error)
 
-  /* "auto_martiniM3/optimization_cy.pyx":61
+  /* "auto_martiniM3/optimization_cy.pyx":60
  * 
  * 
  * cpdef F32 gaussian_overlap_np(             # <<<<<<<<<<<<<<
  *     F32 dist,
  *     int bead1,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_1gaussian_overlap_np, 0, __pyx_mstate_global->__pyx_n_u_gaussian_overlap_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_1gaussian_overlap_np, 0, __pyx_mstate_global->__pyx_n_u_gaussian_overlap_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_gaussian_overlap_np, __pyx_t_4) < (0)) __PYX_ERR(0, 61, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_gaussian_overlap_np, __pyx_t_4) < (0)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":75
+  /* "auto_martiniM3/optimization_cy.pyx":74
  * 
  * 
  * cpdef tuple atoms_in_gaussian_np(             # <<<<<<<<<<<<<<
  *     int bead_id,
  *     const U8[::1] in_ring,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_3atoms_in_gaussian_np, 0, __pyx_mstate_global->__pyx_n_u_atoms_in_gaussian_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 75, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_3atoms_in_gaussian_np, 0, __pyx_mstate_global->__pyx_n_u_atoms_in_gaussian_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_atoms_in_gaussian_np, __pyx_t_4) < (0)) __PYX_ERR(0, 75, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_atoms_in_gaussian_np, __pyx_t_4) < (0)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":101
+  /* "auto_martiniM3/optimization_cy.pyx":100
  * 
  * 
  * cpdef F32 penalize_lonely_atoms_np(             # <<<<<<<<<<<<<<
  *     list lumped_atoms,
  *     const F32[::1] masses,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_5penalize_lonely_atoms_np, 0, __pyx_mstate_global->__pyx_n_u_penalize_lonely_atoms_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 101, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_5penalize_lonely_atoms_np, 0, __pyx_mstate_global->__pyx_n_u_penalize_lonely_atoms_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_penalize_lonely_atoms_np, __pyx_t_4) < (0)) __PYX_ERR(0, 101, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_penalize_lonely_atoms_np, __pyx_t_4) < (0)) __PYX_ERR(0, 100, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":122
+  /* "auto_martiniM3/optimization_cy.pyx":121
  * 
  * 
  * cpdef F32 eval_gaussian_interac_np(             # <<<<<<<<<<<<<<
  *     const I32[::1] list_beads,
  *     const U8[::1] in_ring,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_7eval_gaussian_interac_np, 0, __pyx_mstate_global->__pyx_n_u_eval_gaussian_interac_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 122, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_7eval_gaussian_interac_np, 0, __pyx_mstate_global->__pyx_n_u_eval_gaussian_interac_np, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 121, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_eval_gaussian_interac_np, __pyx_t_4) < (0)) __PYX_ERR(0, 122, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_eval_gaussian_interac_np, __pyx_t_4) < (0)) __PYX_ERR(0, 121, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":243
+  /* "auto_martiniM3/optimization_cy.pyx":242
  * 
  * 
  * def check_beads(             # <<<<<<<<<<<<<<
  *     I32[::1] trial_comb,
  *     I32[:, ::1] listbonds,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_9check_beads, 0, __pyx_mstate_global->__pyx_n_u_check_beads, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 243, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_9check_beads, 0, __pyx_mstate_global->__pyx_n_u_check_beads, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 242, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_check_beads, __pyx_t_4) < (0)) __PYX_ERR(0, 243, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_check_beads, __pyx_t_4) < (0)) __PYX_ERR(0, 242, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":313
+  /* "auto_martiniM3/optimization_cy.pyx":312
  * 
  * 
  * def check_beads_omp(             # <<<<<<<<<<<<<<
  *     I32[::1] trial_comb,
  *     I32[:, ::1] listbonds,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_11check_beads_omp, 0, __pyx_mstate_global->__pyx_n_u_check_beads_omp, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 313, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_11check_beads_omp, 0, __pyx_mstate_global->__pyx_n_u_check_beads_omp, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 312, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_check_beads_omp, __pyx_t_4) < (0)) __PYX_ERR(0, 313, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_check_beads_omp, __pyx_t_4) < (0)) __PYX_ERR(0, 312, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "auto_martiniM3/optimization_cy.pyx":380
+  /* "auto_martiniM3/optimization_cy.pyx":379
  * 
  * 
  * def find_acceptable_trials_cy(             # <<<<<<<<<<<<<<
  *     I32[:, ::1] seq_one_beads,
  *     I32[:, ::1] listbonds,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_13find_acceptable_trials_cy, 0, __pyx_mstate_global->__pyx_n_u_find_acceptable_trials_cy, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 380, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_14auto_martiniM3_15optimization_cy_13find_acceptable_trials_cy, 0, __pyx_mstate_global->__pyx_n_u_find_acceptable_trials_cy, NULL, __pyx_mstate_global->__pyx_n_u_auto_martiniM3_optimization_cy, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 379, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_acceptable_trials_cy, __pyx_t_4) < (0)) __PYX_ERR(0, 380, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_acceptable_trials_cy, __pyx_t_4) < (0)) __PYX_ERR(0, 379, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
   /* "auto_martiniM3/optimization_cy.pyx":1
@@ -25528,13 +25521,13 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_slice[0]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_slice[0]);
 
-  /* "auto_martiniM3/optimization_cy.pyx":393
+  /* "auto_martiniM3/optimization_cy.pyx":392
  *             acceptable_trials.append(seq_one_beads[i])
  *     if not acceptable_trials:
  *         return np.empty((0, 0), dtype=np.int32)             # <<<<<<<<<<<<<<
  *     return np.asarray(acceptable_trials, dtype=np.int32)
 */
-  __pyx_mstate_global->__pyx_tuple[1] = PyTuple_Pack(2, __pyx_mstate_global->__pyx_int_0, __pyx_mstate_global->__pyx_int_0); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 393, __pyx_L1_error)
+  __pyx_mstate_global->__pyx_tuple[1] = PyTuple_Pack(2, __pyx_mstate_global->__pyx_int_0, __pyx_mstate_global->__pyx_int_0); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 392, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[1]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[1]);
   #if CYTHON_IMMORTAL_CONSTANTS
@@ -25587,24 +25580,24 @@ static int __Pyx_InitConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   {
     const struct { const unsigned int length: 9; } index[] = {{2},{68},{35},{54},{37},{60},{24},{52},{26},{34},{29},{33},{45},{22},{15},{179},{37},{30},{32},{1},{1},{1},{1},{1},{8},{5},{6},{34},{15},{23},{25},{7},{6},{2},{6},{35},{9},{30},{50},{39},{34},{8},{20},{32},{22},{30},{37},{5},{8},{20},{8},{15},{3},{17},{2},{2},{15},{7},{18},{14},{20},{30},{3},{4},{19},{5},{5},{7},{2},{2},{10},{14},{1},{11},{15},{9},{17},{18},{4},{5},{8},{4},{5},{15},{5},{6},{9},{5},{24},{25},{5},{6},{7},{8},{19},{12},{1},{2},{10},{7},{5},{5},{13},{5},{8},{10},{9},{20},{12},{8},{6},{7},{4},{10},{7},{4},{8},{4},{7},{2},{6},{5},{3},{25},{16},{4},{24},{3},{14},{11},{10},{19},{14},{12},{10},{17},{13},{8},{3},{5},{5},{15},{4},{13},{10},{13},{12},{10},{12},{19},{5},{4},{4},{5},{4},{4},{6},{8},{3},{10},{5},{6},{6},{6},{1},{5},{311},{59},{100},{110},{136},{360},{339},{1}};
-    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (2250 bytes) */
-const char* const cstring = "BZh91AY&SYl\251\351R\000\001\216\177\377\377\377\377\377\377\377\377\377\277\247\377\376\277\377\377\372@@@@@@@@@@@@@\000@\000`\010?{\251\346\275\267\023a\032\302\204\250\022\033\336\001\274%A\025=4\232i\3514~\224\365=O\325<\324\306SQ\346\250\375(\311\350jz\236&\243\324\310\006\206\201\3526\240z\236\241\247\244\032\017\324\312\017I\352\tD\t\223@L\232C)<iO\023F\2104h\320\310\r\000\000\000\000\001\240\3204\032\r\000\320\230\232T\364jM\033SC\324\320\321\243\032@\000\r\006\203j\000\000\3204\000\0004\r4\000\tM\020)\350\202\246\323\324\323OAOI\351\003L\200bd\320\000\000\0002\030@\000\000\03242 \323\023\023\023\0010\023\000\000\000\000\230\000\002`\000\023\000\000\000\0014\r!Q\352\000\r\006M14\001\220\031\014\002hh\001\223C\004\320\300@\320d\014\203\0012@\260\0142\363\323]\340\343%xj\245\020\025\037\337\352$\212A\007@#\234\252R\001+2HUE\245z\354\222d&B\020\222\004$\220\223(\311\326\340\014\035fi5I\365\306\034#\2352\213MH9\324L\021'\310\202!c\007)L#Q\2672I\212\252\002l\203\014\341\272\314\204\206IZ\000\036\031$X,\331\261\326\2269\315\206g\243\031CgYY\024{\332BlQ\203\342B5\245\312]\032&\302U\004\365>\213\234\372\312\307\216\240|\321\3054\213KS\224\256\212>\242\252f\243\261[gL\246\366k\264\352~c<{\004\263\345\234~\356\227\332k\321\223\345&mO\234\261T\004\260\346f9\322\017\301\242\013\300\231\251\024\375\275A$\253\362\204\262vH\356\376\265\373E\217\245\213\356\204Nu\206\254I\"\366\310[\3244\373\274\217\022gV\361rJ-\212 \266\210\377i5\325\265p{\331<T\226XO\020\022\025Rl\265\312qb\247\277<\034mF9\025\300\203`[!\216\314\014\203\032JA.\006@7+6\030Y\317p\"\320g\227b#\223\356q\362C\231\302Pe\222\333*\226s#f\363\263dE\216_\340\221\255M\230\267wn\344P\342K\336\233\361\243\225\256r\362\255#i\333\357\316n\3256iW\036!\212\250BET`\2706\007\244Za\004\364\314\313bU\244\2209\213\022\223n(\336\267}\010\324\341\341\201`x!\355t*\022\237e^o>\253\213\304q\002\010\\\341\331A\205}]\331\3537\353\250\225[\261n\377\327\233\275\314J\005-e\327,~\210U\216\r\217\360h\306\307\374\r\3525\306\255{W`\322\254""\024r\253\325\214\\U\030\336q\325\372\272\025\312)\246u\326U\236\204F\2702\343X\355\037\206\212\247\371Jt7\255R<H}D\360\010\253\300\340H\212XH\010\320\266\307k\211\223\001\256+\352\332\035@\236#NJ\016\225B\274\030\240\246\222\334\221ZH\377\220\211J\311\254\345k\005\2335\004\240\201\010\223dc\310w0\223\252\322\177D:\237\200 \252%\215u\245\221)\257\361\347\277\2333\2104!\314\006\261H\303g\220e^\0302H\250\266/N\271\305\277\325\345\2503\357`eN\311\207\032v\022\302\243\261\345=:\320\200y}\275\344\022H\r\016\345\326\020\014HQ\242\345\264\312X\347\230>[\253QN\234\266\005\251\030\265\016\220\177\203\256M\205Su-\354\276\322\325\231J\247(\33477\3059\202\265y\314N<tc\342\032\314^\251q\217?\211\301\267%\342\nD89\032f\021]\030gL\332\270{\273\331s\306v\206\315=!\024\323\330\265\026\202\262)D\352^\205\307\2427\027tk\035\3047g\263\"1\305\230Fw\03544\204m\032q\233\t\217\266\251\307P\320h\007%,\360\207\224\215JE\367\247%\244vR\324\240\260e\207L]\307d\310\346\310Y3\0103#Y\230\r\027\n\363\027\026bG\214\225\245\2653\234\212\375\325\357\247\2124\360g\204\365))\021g\321\024I\345\215\013\027fE.\371Y7\r\t\005\236\260\367\305\266\236f\245\361c\231\020\255\261\207]\206a\320\346\2241\367\021p\245\347\206*0\026\353\355\260\303\221\001(z\227\224t\270\234\242\2542f\202\321\362n2+\274\275\215\215r\265\310o\252\256\016\322\211%)5)\244\353\2570\rw\007K\006<\305\242\210\245\3017\230lP_\311\275\264\227Vr\267\371\235\034\341\004\275K\206\265\224\235\253\270\025\311*\302\320T\332E\023h\201F\316\240\253S\262\333w\327\177\343n\26339\276\020\3279)!*k\030\335\253\224\331\246)\207\230\301A\220j\033.3([\002\213.Pi\207\rsm\210\364QVR\020}\001J=\243\232\361\223\\f\371\\\371p\016\206\360\352UWk6\200\245l\324^\210\370\251\214\307\0061\0165\316\244vF%VL\224\034\347\035\035\336\375\250A\037sRi6KB*IG<l\002\326\264\320\261\006!*\004z\215\3122D\214 \231V\367#\301\211\315\310\360agHO\033\021\022\004\356\220\235\223^,\177U\r\004\311F\362\263\005\255\304v\253\270T\223>\t\30540\355F-=\362HHE\n\241#E\001H\221\221\005r:""\325\242\354\325\220\301\301R\211%+#e\251\244\311T\325\000\247\032\323\301\320\362\200\271N+\342\340\355\302jbS\311&\031\003\201\177\317\205*\355\211\314\315a@0\317\231\021\243\3157\242\250\252'/>b\235\244\252&\006\315T\354i0lVU=\024\327\026nM\217\240e\014\276\201W4\234\372r\262\305\024\212\n\265!\235\334\345\343\336\345\207\022p5\031\3578{X\304'B\242\206@\251\241\006\226\233\006{\304.\265\025\360\222\032\340\304%N\270\231\370 \362K\267\244\225\256x\344\030\214F\n\013\n\037\241\350\227\231\314\014r\274\315\264\303dR\2662\334\313\006>\016F\252\275\265\301\272\334\347+\230\256\276\210\356B\342\020\242A\2439\222lR\344k\302\3016mKa`\310\254\026\244\212\245\310\266\261\326\\\225\253\004\262\343\3372\036\034\334U\276\270r\261\201o\326d\333\002\tj4\022\221\221?`&m\304\352\231\257\027\260\256\352|]\004\330\301QR\020\220\325\310\345\210M\207wYb\370\320\224\027\241\255\013\\P\226\r\270\254zN\325\233\251\020\201\303B\025\262\020!KQ\342p\255T\262\211\242\306\"\307dc7\2627\023F]\365D\202j\3348\017\335Q\330\233q\303\205b\251\317n\365g\221\2037\223wznJ\322\266x\3524\320ry:\257\027Bk\210\346j5\245W\323\311\357:e@m\013\002C\025\274\361\245*\250z\352\3030(c\201\251\302\213\22317\206\035\327P\301\025\235!V\266\005\302p \250\340\264`\247\216\230\230\002\332%\337~O\213\250C0\244\030\201\214\004BL`\t\200\212O\370\014\013\274\375\002P/\001\003\304\001\206\016\025\204\010\323\332UZ\013C[fq\254\202\024\334\317\r\265l\261DC\210/_A~X\246\022\226I\241\350I\023\317u\016\"\352\2608\257\220\2439\221\203i\235\001\306V{\205\246\362\334X\264\247j\231\330s\3308oM\372\177\222\027^y(\\\311S\267D\316L\303\006\3015\337\271\243\016\346\365\324\302$\241\244\305\306h\224m\305}89\270\221\253\270a \253\003\027\2144\202\257\247\264\242\033\353\244\210\r\002\002\264\004\023\005\326N\032U\336K\342\324\373\364q\371q@\306M\021\023\233K\275\311\352b\276zg;\272\362\361Du\344$\327*\302;ao1]\272\310\250\331&V\246\264\273\337\031f\236\220\347(\344\364I\304\226\225 \201X\350\017\276>\211\033\372\262:o\376\313}*\236'""\2414\335\330\247\017\020w~\324k\023u)\364)\267\224E;\362>\304yK*O&\307\217$\266L6h\371\265\333\263\013\315\037\221\254&f3*\224\032\"\324\326X\325\226V\250\253\310\024\205D^C\013ahdg\2009\007\006\375\320PPlg1\0206\246\2210\3130RQh\357\026\210\214s\215\361\345\325\345\327\264\020*\315dX:\313\022\245GM8\024\024w?\361w$S\205\t\006\312\236\225 ";
-    PyObject *data = __Pyx_DecompressString(cstring, 2250, 2);
+    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (2243 bytes) */
+const char* const cstring = "BZh91AY&SY\204\022A5\000\001\215\377\377\377\377\377\377\377\377\377\377\277\347\377\376\277\377\377\372@@@@@@@@@@@@@\000@\000`\010.\324\346\266\330\233\037Y\323sa*\035dw^\001\340\3215\0215\006\324\323M\352\232\036\232mOI\345!\354\223\312\233Q\215'\246\3254\017P\006\200\033B\007\251\351\032zA\246\217\320\232G\352e\004\242\000\232\0044\322h\3246I\246\223\323P\321\352\006\203@\000\320\000\000\000\001\243A\240\003@4\002%6(\324\311\265\r4\032h\362i\000\0004\032\014\200\000\000\320\000\001\246\201\240\000\022\232\020S\324\3224L\211\264\304F i\221\2404\321\352\000\000\000\r\000\000\000\00044i\352 \311\200\023\000\0010\000\000\000\t\202`\002`\000\t\211\200\000\t\211\210\004\242$Q\355@\364\236T\3322\004\300jf\200\010\300\214\230\000\000\010\300\010\300\232`\021\241\211\222\001r\2147C\027\017\032t\211g\031k\002\275w~\361'\000E %(\257\000\272\304\270\215$_\276I&Bd!\t BI\t2\213\364\366F\016\2334\265\212o\2148G:\205\246\342\rl(\010\224\325\004AF\251'\306\243\223Q$\314\252\200\2511\206p\3433!!\222W\200\007\206I\027\013\266\256\266\374\345\252p\331\250\316\310\266\226\026\022G\275\244(\305\030>D%b^\245\362\215\030N\260\246\247\306\367>\302\307\216\210\372#\212\252\026\246\247\n\272H\372\312\352\242\216\301n\245S\243\331\262\343\352\352\237\261\366\005\372\256y\346\364>\322nz\306RgX\214\366\235\211\204\246\014\314s\024F\376\204\027\2013\222t~\342\300Ef\370\315*:\210\362\377Z\335\223O\347M\236t\345*\303\326\025'{Pk\3244\373\302\235!\307K\021\202T_$A}1\376\326\213\245{g|]<X\235\020\236 $V{RkYN\233\021\200xx\332lr+\241\006\270\266\003\035\334\031\0074U\tt8@5{w\233\273N=\201W\023\370|\010\354\341\367t\324\025\250Xn\362\016\211\341_v^~]3\320t\350]\342\362\367\227^\2749\02593\320\243\362\343\235\3029\372\026\310\333;\232\375\261\275\307\266\335\256\343\3041u\010H\313\016\031\360\352\036\221\203\002\202\224\263:\316L\324*\0101J\253\355\250\177\\E\370\323\342\342\201H\357\307\261\320\254J\275uy\266\372\3572\010\342\004\020\275\303\253\306-\033\324\327M\206\375\225\223\257\\\233\277\365""\345\356\262\223\201SY}/a?\2326a\231\263\376\r\030\\\377y\277K\\j\331\267~\r+\301G*\275X\305\316\250\306\361\235O\243\241d\344\232ie\205y\342\210\327\006<K\tm\237~\212\337\370\316\221o\345I8Q\364\022\264E]\255\362\221.\245\001\032\026\320\364<,\231\207\272\321\210\363\206\002V\336J\300\350\2616\211\230\240Q\242\302TgT\217\310D\242\262z\262\265B\252\254\004\240LM\022N\216\267\252\346yuj\323\347\207T\356D\026D\345n\004\346J\213\374zlQ\231\304\032P\302\203X\244\241\247\220cfl\314\232*-\253\341\331I7\372\310\\\203:\214\014j\322f\342N\262ZVu\274\227\247V\020\016\227g\220\202M\001\241\332\272\322\001\201\010\350\275n1\236\031\350\017\236\265\254\253s\035\241kF-c\246\037\340\353\323iT\326\227rze\313B\245N\023t\335\337\024\224+V\311\211Y\004h>e!\004%G\210-d\270\024Q\026H:!QA\"X=k\031\374\351\271\263_.\273[j5,~\000\330a\272\220[\210\270\204\025\212\356\225C \247)y\346S\212\033\253\342I\031d\314#U\307M\r\"7\r\214\250\302c\354\262q\3244\032A\311\235XC\314\233JLr)+dvS\264\240\270h\207La\307d\310\336`\312\356&fF\3220\036wJ\362\345\311\005<d\2550\230\316JX\020\321fW\006\226f\270\317b\263$]\364\305Ry\312\245\3143\"\270}\014\233\251BAw\264>2m\312\032\370\245\336^\341\242/_\345\315rk\314,\364\322^Dk\036\010\231\301i\326\325\264\315\310\200\221z\231\010\364y\256QV\030\263Ap\371\267\t\226d21\262\262w9\r\365U}\311\010\221\024t\237RA\336\262\200\244x.\337d\"\006\212\"\217\004\264!\371\337Q\026\252+]\036\230$\323\312\272\366\0044\212\243\303Z\307J\367*\025\304\2110\023@\251\035\024H\3442\333|@\263W\217\272\357\302\177\337v\3245\034\327\020\330;\204\220\225x\006Xkh6\353\222A\346\020Pd\032\206\227\031T.\201\033oPi\233\202\3126\324z(\2539\210>!R=\243\232\361\224\\(\371\336\371\363\007CxuJ\253\267\227@T\266\3522\">JaA\301\204\203\211s\251-#\022\273hN\016s\216\363_z\324 \217\275\251D\243'\241\025&\243\2366\001sZhY\003\020\234Dz\215\306SD\224 \230\330\367#\301\215\314\314\360g\273\244'\216\034D\202wHN\311\261\027?\253\006\222\204\307!]\202\367\344\273Y\334,K>t\342\242\030v\253\027\246\272HHEK!"")\242!P\222\231\005r:\345\215\371l!\231\301Z\2115,%m\311\270b\252j\200W\227zgt<\300`\257)\362pv\332j\344W\303(\031\203\203\217\313jm\272'-k\010\203\014\371Q\032<\334\310\212\242\250\234\354\371J\266\322\271\031\2155\325\265\270fl\226u\275\024\331&n\321\217\210\310\263$E\\\263s\352\306\333TRH*\326\206wq\257\026\3678:\344b/\270\321\315c\020\252\n\212\031\301S\024\032Zh0\274B\353Q_\t\241\256\014Buk\221\206\374\036My;d\356s\307 \304b0PXE\370\275\023!\234\277\026\357\205\235\"\r\0301J%vN\021\341\211L\335i\205\304fcd6\276\224\365\021z\"\021\230c\201\2354T\344k\302\3216\256K\241h\311,\026\264\222\245\350\2671\326\336\226+\004\264e\332\262\036\034\342\253c\202\034\354\240[\013Q7P \235\243I2fO\254&n*u]LF.,:\247+IF3\252\252\302\022\032\331\234\271\t\263\363m9>\021H\231\020\330\205\316\"\226\215\274\260zR\345\243\252\020\201\301\024,d B\246\243\304\340Z\352dh\213)\013-#\031\275\211\312M\030\367u\223\n+ss\017\325Q\330\034\251f\340Y*v\315\336\260\361\3633y5\357Q\311bX\317\031F\232\016\016\035Y\005\320\233$9\232\215\211^J\271\2677\344\270\021\305\206D\030\255\265\032:\252\206\222\260\233\005\010\037'\334\024Y\306@R\214\\\270`\341\031\341&\315[\202\340@\023* \026\010)c\245\273C\t\023/7'\303\322!\230\233J\202\250j\243\352\tbk\246~\032\211\366fq\270'\334\320\340\0020\302\204i\261\327\360\250\204;A\215\261\224+\020\210\366s\000\333W\235gA2B\315\242\026\247\005,f\270\236\007\264\304\235{\004\311XU\306U\366\n\031K\205\206\302\364\203+\240\332\010vQ\224\010g\261\236;\314\374C\"\334\377\305\363\002\303\216\031#Y9{\240\362\315\241sTOoxt\342\334\267`\342\006(h-\262\273\241\335iO\035\3121\226\246\340\272\037\250\372\326E\330\000\251\356\360(Ei '\305 \370\252\370}\240\225N\354\020\270\r\340\212y\347p{#}n#\240<a\271\246\347\213\240\245\241\347\233n8\250\3446\341\030\254:\261\006\341D\2533L\267t\262\007;&\235i\323\254\375g\nz!\231\271\031\342P\200\371\202\005`tQ\242(\226<z\230\3740\346\360\n\372u\034\210K\246\336\256\206f(\246\337\016\216$3\372\227%\361D\221\345\345\357\014i\2504\234\r0\305q""\\4=\0245\373\263&[m\201\020c|b`\034hsi\004S\030a\216\272\350\251I\204\024J\222\230K\"\310K\205\352U\212\212\276\360\327k\252%b\3679\251\357b\223a\242M\225\211\314\357Ek\363\327B\317;\367\202\005j,\313;\255\0215\261\2355`RY\334\377\305\334\221N\024$!\004\220M@";
+    PyObject *data = __Pyx_DecompressString(cstring, 2243, 2);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
-    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (2107 bytes) */
-const char* const cstring = "x\332\305U\315S\333H\026\307\031CH`v\200\000!\231\335\244\311\027I6\361\214\201Ifw\362Q\204\220-\252vf\002$$\273\263[\252\266\3246JdIV\267\000\263\265U9\372\250\243\216:\352\350\243\217\034s\364QG\376\204\374\t\363{-\003&\314\354u)\323\325ju\367{\277\217\367\364W\266\3448\314\262\353\302\225\266\347J\346\007\302\024\226\355\326\216\027\331M\213\325C\251XE0\333\265\304\256\260\030w-\346z\212I\307\306\366ga\265*\002\266m\213\035fyB\352Wb\327\367\244`R\005\266%\3442w\231\347:Mf\006\202+\3018\253\344\207\324\026W\314\226\314\364\\e\327B/\224\010\302\352\242\356\005\315\022N\321U\\J\273\3462\3451\034\266\356\353{\362\035\024\262\267\251w\361N`+^qDoC\236T5\360\352\377\353\254\206\305vl\265\305T\323\027l\256\267\256\002\356J\r\343\370H\276\r'lP\245\372\270{\336O\230\235\223\220oZ\251\373\252\311\344\026\307\325*\364\221\\\325\013\230\331T[\236[\342A\300\233\253:\001/T\314\253\262\212\027\272\226d\267\371.n\271i\335Y=\035+'?\364}/P\302Zu\267\271cC%\317\022\367\210xl\206Hs\346\034C\2349\004# s\367X\r\247\0167\347\351\200k\035\346\321\217\032\340&\001D\n?y\240RK\263\254\263$<\226p\354\212\010@2($Y\021D\353\347\262\227+/\357/~\277\250m\021\210w\010/\221]\305t\240\034\354@\230B\333Q\010F\364\312\022[\255\262\246\0272W M\310\352c_\377\001\265%\\&\205\242\t\233\323Zp\005\334\006\216\303\233s=^\355mA\247_pG\212\322\317'\310C\312=\203q\323\024\362\220\315\r%|V\347M\315\037\374\274'\002\357\230\350\327\256v\016\256\204\033\267E\000c(Q\247g\257B\240JO\346\356<\345\226e\270D\017\201e`\350\333]\036*\317\250\363\000\000\355\037\027\276\361|e\327\355\275<c\263Y\362\233\273\246\3478\2240\244+\361\212\371\250\317\355tM\016\347\311\347\313\207&{b\331\2222\023:\277\232\311n\223\2205\355/\302H\345*v\225p\225.\236\343\312\265e~\304\"\034\322\336\023\354\321c\366\355)\367\271\036\304\255\362\320Q\3140\002a\205\2460\014f\205\232\n\327s\357C\354m\233;xk\002\2422\0147\254\373\315\222az\201(\325q\316\326\367\260*\267\235\\Q\273N\326\354\337\026\3269\352\346\363\035=f\237<\312\373\204u\202\216\323k""\344\347#VN\274?Z\r\217D\344\216\343\231\272\331\350\344,\256x\3517\336\346\205@w\364zUiicyuu\305ql_\332\3220^6w\361\377\034~7~\002\315\353\242\272!\032\241pMA\345R:\256\034(Kn\363u\0032p\031\214\311m\376\3560\224\221[\222K\235\020\227M\327\264\275\022\330A\341\333\256\220\\\031\266kT,\020&\252U\256\274\272\244\205\032\017\321\000\271k\270\376I\247\225>sZ\205[\025.\005.\300\317\203\201\035\356\347wU\320\373\3124\314\323`\330V\305\256\274\253x\256e\300ZJ\322L\207\"+I\323\334\022\346{\203v\312\276\251\341\325}\030\200J\3240\016'5\241\310[\364\010\004t\005Z\215)*\334|oz~\323D5\302.\026q\247CY\324\000\364`\200\332\\|A\355\021t\242{\t8F\267\030\021\0040\r:\3251z\333E\277\341&X\250Bl\343\024\323 \240\352\360\232\204\273a\265^\3233\214j\350\232\306\361-\207\264\270\300\202\344\245\"]\014\333\2660hG\032\207<\350\217\002\202.\314S\252G*\345\245\324\253'\007\220rvh\246it<\027\r\322 \365\014\037\345\347\3206\324\201\260\214\\Q\350\207\010\030\251\325\341\273B\037\025\352\334X\362\254\020p\0147G\344\362:=\344#\212\032\243\330\301\340\273Z&]\\`\320\253V\321*Ir\216\317\034\274`\032;\302\256m\251\343\027\371\263\017Q\01632\372\322\224\270\322\367\300\007\032\225\241\005\227a=\177\352\321CS\255\231\236\205\256o\233\357\221\350\212{\270o;\027\002\177\215\3600\361\343Vr4\313\233N\337\202\330\245i\r\334Ap\333\302\317\260ixG\010aS\303\253\352\024\203mk\207\376\217 \352\0073\360$Hl\030\300\322\363\250A\210\363\370\230\365\272\232\236\367\240\364\315\017\263\321\r\200\324\224\220\037\257h\020\276T\036\376\203\220\234\253\204\244\021>%]\340\205:\276g\256\372\036L\200\323\320Gk!\257\206B\356\322\027Ev\007\256%\263\237\256\014\014^\216/'\017\322\361t\366\323\320\300\340\225x-+^\216g\263\342\225\230g\305\253q\343\2408\334\032l\275\216f\243r6<\026\rF\377\214\033I!\033\036i=\304\332\303\370:N\214\376)^;(Nt'\256'\013\211\231N\244O;\327\272\2176\273\233o\273o\377\361{\027\214\266V\242\251\210GA<\021/ \330\350d\264\202T\312\311R6z\245{\245\334\036\317\306\220I\3740\231\315\306\306O\377\0200\232=(""^\214\032\331\357D\030\213\316u/\335O\221\337\227\247\177\007\303_\307\345<\213\361l\364\253V\020]\214\013\331\030K\316&\215\264\240/\317\010\322\335t\266\373\347\307\235\267\373 f\244U\356\016\000\353\247\311\201\301\351\310H\226\2227\351\337\332\177\351\274\330\377\246\273\266\216\367\335\221\253q\220\\\300\213\365$L\237\245\325\366r[u\346;\233\373\363\373k\037\n\237\306\006\006/!\312Q\276\217\223\241\204'\rb\363\007P\361_\034|\225~\335^\"F\337\340\341\337\355\331v9+\236\375\240Z\310\225\222\234\006_\027\342\3478WI\013\224\321|\353m\264\326\235\276\223N\247A{<W\365<\205\031\212\253\270\001\272\200\304\203b\271=\321~\320\031\357\\\317s\311SX\243\300\363\255\215\250\030!\344XT AN\3505\322Zl5\242/\242\205\010\002]\216o%\205\004\304\003'K\316$\263@4A\241\316'\267\322B\212\027S\335\251[I-]K\355\266\354\314\355\217g\305\351\250\032?#+iS]\210\312\344\262s\307\001\276j\355\305\343\332D\210\365]t\006\254\217\316\304gs\001\351\360R\274\201P\327\2235\000\036L\327\323\355\366F\247\330y\326A\236#\255\247\361\265\370\357i\001y\334\033\030\234\211\366\222i\022\217B\014\177\330mI\\\206\000\215O\303\003\203\345\366\231\366\355\316l\347\321\376\366\307\365\217;\335\315_\272\277\374\213\230\r[KD\306PKD\345h9\322Z,\264xK\001\263\251S[\217\033\331h/\363\2139?\371\356\245l\370\017\230<Mf\223\357\322\363Z*M\030\305\035\235\212^\301\330\020o.\t\240M\243=\334\031\352T\366\0139\376\243\013\276\004\021w\001r\215\254\370\"\272\0315\342/\342y`.d\243\343\220\343\0351N\376\374\017Ja1VI9\033\233\211\007c#]\202\261\373\247\027\242\007\361$\222U\250\346\013\351R6y1\332\326\334\335H\252\260\"\317fn\301k{\355\361\203I8\377\004\212\221\326\023 \275\021W(j\017\351p\367\354\035t\205{m\2569$\266\313\340\371V\037\317\007\240\257\217\345\241\377\037\313th\022v:w\236\334S\2105c\r\352\023\375$\216EC\221\210\313\361r^\243DY9\233\234\312\306\246\242\327\361]*\026Z\372!\346\340p\021U9\371\307x%\271\332.\240\023\365O/Fa\374\002\254V\322b\372\242}\275\275\331Y\354l\357o|<\363\361\306\307j\367\025\332\336\233l""\206\332\347\314%b\250q\304\316oQ\372\363\257\323\350\267\027";
-    PyObject *data = __Pyx_DecompressString(cstring, 2107, 1);
+    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (2110 bytes) */
+const char* const cstring = "x\332\305U\317S\333H\026\306\031CH`v\200\000!\231\335\244\035\222\220d\023\317\030\230dv\207$E\010\354R\2653\023 !\331\235\335R\265\245\266Q\"K\262\324\002\314\326V\345\350\243\216:\352\250\243\217>r\344\350\243\216\374\t\371\023\366{-\033L\230\331\353R\246\253\325\352\356\367\276\037\357\351\317l\331\262\230a\326\204\355\233\216\3553\327\023\2720L\273z\272\310\356\030\254\026\370\222\225\0053mC\354\013\203q\333`\266#\231o\231\330\376\"\250T\204\307vM\261\307\014G\370\352\225\330w\035_0_z\246!\374\025n3\307\266\032L\367\004\227\202qV\316\016\311\035.\231\3513\335\261\245Y\r\234\300G\020V\0235\307k\024q\212\256\342\276oVm&\035\206\303\306#uO\266\203Bv7u/\336\363L\311\313\226\350n\310\222\252xN\355\177\235U\260\330\236)w\230l\270\202\315u\327\245\307m_\3018=\222m\303\t\023T\311>\356^\366\023ff$d\233Vk\256l0\177\207\343j\031\270H\256\342xLo\310\035\307.r\317\343\215u\225\200\023H\346TX\331\tl\303g\367\370>n\271c\334_?\037+#?p]\307\223\302X\267w\271eB%\307\020\017\211xl\206Hs\372\034C\2349\004# s\017Y\025\247z\233\263t\300\265\n\263\364\243\002\270M\000\221\302O\016\250T\322\254\250,\t\217!,\263,<\220\014\nIV\004Q\372\331\354\325\352\253G\213\337/*[x\342=\302\373\310\256\254[P\016v L\201iI\004#z\375\"[\257\260\206\0230[ M\310\352b_\377\001\271#l\346\013I\0236\247\264\340\022\2705\034\2077\347\272\274\232\273\202N\257q\313\027\305\237\317\220\207\224\273\006\343\272.\374\036\233[R\270\254\306\033\212?\370\371@x\316)\321ol\345\034\\\t7\356\n\017\306\220\242F\317N\231@\025\237\315\335\177\316\rC\263\211\036\002\313\300\320\267\373<\220\216V\343\036\000\232?.|\343\270\322\254\231\007Y\306z\243\3506\366u\307\262(aHW\344e}\251\317\355tM\006\347\331\347\313=\223=3L\2372\023*\277\252\316\356\221\220U\345/\302H\345*\366\245\260\245*\236\323\3125\375\354\210A8|\363@\260\245\247\354\333s\356\263\035\210[\341\201%\231\246y\302\010t\241i\314\010\024\025\266c?\202\330\273&\267\360V\007D\251ivPs\033EMw<Q\254\341\234\251\356a\025nZ\231\242f\215\254\331\277-\250q\324\315\347;\272\314>[""\312\372\204q\206\216\363k\344\347\023V\316\274?Y\rND\344\226\345\350\252\331\250\344\014.y\361W\336f\205@wt{Uqyke}}\325\262L\3277}M{\325\330\307\377K\370]\373\t4o\212\312\226\250\007\302\326\005\225K\361\264r\240,\271\315U\rH\303e0&7\371\373^(-\263$\367UB\334o\330\272\351\024\301\016\n\337\264\205\317\245f\332Z\331\000a\242R\341\322\251\371\264P\345\001\032 \2675\333=\353\264\342gN+s\243\314}\201\013\360s``\213\273\331]e\364\276\022\r\3634h\246Q6\313\357\313\216mh\260\226\364i\246B\221\225|]\337\021\372\007\215v\372}S\315\251\2710\000\225\250\246\365&U!\311[\364\010\004t\005Z\215.\312\\\377\240;nCG5\302.\006q\247B\031\324\000\324\240\201\332L|A\355\021t\242{\t8F\265\030\341y0\r:\325)z\323F\277\341:X\250@l\355\034\323 \240b\361\252\017w\303j\335\246\247i\225\300\326\265\323[z\264\330\300\202\344}I\272h\246i`P\216\324z<\250\217\002\202.\314S\252'*e\245\324\255'\013\2202vh\246h\264\034\033\rR#\3654\027\345g\3216\324\2010\264LQ\350\207\010\030\251\325\341\273B\037\025\352\334Xr\214\000p4;Cd\363\032=d#\212\032\243\330\303\340\332J&U\\`\320\251T\320*Ir\216\317\034\274\240k{\302\254\356\310\323\027\331\263\013Qz\031i}i\372\270\322u\300\007\032\225\246\004\367\203Z\366\324\245\207\246J35\013l\327\324? \321U\273\267o7\023\002\177\365\240\227\370i+9\231eM\247oA\354\323\264\n\356 \270i\340\247\2314\274'\204\260\251\346TT\212\336\256\261G\377'\020\325\203\3569>H\254k\300\322\365\250F\210\263\370\230u\273\232\232w\241\364\315{\331\250\006@j\372\220\037\257h\020\256/\035\374{\0019W\n\237F\370\224t\201\027j\370\236\331\362{0\001N\003\027\255\205\274\032\010\177\237\276(~g\340V\\\370tc`\360zt=~\234\214'\205OC\003\2037\242\2154\177=*\244\371\033\021O\3637\243\372q~\2709\330|\023\026\302R:<\026\016\206\377\210\352q.\035\036i>\301\332\223h\026'F\377\020m\034\347':\023\263\361B\254'\023\311\363\366\255\316\322vg\373]\347\335\337\177\353\202\321\346j8\025\362\320\213&\242\005\004\033\235\014W\221J)^NGotn\224Z\343\351\0302\211\236\304\205tl\374\374\017\001\303\302q\376jXO\177#\302Xx""\251s\355Q\202\374\276<\377;\036\376:*eY\214\247\243_5\275\360j\224K\307X|1\256'9uyJ\220\036$\205\316\037\237\266\337\035\202\230\221f\2513\000\254\237&\007\006\247C-^\216\337&\177i\375\251\275v\370Mgc\023\357;#7#/\276\202\027\233q\220\274H*\255\225\226l\317\267\267\017\347\0177>\346>\215\r\014^C\224\223|\237\306C1\217\353\304\346\017\240\342?8\370:\371\272\265L\214\276\305\303\277Z\205V)\315_\374(\233\310\225\222\234\006_W\242\2278WNr\224\321|\363]\270\321\231\276\237L'^k<S\3652\205\031\212*\270\001\272\200\304\343|\2515\321z\334\036o\317f\271d)lP\340\371\346V\230\017\021r,\314\221 g\364\032i.6\353\341\027\341B\010\201\256Gw\343\\\014\342\201\223\305\027\342\002\020MP\250\313\361\335$\227\340\305Tg\352n\\M6\022\263\345\267\347\016\307\323\374tX\211^\220\225\224\251\256\204%r\331\245\323\000_5\017\242qe\"\304\372.\274\000\326Gg\242\213\231\200tx9\332B\250\331x\003\200\007\223\315d\267\265\325\316\267_\264\221\347H\363yt+\372[\222C\036\017\007\006g\302\203x\232\304\243\020\303\037\367\233>.C\200\372\247\341\201\301R\353B\353^\273\320^:\334=\332<\332\353l\377\322\371\345\237\304l\320\\&2\206\232\",\205+\241\322b\241\311\233\022\230u\225\332fTOG\273\231_\315\370\311v/\247\303\277\303\344y\\\210\277K.+\251\024a\024wt*|\rcC\274\331x>\336NJ\311_[k\355[\355\345\014\377\311\005_\202\210\007\000\271AV\\\013\357\204\365\350\213h\036\230s\351\3508\344xO\214\223?\377\215RX\214d\\J\307f\242\301HK\226a\354\376\351\225\360q4\211d%\252\371J\262\234N^\rw\025w\267\343\n\254\310\323\231\273\360\332Ak\374x\022\316?\203b\244\371\014HoGe\212\332E:\334\271x\037]\341a\213+\016\211\355\022x\276\333\307\3631\350\353cy\350\377\3072\035\232\204\235.]&\367\344\"\305X\235\372D?\211c\341P(\242R\264\222\325(QVJ'\247\322\261\251\360M\364\200\212\205\226~\21088\\DUN\376>Z\215o\266r\350D\375\323\253a\020\255\201\325r\222O\326Z\263\255\355\366b{\367p\353\350\302\321\355\243J\3475\332\336\333t\206\332\347\3145b\250~\302\316\257Q\372\363\177\001\014[\2673";
+    PyObject *data = __Pyx_DecompressString(cstring, 2110, 1);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
     #else /* compression: none (3807 bytes) */
-const char* const bytes = ": All dimensions preceding dimension %d must be indexed and not slicedBuffer view does not expose stridesCan only create a buffer that is contiguous in memory.Cannot assign to read-only memoryviewCannot create writable memory view from read-only memoryviewCannot index with type 'Cannot transpose memoryview with indirect dimensionsDimension %d is not directEmpty shape tuple for cython.arrayIndex out of bounds (axis %d)Indirect dimensions not supportedInvalid mode, expected 'c' or 'fortran', got Invalid shape in axis <MemoryView of Note that Cython is deliberately stricter than PEP-484 and rejects subclasses of builtin types. If you need to pass subclasses then set the 'annotation_typing' directive to False.Out of bounds on buffer access (axis Step may not be zero (axis %d)Unable to convert item to object.>')?add_note and  at 0xauto_martiniM3/optimization_cy.pyxcollections.abc<contiguous and direct><contiguous and indirect>disableenablegc (got got differing extents in dimension isenableditemsize <= 0 for cython.arrayno default __reduce__ due to non-trivial __cinit__numpy._core.multiarray failed to importnumpy._core.umath failed to import object><strided and direct><strided and direct or indirect><strided and indirect>unable to allocate array data.unable to allocate shape and strides.ASCIIEllipsis__Pyx_PyDict_NextRefSequenceView.MemoryViewabcacceptable_trialsaiajallocate_bufferasarrayasyncio.coroutinesat_in_bd_coeffatoms_in_gaussian_npauto_martiniM3.optimization_cybadbasebd_bd_overlap_coeffbead1bead2bead_idbibjbond_distsbonds_in_ringsccheck_beadscheck_beads_omp__class____class_getitem__cline_in_tracebackcopycount__dict__distdtypedtype_is_objectemptyencodeenumerateerroreval_gaussian_interac_npfind_acceptable_trials_cyflagsformatfortran__func__gaussian_overlap_np__getstate__iid__import__in_ringindexint32_is_coroutineitemsitemsizelist_beadslistbondslonely_atom_penalizelumped_atoms__main__massesmemviewmode__module__n_trialname__name__ndim__new__npnringsnumpyobjoffset_bd_ar""omatic_weightoffset_bd_weightpackpenalize_lonely_atoms_nppop__pyx_checksum__pyx_state__pyx_type__pyx_unpickle_Enum__pyx_vtable____qualname____reduce____reduce_cython____reduce_ex__registerridrid_irid_jring_id_of_atomrvdwrvdw_aromaticrvdw_crossseq_one_beads__set_name__setdefault__setstate____setstate_cython__shapesizesortstartstepstopstruct__test__tmptrial_combuint8unpackupdatevaluesxzeros\320\000\"\240!\360\036\000\005\032\230\032\2406\250\021\250!\360\006\000\005\036\230Q\330\004\032\230!\330\004\036\230a\330\004\037\230q\340\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\013\2107\220!\2207\230#\230Q\330\014\035\230Q\340\004\022\320\022#\2403\240c\250\022\250?\270\"\320<V\320VX\320XY\340\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\014\210E\220\025\220a\220r\230\022\2303\230a\330\014\024\220E\230\032\2401\240A\330\014\036\320\0361\260\021\330\020\032\230!\2307\240!\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\340\004\022\220!\340\004\027\220q\330\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\020\220\t\320\031-\250Q\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\340\010\033\2301\330\010\014\210E\220\021\330\014\017\210r\220\027\230\001\330\020 \240\007\240q\250\001\340\004\022\220!\330\004\022\320\022*\250!\320+=\270X\300Q\330\004\013\2101\320\000\035\230Q\360\024\000\005\026\220_\240A\240W\250G\2609\270F\300/\320QR\330\004\013\320\013\037\230r\240\023\240A\240R\240u\250B\250f\260C\260t\2702\270V\3002\300Q\200\001\360\020\000\005\031\230\001\330\004\010\210\005\210U\220!\220=\240\006\240a\240q\330\010\013\210;\220a\220}\240A\240T\250\033\260A\330\014\035\230W\240A\240]\260!\2601\330\004\007\200t\2101\330\010\017\210r\220\026\220r\230\023\230D\240\006\240b\250\001\330\004\013\2102\210X\220Q\320\026)\250\026\250r\260\021\320\000\"\240!\360\n\000\005\031\230\006\230f\240A\240Q\340\004\032\230!\340\0041\260\022\2606""\270\021\270#\270V\3002\300Q\330\004\010\210\005\210Q\330\010\013\2102\210S\220\004\220A\330\014\020\220\001\220\025\220a\340\004\010\210\005\210U\220!\2201\330\010\013\2104\210q\220\003\2203\220a\330\014\032\230&\240\001\240\021\340\004\013\320\013 \240\002\240!\200\001\360\022\000\005\031\230\n\240&\250\001\250\021\340\004\025\320\025&\240g\250Q\250i\260s\270'\300\021\330\004\026\220f\230B\230a\330\004\032\230!\330\004\023\2201\360\006\000\005\t\210\005\210U\220!\2201\330\010\017\210z\230\021\230#\230Q\330\010\013\2105\220\002\220!\330\014\030\230\007\230q\240\001\330\010\026\220f\230A\230S\240\002\240#\240Q\240b\250\005\250R\250v\260S\270\004\270B\270a\340\004\013\210?\230\"\230L\250\001\200\001\360,\000\005\030\220z\240\026\240q\250\001\360\006\000\005\010\200x\210s\220!\330\010\017\210q\360\010\000\0051\260\002\260(\270!\270<\300v\310R\310w\320V[\320[\\\330\004\007\200u\210A\330\004\010\210\006\210e\2201\220C\220q\330\010\013\2103\210a\210t\2203\220c\230\021\230#\230R\230q\330\014\023\2201\360\006\000\005\027\220a\340\004\010\210\006\210e\2201\220A\330\010\016\210e\220?\240!\2405\250\n\260!\2601\330\010\013\2104\210s\220!\330\014\025\220T\230\022\2301\330\004'\240r\250\026\250q\260\010\270\006\270b\300\001\360\006\000\005\t\210\006\210e\2201\220A\330\010\r\210U\220*\230A\230Q\330\010\014\210F\220%\220q\230\003\2302\230S\240\001\330\014\021\220\025\220j\240\001\240\021\330\014\017\210{\230!\2304\230t\2401\330\020\030\230\005\230_\250A\250Q\330\020\030\230\005\230_\250A\250Q\330\020\023\2206\230\024\230R\230t\2406\250\023\250A\330\024\027\220v\230S\240\002\240$\240f\250B\250a\330\030&\240a\240z\260\021\340\024\033\2301\340\004\010\210\006\210e\2201\220A\330\010\013\210>\230\021\230$\230b\240\001\330\014\023\2201\360\006\000\005\010\320\007)\250\021\250,\260a\330\010\017\210q\340\004\013\2101\200\001\360&\000\005\030\220z\240\026\240q\250\001\340\004\007\200x\210s\220!\330\010\017\210q\360\006\000\0051\260\002\260(\270!\270<\300v\310R\310w\320V[\320[\\\330\004""\007\200u\210A\330\004\010\210\006\210e\2201\220C\220q\330\010\013\2103\210a\210t\2203\220c\230\021\230#\230R\230q\330\014\023\2201\360\006\000\005\027\220a\340\004\010\210\006\210e\2201\220A\330\010\016\210e\220?\240!\2405\250\n\260!\2601\330\010\013\2104\210s\220!\330\014\025\220T\230\022\2301\360\006\000\005\024\2201\330\t\n\330\014\030\230\001\230\021\330\014\017\210q\330\020\021\330\014\021\220\025\220j\240\001\240\021\330\014\020\220\006\220e\2301\230C\230r\240\023\240A\330\020\023\2201\330\024\025\330\020\025\220U\230*\240A\240Q\330\020\023\220;\230a\230t\2404\240q\330\024\034\230E\240\037\260\001\260\021\330\024\034\230E\240\037\260\001\260\021\330\024\027\220u\230F\240$\240b\250\004\250F\260#\260V\2704\270v\300S\310\002\310$\310f\320TV\320VW\330\030\036\230a\330\030\031\340\004\007\200q\330\010\017\210q\360\006\000\005\010\320\007)\250\021\250,\260a\330\010\017\210q\340\004\013\2101O";
+const char* const bytes = ": All dimensions preceding dimension %d must be indexed and not slicedBuffer view does not expose stridesCan only create a buffer that is contiguous in memory.Cannot assign to read-only memoryviewCannot create writable memory view from read-only memoryviewCannot index with type 'Cannot transpose memoryview with indirect dimensionsDimension %d is not directEmpty shape tuple for cython.arrayIndex out of bounds (axis %d)Indirect dimensions not supportedInvalid mode, expected 'c' or 'fortran', got Invalid shape in axis <MemoryView of Note that Cython is deliberately stricter than PEP-484 and rejects subclasses of builtin types. If you need to pass subclasses then set the 'annotation_typing' directive to False.Out of bounds on buffer access (axis Step may not be zero (axis %d)Unable to convert item to object.>')?add_note and  at 0xauto_martiniM3/optimization_cy.pyxcollections.abc<contiguous and direct><contiguous and indirect>disableenablegc (got got differing extents in dimension isenableditemsize <= 0 for cython.arrayno default __reduce__ due to non-trivial __cinit__numpy._core.multiarray failed to importnumpy._core.umath failed to import object><strided and direct><strided and direct or indirect><strided and indirect>unable to allocate array data.unable to allocate shape and strides.ASCIIEllipsis__Pyx_PyDict_NextRefSequenceView.MemoryViewabcacceptable_trialsaiajallocate_bufferasarrayasyncio.coroutinesat_in_bd_coeffatoms_in_gaussian_npauto_martiniM3.optimization_cybadbasebd_bd_overlap_coeffbead1bead2bead_idbibjbond_distsbonds_in_ringsccheck_beadscheck_beads_omp__class____class_getitem__cline_in_tracebackcopycount__dict__distdtypedtype_is_objectemptyencodeenumerateerroreval_gaussian_interac_npfind_acceptable_trials_cyflagsformatfortran__func__gaussian_overlap_np__getstate__iid__import__in_ringindexint32_is_coroutineitemsitemsizelist_beadslistbondslonely_atom_penalizelumped_atoms__main__massesmemviewmode__module__n_trialname__name__ndim__new__npnringsnumpyobjoffset_bd_ar""omatic_weightoffset_bd_weightpackpenalize_lonely_atoms_nppop__pyx_checksum__pyx_state__pyx_type__pyx_unpickle_Enum__pyx_vtable____qualname____reduce____reduce_cython____reduce_ex__registerridrid_irid_jring_id_of_atomrvdwrvdw_aromaticrvdw_crossseq_one_beads__set_name__setdefault__setstate____setstate_cython__shapesizesortstartstepstopstruct__test__tmptrial_combuint8unpackupdatevaluesxzeros\320\000\"\240!\360\036\000\005\032\230\032\2406\250\021\250!\360\006\000\005\036\230Q\330\004\032\230!\330\004\036\230a\330\004\037\230q\340\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\013\2107\220!\2207\230#\230Q\330\014\035\230Q\340\004\022\320\022#\2403\240c\250\022\250?\270\"\320<V\320VX\320XY\340\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\014\210E\220\025\220a\220r\230\022\2303\230a\330\014\024\220E\230\032\2401\240A\330\014\036\320\0361\260\021\330\020\032\230!\2307\240!\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\330\020\021\340\004\022\220!\340\004\027\220q\330\004\010\210\005\210U\220!\2201\330\010\020\220\005\220Z\230q\240\001\330\010\020\220\t\320\031-\250Q\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\330\014\r\340\010\033\2301\330\010\014\210E\220\021\330\014\017\210r\220\027\230\001\330\020 \240\007\240q\250\001\340\004\022\220!\330\004\022\320\022*\250!\320+=\270X\300Q\330\004\013\2101\320\000\035\230Q\360\024\000\005\026\220_\240A\240W\250G\2609\270F\300/\320QR\330\004\013\320\013\037\230r\240\023\240A\240R\240u\250B\250f\260C\260t\2702\270V\3002\300Q\200\001\360\020\000\005\031\230\001\330\004\010\210\005\210U\220!\220=\240\006\240a\240q\330\010\013\210;\220a\220}\240A\240T\250\033\260A\330\014\035\230W\240A\240]\260!\2601\330\004\007\200t\2101\330\010\017\210r\220\026\220r\230\023\230D\240\006\240b\250\001\330\004\013\2102\210X\220Q\320\026)\250\026\250r\260\021\320\000\"\240!\360\n\000\005\031\230\006\230f\240A\240Q\340\004\032\230!\340\0041\260\022\2606""\270\021\270#\270V\3002\300Q\330\004\010\210\005\210Q\330\010\013\2102\210S\220\004\220A\330\014\020\220\001\220\025\220a\340\004\010\210\005\210U\220!\2201\330\010\013\2104\210q\220\003\2203\220a\330\014\032\230&\240\001\240\021\340\004\013\320\013 \240\002\240!\200\001\360\022\000\005\031\230\n\240&\250\001\250\021\340\004\025\320\025&\240g\250Q\250i\260s\270'\300\021\330\004\026\220f\230B\230a\330\004\032\230!\330\004\023\2201\360\006\000\005\t\210\005\210U\220!\2201\330\010\017\210z\230\021\230#\230Q\330\010\013\2105\220\002\220!\330\014\030\230\007\230q\240\001\330\010\026\220f\230A\230S\240\002\240#\240Q\240b\250\005\250R\250v\260S\270\004\270B\270a\340\004\013\210?\230\"\230L\250\001\200\001\360,\000\005\030\220z\240\026\240q\250\001\360\006\000\005\010\200x\210s\220!\330\010\017\210q\360\010\000\0051\260\002\260(\270!\270<\300v\310R\310w\320V[\320[\\\330\004\007\200u\210A\330\004\010\210\006\210e\2201\220C\220q\330\010\013\2103\210a\210t\2203\220c\230\021\230#\230R\230q\330\014\023\2201\360\006\000\005\027\220a\340\004\010\210\006\210e\2201\220A\330\010\016\210e\220?\240!\2405\250\n\260!\2601\330\010\013\2104\210s\220!\330\014\025\220T\230\022\2301\330\004#\2402\240V\2501\250H\260F\270\"\270A\360\006\000\005\t\210\006\210e\2201\220A\330\010\r\210U\220*\230A\230Q\330\010\014\210F\220%\220q\230\003\2302\230S\240\001\330\014\021\220\025\220j\240\001\240\021\330\014\017\210{\230!\2304\230t\2401\330\020\030\230\005\230_\250A\250Q\330\020\030\230\005\230_\250A\250Q\330\020\023\2206\230\024\230R\230t\2406\250\023\250A\330\024\027\220v\230S\240\002\240$\240f\250B\250a\330\030&\240a\240z\260\021\340\024\033\2301\340\004\010\210\006\210e\2201\220A\330\010\013\210>\230\021\230$\230b\240\001\330\014\023\2201\360\006\000\005\010\320\007)\250\021\250,\260a\330\010\017\210q\340\004\013\2101\200\001\360&\000\005\030\220z\240\026\240q\250\001\340\004\007\200x\210s\220!\330\010\017\210q\360\006\000\0051\260\002\260(\270!\270<\300v\310R\310w\320V[\320[\\\330\004\007\200u\210A""\330\004\010\210\006\210e\2201\220C\220q\330\010\013\2103\210a\210t\2203\220c\230\021\230#\230R\230q\330\014\023\2201\360\006\000\005\027\220a\340\004\010\210\006\210e\2201\220A\330\010\016\210e\220?\240!\2405\250\n\260!\2601\330\010\013\2104\210s\220!\330\014\025\220T\230\022\2301\360\006\000\005\024\2201\330\t\n\330\014\030\230\001\230\021\330\014\017\210q\330\020\021\330\014\021\220\025\220j\240\001\240\021\330\014\020\220\006\220e\2301\230C\230r\240\023\240A\330\020\023\2201\330\024\025\330\020\025\220U\230*\240A\240Q\330\020\023\220;\230a\230t\2404\240q\330\024\034\230E\240\037\260\001\260\021\330\024\034\230E\240\037\260\001\260\021\330\024\027\220u\230F\240$\240b\250\004\250F\260#\260V\2704\270v\300S\310\002\310$\310f\320TV\320VW\330\030\036\230a\330\030\031\340\004\007\200q\330\010\017\210q\360\006\000\005\010\320\007)\250\021\250,\260a\330\010\017\210q\340\004\013\2101O";
     PyObject *data = NULL;
     CYTHON_UNUSED_VAR(__Pyx_DecompressString);
     #endif
@@ -25713,37 +25706,37 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {8, 0, 0, 8, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 61};
+    const __Pyx_PyCode_New_function_description descr = {8, 0, 0, 8, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 60};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_dist, __pyx_mstate->__pyx_n_u_bead1, __pyx_mstate->__pyx_n_u_bead2, __pyx_mstate->__pyx_n_u_in_ring, __pyx_mstate->__pyx_n_u_bd_bd_overlap_coeff, __pyx_mstate->__pyx_n_u_rvdw, __pyx_mstate->__pyx_n_u_rvdw_aromatic, __pyx_mstate->__pyx_n_u_rvdw_cross};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_gaussian_overlap_np, __pyx_mstate->__pyx_kp_b_iso88591_Q__AWG9F_QR_r_ARuBfCt2V2Q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {7, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 75};
+    const __Pyx_PyCode_New_function_description descr = {7, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 74};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_bead_id, __pyx_mstate->__pyx_n_u_in_ring, __pyx_mstate->__pyx_n_u_bond_dists, __pyx_mstate->__pyx_n_u_masses, __pyx_mstate->__pyx_n_u_at_in_bd_coeff, __pyx_mstate->__pyx_n_u_rvdw, __pyx_mstate->__pyx_n_u_rvdw_aromatic};
     __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_atoms_in_gaussian_np, __pyx_mstate->__pyx_kp_b_iso88591_gQis_fBa_1_U_1_z_Q_5_q_fAS_Qb_R, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 101};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 100};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_lumped_atoms, __pyx_mstate->__pyx_n_u_masses, __pyx_mstate->__pyx_n_u_lonely_atom_penalize};
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_penalize_lonely_atoms_np, __pyx_mstate->__pyx_kp_b_iso88591_fAQ_1_6_V2Q_Q_2S_A_a_U_1_4q_3a, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {12, 0, 0, 12, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 122};
+    const __Pyx_PyCode_New_function_description descr = {12, 0, 0, 12, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 121};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_list_beads, __pyx_mstate->__pyx_n_u_in_ring, __pyx_mstate->__pyx_n_u_bond_dists, __pyx_mstate->__pyx_n_u_masses, __pyx_mstate->__pyx_n_u_offset_bd_weight, __pyx_mstate->__pyx_n_u_offset_bd_aromatic_weight, __pyx_mstate->__pyx_n_u_lonely_atom_penalize, __pyx_mstate->__pyx_n_u_bd_bd_overlap_coeff, __pyx_mstate->__pyx_n_u_at_in_bd_coeff, __pyx_mstate->__pyx_n_u_rvdw, __pyx_mstate->__pyx_n_u_rvdw_aromatic, __pyx_mstate->__pyx_n_u_rvdw_cross};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_eval_gaussian_interac_np, __pyx_mstate->__pyx_kp_b_iso88591_6_Q_a_q_U_1_Zq_7_7_Q_Q_3c_VVXXY, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 14, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 243};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 14, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 242};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_trial_comb, __pyx_mstate->__pyx_n_u_listbonds, __pyx_mstate->__pyx_n_u_ring_id_of_atom, __pyx_mstate->__pyx_n_u_bi, __pyx_mstate->__pyx_n_u_bj, __pyx_mstate->__pyx_n_u_ai, __pyx_mstate->__pyx_n_u_aj, __pyx_mstate->__pyx_n_u_n_trial, __pyx_mstate->__pyx_n_u_rid_i, __pyx_mstate->__pyx_n_u_rid_j, __pyx_mstate->__pyx_n_u_tmp, __pyx_mstate->__pyx_n_u_nrings, __pyx_mstate->__pyx_n_u_rid, __pyx_mstate->__pyx_n_u_bonds_in_rings};
     __pyx_mstate_global->__pyx_codeobj_tab[4] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_check_beads, __pyx_mstate->__pyx_kp_b_iso88591_z_q_xs_q_1_vRwV_uA_e1Cq_3at3c_R, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[4])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 14, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 313};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 14, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 312};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_trial_comb, __pyx_mstate->__pyx_n_u_listbonds, __pyx_mstate->__pyx_n_u_ring_id_of_atom, __pyx_mstate->__pyx_n_u_bi, __pyx_mstate->__pyx_n_u_bj, __pyx_mstate->__pyx_n_u_ai, __pyx_mstate->__pyx_n_u_aj, __pyx_mstate->__pyx_n_u_rid_i, __pyx_mstate->__pyx_n_u_rid_j, __pyx_mstate->__pyx_n_u_n_trial, __pyx_mstate->__pyx_n_u_tmp, __pyx_mstate->__pyx_n_u_nrings, __pyx_mstate->__pyx_n_u_rid, __pyx_mstate->__pyx_n_u_bad};
     __pyx_mstate_global->__pyx_codeobj_tab[5] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_check_beads_omp, __pyx_mstate->__pyx_kp_b_iso88591_z_q_xs_q_1_vRwV_uA_e1Cq_3at3c_R_2, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[5])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 380};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 379};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_seq_one_beads, __pyx_mstate->__pyx_n_u_listbonds, __pyx_mstate->__pyx_n_u_ring_id_of_atom, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_acceptable_trials};
     __pyx_mstate_global->__pyx_codeobj_tab[6] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_auto_martiniM3_optimization_cy_p, __pyx_mstate->__pyx_n_u_find_acceptable_trials_cy, __pyx_mstate->__pyx_kp_b_iso88591_U_aq_a_AT_A_WA_1_t1_r_r_D_b_2XQ, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[6])) goto bad;
   }
@@ -32213,29 +32206,6 @@ static const char* __Pyx_BufFmt_CheckString(__Pyx_BufFmt_Context* ctx, const cha
           return 0;
       *(__pyx_t_14auto_martiniM3_15optimization_cy_I32 *) itemp = value;
       return 1;
-  }
-  
-/* ObjectToMemviewSlice */
-  static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_dc_nn_int32_t(PyObject *obj, int writable_flag) {
-      __Pyx_memviewslice result = __Pyx_MEMSLICE_INIT;
-      __Pyx_BufFmt_StackElem stack[1];
-      int axes_specs[] = { (__Pyx_MEMVIEW_DIRECT | __Pyx_MEMVIEW_CONTIG) };
-      int retcode;
-      if (obj == Py_None) {
-          result.memview = (struct __pyx_memoryview_obj *) Py_None;
-          return result;
-      }
-      retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, __Pyx_IS_C_CONTIG,
-                                                   (PyBUF_C_CONTIGUOUS | PyBUF_FORMAT) | writable_flag, 1,
-                                                   &__Pyx_TypeInfo_nn_int32_t, stack,
-                                                   &result, obj);
-      if (unlikely(retcode == -1))
-          goto __pyx_fail;
-      return result;
-  __pyx_fail:
-      result.memview = NULL;
-      result.data = NULL;
-      return result;
   }
   
 /* Declarations */

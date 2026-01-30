@@ -39,51 +39,6 @@ from .optimization_cy import (
 logger = logging.getLogger(__name__)
 
 
-@timeit
-def find_acceptable_trials(seq_one_beads, 
-    molecule, list_heavy_atoms, heavyatom_coords, ring_atoms, list_bonds,
-    allatom_coords, force_map):
-    # NumPy-only fast path: caller is responsible for dtype/shape normalization.
-    # Here we just build the aux arrays needed by the Cython kernel.
-    bonds = np.asarray(list_bonds, dtype=np.int32)
-    seq = np.asarray(seq_one_beads, dtype=np.int32)
-
-    # Build ring_id mapping sized to include max atom id in bonds/seq
-    max_atom = -1
-    if seq.size:
-        max_atom = max(max_atom, int(seq.max()))
-    if bonds.size:
-        max_atom = max(max_atom, int(bonds.max()))
-    ring_id = np.full(max_atom + 1, -1, dtype=np.int32)
-    for rid, ring in enumerate(ring_atoms):
-        ring = np.asarray(ring, dtype=np.int32)
-        ring_id[ring] = rid
-
-    return find_acceptable_trials_cy(seq, bonds, ring_id)
-
-
-def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
-    """Build a dense `ring_id_of_atom` array.
-
-    ring_id_of_atom[atom_id] = ring index, or -1 when not in any ring.
-    """
-    max_atom = -1
-    for ring in ring_atoms:
-        if ring:
-            max_atom = max(max_atom, int(np.max(ring)))
-    ring_id = np.full(max_atom + 1 if max_atom >= 0 else 0, -1, dtype=dtype)
-    for rid, ring in enumerate(ring_atoms):
-        if not ring:
-            continue
-        arr = np.asarray(ring, dtype=dtype)
-        # Ensure ring_id is long enough
-        mx = int(arr.max())
-        if mx >= ring_id.shape[0]:
-            ring_id = np.pad(ring_id, (0, mx - ring_id.shape[0] + 1), constant_values=-1)
-        ring_id[arr] = rid
-    return ring_id
-
-
 def read_bead_params():
     """Returns bead parameter dictionary
     CG Bead vdw radius (in Angstroem)"""
@@ -129,7 +84,7 @@ def _get_masses(molecule):
     return np.array(masses).astype(np.float32)
 
 
-def _get_heavy_atom_bonds(molecule, list_heavy_atoms):
+def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
     # List of bonds between heavy atoms
     list_bonds = []
     for i in range(len(list_heavy_atoms)):
@@ -210,9 +165,53 @@ def collect_energies_and_combs(
 
 
 @timeit
+def find_acceptable_trials(seq_one_beads, 
+    ring_atoms, list_bonds, *, dtype=np.int32):
+    # NumPy-only fast path: caller is responsible for dtype/shape normalization.
+    # Here we just build the aux arrays needed by the Cython kernel.
+    bonds = np.asarray(list_bonds, dtype=dtype)
+    seq = np.asarray(seq_one_beads, dtype=dtype)
+
+    # Build ring_id mapping sized to include max atom id in bonds/seq
+    max_atom = -1
+    if seq.size:
+        max_atom = max(max_atom, seq.max())
+    if bonds.size:
+        max_atom = max(max_atom, bonds.max())
+
+    ring_id = np.full(max_atom + 1, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        ring = np.asarray(ring, dtype=dtype)
+        ring_id[ring] = rid
+    return find_acceptable_trials_cy(seq, bonds, ring_id)
+
+
+def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
+    """Build a dense `ring_id_of_atom` array.
+
+    ring_id_of_atom[atom_id] = ring index, or -1 when not in any ring.
+    """
+    max_atom = -1
+    for ring in ring_atoms:
+        if ring:
+            max_atom = max(max_atom, int(np.max(ring)))
+    ring_id = np.full(max_atom + 1 if max_atom >= 0 else 0, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        if not ring:
+            continue
+        arr = np.asarray(ring, dtype=dtype)
+        # Ensure ring_id is long enough
+        mx = int(arr.max())
+        if mx >= ring_id.shape[0]:
+            ring_id = np.pad(ring_id, (0, mx - ring_id.shape[0] + 1), constant_values=-1)
+        ring_id[arr] = rid
+    return ring_id
+
+
+@timeit
 def find_bead_pos(
     molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
-    min_beads=None, max_beads=None,
+    min_beads=None, max_beads=None, dtype=np.int32, 
 ):
     """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
     arrangement with best energy score. Return all possible arrangements sorted by energy score."""
@@ -231,8 +230,8 @@ def find_bead_pos(
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
 
-    list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms)
-    ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms)
+    list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms, dtype=dtype)
+    ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms, dtype=dtype)
 
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
     if not min_beads:
@@ -255,18 +254,14 @@ def find_bead_pos(
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
         if num_beads==0: num_beads=1
-        seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)))
+        seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)), dtype=dtype)
 
         logger.info("Filtering Acceptable Trials...")
         acceptable_trials = find_acceptable_trials(
             seq_one_beads,
-            molecule,
-            list_heavy_atoms,
-            heavyatom_coords,
             ring_atoms,
             list_bonds,
-            allatom_coords,
-            force_map,
+            dtype=dtype,
         )
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 

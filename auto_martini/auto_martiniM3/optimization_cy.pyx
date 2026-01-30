@@ -22,7 +22,6 @@ Notes
 
 cimport cython
 from cython.parallel cimport prange
-from libc.stdint cimport int32_t
 from libc.math cimport exp
 
 cimport numpy as cnp
@@ -283,7 +282,7 @@ def check_beads(
         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
         if rid >= nrings:
             nrings = rid + 1
-    cdef int32_t[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
+    cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
 
     # Check for beads linked by chemical bond (except in rings)
     for bi in range(n_trial):
