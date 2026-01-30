@@ -442,7 +442,7 @@ def get_standard_mass(bead_type): # AutoM3
         if bead_type.startswith('S'): return 54
         else: return 72
 
-def print_atoms(molname,forcepred,cgbeads,molecule,hbonda,hbondd,partitioning,ringatoms,ringatoms_flat,logp_file,trial=False):
+def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partitioning, ringatoms, ringatoms_flat, logp_file, trial=False):
     """
     Print CG Atoms in itp format
     AutoM3 added argument : logp_file
@@ -539,6 +539,7 @@ def print_atoms(molname,forcepred,cgbeads,molecule,hbonda,hbondd,partitioning,ri
             beadtypes.append(bead_type)
 
     return atomnames, beadtypes, text, atoms_in_smi_dict    # AutoM3 new variable : atoms_in_smi_dict
+
 
 def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False):
     """print CG bonds in itp format"""
@@ -682,6 +683,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                     exit(1)
     return bondlist, constlist, text
 
+
 def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bondlist, constlist, ringatoms): 
     """print CG angles in itp format and returns the angles list"""
     logger.debug("Entering print_angles()")
@@ -789,6 +791,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
             text = text
     return text, angle_list
 
+
 def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
     """Print CG dihedrals in itp format"""
     logger.debug("Entering print_dihedrals()")
@@ -895,6 +898,7 @@ def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
                     )
                 )
     return text
+
 
 def print_virtualsites(ringatoms,cg_bead_coords,partitionning,mol): ### AutoM3 ###
     """
@@ -1026,22 +1030,24 @@ def print_virtualsites(ringatoms,cg_bead_coords,partitionning,mol): ### AutoM3 #
         
     return text, virtual_sites, rigid_dihedral
 
-def topout(header_write,atoms_write,bonds_write,angles_write):
-    """Print simple itp file"""
-    text=header_write +"\n"+ atoms_write + "\n" + bonds_write + "\n" + angles_write
 
-    #bartender info search
-    bartender_input_info={}
-    bartender_input_info["BONDS"]=[]
+def topout(header_write, atoms_write, bonds_write, angles_write):
+    """Print simple itp file"""
+    text = header_write + "\n" + atoms_write + "\n" + bonds_write + "\n" + angles_write
+
+    # bartender info search
+    bartender_input_info = {}
+    bartender_input_info["BONDS"] = []
     for line in list(bonds_write.split("\n")):
-        if ";" not in line and len(line.split())>4:
+        if ";" not in line and len(line.split()) > 4:
             bartender_input_info["BONDS"].append(line.split()[:2])
-    
-    bartender_input_info["ANGLES"]=[]
+
+    bartender_input_info["ANGLES"] = []
     for line in list(angles_write.split("\n")):
-        if ";" not in line and len(line.split())>5:
+        if ";" not in line and len(line.split()) > 5:
             bartender_input_info["ANGLES"].append(line.split()[:3])
     return text, bartender_input_info
+
 
 def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, bead_coords, ring_atoms, cg_beads): ### AutoM3 ###
     """AutoM3 : Print itp file without virtual sites, upon users wish"""
@@ -1141,14 +1147,15 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
         if ";" not in line and len(line.split())>6:
             bartender_input_info["IMPROPERS"].append(line.split()[:4])
     
-    text = modified_header_write +"\n"+ atoms_write +"\n"+ modified_bonds_write +"\n"+ modified_angles_write +"\n"+ dihedrals_write+exclusions_net
+    text = modified_header_write + "\n" + atoms_write + "\n" + modified_bonds_write + "\n" + modified_angles_write + "\n" + dihedrals_write + exclusions_net
     return text, bartender_input_info
+
 
 def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###
     """AutoM3 : Prints whole .itp file with all bonded and nonbonded parameters. """
     text = ""
-    bartender_input_info={}
-    nb_beads=0
+    bartender_input_info = {}
+    nb_beads = 0
     molname=""
     for line in list(atoms_write.split("\n")):
         if line != "":
@@ -1192,23 +1199,23 @@ def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_wr
     for line in list(header_write.split("\n")):
         if ("  "+molname) not in line: modified_lines_header.append(line)
         else:
-            lineH=line.split("         ")
-            txt=lineH[0]+"         1"
+            lineH = line.split("         ")
+            txt = lineH[0] + "         1"
             modified_lines_header.append(txt)
-    modified_header_write="\n".join(modified_lines_header)
+    modified_header_write = "\n".join(modified_lines_header)
 
-    #Adding force to constraints
-    modified_lines_bonds=[]
+    # Adding force to constraints
+    modified_lines_bonds = []
     bonds_list = []
     for line in list(bonds_write.split("\n")):
         if '1' in line:
             bonds_list.append(f"{line.split('   ')[1]},{line.split('   ')[2]}")
-        if '1' in line and len(line.split("   "))<7:
-            modified_lines_bonds.append(line+"    1000000")
+        if '1' in line and len(line.split("   ")) < 7:
+            modified_lines_bonds.append(line + "    1000000")
         else:
             modified_lines_bonds.append(line)
-        if line=="[constraints]":
-            if line in modified_lines_bonds : modified_lines_bonds.remove(line)
+        if line == "[constraints]":
+            if line in modified_lines_bonds: modified_lines_bonds.remove(line)
             txt = "#ifndef FLEXIBLE\n[constraints]\n#endif"
             modified_lines_bonds.append(txt)
     modified_bonds_write = "\n".join(modified_lines_bonds)
@@ -1292,31 +1299,31 @@ def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_wr
         exclusions_net="   "+exclusions_net+row+"\n"
     
 
-    #bartender info search
-        
-    bartender_input_info["VSITES"]=[]
+    # bartender info search
+    bartender_input_info["VSITES"] = []
     for line in list(vs_write.split("\n")):
-        if ";" not in line and len(line.split())>3:
+        if ";" not in line and len(line.split()) > 3:
             info_vs = f"{line.split()[0]} {','.join(line.split()[2:])} 1"
             bartender_input_info["VSITES"].append(info_vs)
 
-    bartender_input_info["BONDS"]=[]
+    bartender_input_info["BONDS"] = []
     for line in list(modified_bonds_write.split("\n")):
-        if ";" not in line and len(line.split())>4:
+        if ";" not in line and len(line.split()) > 4:
             bartender_input_info["BONDS"].append(line.split()[:2])
-    
-    bartender_input_info["ANGLES"]=[]
+
+    bartender_input_info["ANGLES"] = []
     for line in list(modified_angles_write.split("\n")):
-        if ";" not in line and len(line.split())>5:
+        if ";" not in line and len(line.split()) > 5:
             bartender_input_info["ANGLES"].append(line.split()[:3])
-    
-    bartender_input_info["IMPROPERS"]=[]
-    for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write 
-        if ";" not in line and len(line.split())>6:
+
+    bartender_input_info["IMPROPERS"] = []
+    for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write
+        if ";" not in line and len(line.split()) > 6:
             bartender_input_info["IMPROPERS"].append(line.split()[:4])
 
-    text = modified_header_write +"\n"+ modified_atoms_write+"\n"+ modified_bonds_write+"\n"+ modified_angles_write+ "\n"+ modified_dihedrals_write + "\n"+ vs_write + exclusions_net
+    text = modified_header_write + "\n" + modified_atoms_write + "\n" + modified_bonds_write + "\n" + modified_angles_write + "\n" + modified_dihedrals_write + "\n" + vs_write + exclusions_net
     return text, vs_bead_names, bartender_input_info
+
 
 def bartender_input(mol, molname, atoms_in_beads, bart_info_dict): ### AutoM3 ###
     """ Generates ready t use input data for Bartender """
@@ -1358,6 +1365,7 @@ def bartender_input(mol, molname, atoms_in_beads, bart_info_dict): ### AutoM3 ##
                 for i in info:
                     text+=f"{','.join(i)}\n"
     return text
+
 
 def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_file=None, trial=False): 
     """
@@ -1446,17 +1454,20 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
         logger.debug("logp value: %7.4f" % log_p)
         return (convert_log_k(log_p),"; ALOGPS defined bead")
 
+
 def convert_log_k(log_k):
     """Convert log_{10}K to free energy (in kJ/mol)"""
     val = 0.008314 * 300.0 * log_k / math.log10(math.exp(1))
     logger.debug("free energy %7.4f kJ/mol" % val)
     return val
 
+
 def mad(bead_type, delta_f, in_ring=False):
     """Mean absolute difference between bead type and delta_f"""
     # logger.debug('Entering mad()')
     delta_f_types = read_delta_f_types()
     return math.fabs(delta_f_types[bead_type] - delta_f)
+
 
 def count_letters(s): ### AutoM3 ###
     """ Counting atoms in SMILES code """
@@ -1473,6 +1484,7 @@ def count_letters(s): ### AutoM3 ###
             i += 1
     return count
 
+
 def find_closest_logPvalue(value, keyslist,in_ring): ### AutoM3 ###
     closest_key = None
     closest_diff = float('inf')
@@ -1486,6 +1498,7 @@ def find_closest_logPvalue(value, keyslist,in_ring): ### AutoM3 ###
                 closest_diff = diff
     return closest_key
 
+
 def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ### AutoM3 ###
     """Determine CG bead type from delta_f value, charge,
     and hbond acceptor, and donor"""
@@ -1497,54 +1510,54 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
     if charge != 0:
         # The compound has a +/- charge -> Q type
 
-        if count_letters(str(smi_frag)) == 2: 
-            othertypes_Q=["TQ1","TQ2","TQ3","TQ4","TQ5","TD"]
-        if count_letters(str(smi_frag)) == 3: 
-            othertypes_Q=["SQ1","SQ2","SQ3","SQ4","SQ5","SD"]
-        if count_letters(str(smi_frag)) > 3: 
-            othertypes_Q=["Q1","Q2","Q3","Q4","Q5","D"]
-        bead_type=find_closest_logPvalue(delta_f, othertypes_Q,in_ring)
+        if count_letters(str(smi_frag)) == 2:
+            other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5", "TD"]
+        if count_letters(str(smi_frag)) == 3:
+            othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5", "SD"]
+        if count_letters(str(smi_frag)) > 3:
+            othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5", "D"]
+        bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
 
     else:
         # Neutral group
         if hbonda > 0 or hbondd > 0:
             if count_letters(str(smi_frag)) == 2:
-                othertypes_NPa=["TN1a","TN2a","TN3a","TN4a","TN5a","TN6a","TP1a","TP2a","TP3a","TP4a","TP5a","TP6a"]
-                othertypes_NPd=["TN1d","TN2d","TN3d","TN4d","TN5d","TN6d","TP1d","TP2d","TP3d","TP4d","TP5d","TP6d"]
+                other_types_NPa = ["TN1a", "TN2a", "TN3a", "TN4a", "TN5a", "TN6a", "TP1a", "TP2a", "TP3a", "TP4a", "TP5a", "TP6a"]
+                other_types_NPd = ["TN1d", "TN2d", "TN3d", "TN4d", "TN5d", "TN6d", "TP1d", "TP2d", "TP3d", "TP4d", "TP5d", "TP6d"]
             if count_letters(str(smi_frag)) == 3:
-                othertypes_NPa=["SN1a","SN2a","SN3a","SN4a","SN5a","SN6a","SP1a","SP2a","SP3a","SP4a","SP5a","SP6a"]
-                othertypes_NPd=["SN1d","SN2d","SN3d","SN4d","SN5d","SN6d","SP1d","SP2d","SP3d","SP4d","SP5d","SP6d"]
+                other_types_NPa = ["SN1a", "SN2a", "SN3a", "SN4a", "SN5a", "SN6a", "SP1a", "SP2a", "SP3a", "SP4a", "SP5a", "SP6a"]
+                other_types_NPd = ["SN1d", "SN2d", "SN3d", "SN4d", "SN5d", "SN6d", "SP1d", "SP2d", "SP3d", "SP4d", "SP5d", "SP6d"]
             if count_letters(str(smi_frag)) > 3:
-                othertypes_NPa=["N1a","N2a","N3a","N4a","N5a","N6a","P1a","P2a","P3a","P4a","P5a","P6a"]
-                othertypes_NPd=["N1d","N2d","N3d","N4d","N5d","N6d","P1d","P2d","P3d","P4d","P5d","P6d"]
+                other_types_NPa = ["N1a", "N2a", "N3a", "N4a", "N5a", "N6a", "P1a", "P2a", "P3a", "P4a", "P5a", "P6a"]
+                other_types_NPd = ["N1d", "N2d", "N3d", "N4d", "N5d", "N6d", "P1d", "P2d", "P3d", "P4d", "P5d", "P6d"]
 
             if hbonda > 0 and hbondd == 0:
-                bead_type=find_closest_logPvalue(delta_f, othertypes_NPa,in_ring)
-            if hbonda  >= 0 and hbondd > 0:
-                bead_type=find_closest_logPvalue(delta_f, othertypes_NPd,in_ring)
+                bead_type = find_closest_logPvalue(delta_f, other_types_NPa, in_ring)
+            if hbonda >= 0 and hbondd > 0:
+                bead_type = find_closest_logPvalue(delta_f, other_types_NPd, in_ring)
 
         else:
             # all other cases. Simply find the atom type that's closest in
             # free energy.
             
             if count_letters(str(smi_frag)) == 2:
-                othertypes = ["TP6","TP5","TP4","TP3","TP2","TP1","TC6","TC5","TC4","TC3","TC2","TC1","TN6","TN5","TN4","TN3","TN2","TN1"]
-                if not in_ring: othertypes.remove("TC5")
+                other_types = ["TP6", "TP5", "TP4", "TP3", "TP2", "TP1", "TC6", "TC5", "TC4", "TC3", "TC2", "TC1", "TN6", "TN5", "TN4", "TN3", "TN2", "TN1"]
+                if not in_ring: other_types.remove("TC5")
 
             if count_letters(str(smi_frag)) == 3:
-                othertypes = ["SP6","SP5","SP4","SP3","SP2","SP1","SC6","SC5","SC4","SC3","SC2","SC1","SN6","SN5","SN4","SN3","SN2","SN1"]
+                other_types = ["SP6", "SP5", "SP4", "SP3", "SP2", "SP1", "SC6", "SC5", "SC4", "SC3", "SC2", "SC1", "SN6", "SN5", "SN4", "SN3", "SN2", "SN1"]
 
             if count_letters(str(smi_frag)) > 3:
-                othertypes = ["P6","P5","P4","P3","P2","P1","C6","C5","C4","C3","C2","C1","N6","N5","N4","N3","N2","N1"]
+                other_types = ["P6", "P5", "P4", "P3", "P2", "P1", "C6", "C5", "C4", "C3", "C2", "C1", "N6", "N5", "N4", "N3", "N2", "N1"]
 
-            bead_type=find_closest_logPvalue(delta_f, othertypes,in_ring)
+            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
             #logger.debug("closest type: %s; error %7.4f" % (bead_type, min_error))
     
-    for hal in ["Cl","Br","F","I"]: 
+    for hal in ["Cl", "Br", "F", "I"]:
         if hal in str(smi_frag):
-            if count_letters(str(smi_frag)) == 2: othertypes = ["TX4","TX3","TX2","TX1"]
-            if count_letters(str(smi_frag)) == 3: othertypes = ["SX4","SX3","SX2","SX1"]
-            if count_letters(str(smi_frag)) > 3: othertypes = ["X4","X3","X2","X1"]
-            bead_type=find_closest_logPvalue(delta_f, othertypes,in_ring)
-    
+            if count_letters(str(smi_frag)) == 2: other_types = ["TX4", "TX3", "TX2", "TX1"]
+            if count_letters(str(smi_frag)) == 3: other_types = ["SX4", "SX3", "SX2", "SX1"]
+            if count_letters(str(smi_frag)) > 3: other_types = ["X4", "X3", "X2", "X1"]
+            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
+
     return bead_type

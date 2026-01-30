@@ -27,7 +27,6 @@ if __name__ == "__main__":
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
-    exit()
 
     # Save the atomistic RDKit molecule to SDF
     sdf_path = outdir / f"{molname.lower()}_aa.sdf"
@@ -39,7 +38,7 @@ if __name__ == "__main__":
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname.lower()}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=9, max_beads=9)
+        min_beads=11, max_beads=11)
     print(f"Wrote: {itp_path}")
 
     # Save CG structure (.gro)
