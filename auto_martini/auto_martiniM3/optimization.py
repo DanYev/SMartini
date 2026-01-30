@@ -31,11 +31,7 @@ from sys import exit
 from .common import *
 from . import topology # AutoM3 change
 from reforge.utils import timeit
-from .optimization_cy import (
-    find_acceptable_trials_cy,
-    find_acceptable_trials_cy_omp,
-    eval_gaussian_interac_np,
-)  
+from . import optimization_cy as opcy
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +129,7 @@ def collect_energies_and_combs(
     for trial_comb in acceptable_trials:
         # Do the energy evaluation
         trial_ene = float(
-            eval_gaussian_interac_np(
+            opcy.eval_gaussian_interac(
                 trial_comb,
                 is_ring,
                 bond_dists,
@@ -184,7 +180,7 @@ def find_acceptable_trials(seq_one_beads,
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
-    return find_acceptable_trials_cy(seq, bonds, ring_id)
+    return opcy.find_acceptable_trials(seq, bonds, ring_id)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):

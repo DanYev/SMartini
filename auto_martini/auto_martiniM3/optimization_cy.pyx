@@ -118,7 +118,7 @@ cpdef F32 penalize_lonely_atoms_np(
     return lonely_atom_penalize * weight_sum
 
 
-cpdef F32 eval_gaussian_interac_np(
+cpdef F32 eval_gaussian_interac(
     const I32[::1] list_beads,
     const U8[::1] in_ring,
     const F32[:, ::1] bond_dists,
@@ -307,7 +307,7 @@ cdef bint check_beads(
     return True
 
 
-def find_acceptable_trials_cy(
+def find_acceptable_trials_tmp(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
@@ -322,7 +322,7 @@ def find_acceptable_trials_cy(
     return np.asarray(acceptable_trials, dtype=np.int32)
 
 
-def find_acceptable_trials_cy_omp(
+def find_acceptable_trials(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
