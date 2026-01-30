@@ -309,81 +309,12 @@ def check_beads(
     return True
 
 
-def check_beads_omp(
-    I32[::1] trial_comb,
-    I32[:, ::1] listbonds,
-    I32[::1] ring_id_of_atom,
-):
-    """OpenMP-accelerated variant of :func:`check_beads_cy_np`.
-
-    Same contract as `check_beads_cy_np`, but uses OpenMP parallelization for the
-    pairwise bond check.
-
-    Note
-    ----
-    This requires that the extension is compiled with OpenMP flags (e.g.
-    ``-fopenmp`` on GCC/Clang).
-    """
-
-    cdef Py_ssize_t bi, bj
-    cdef int ai, aj
-    cdef int rid_i, rid_j
-    cdef int n_trial = trial_comb.shape[0]
-
-    if n_trial <= 1:
-        return True
-
-    # duplicates check (serial)
-    cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
-    tmp.sort()
-    for bi in range(1, n_trial):
-        if tmp[bi] == tmp[bi - 1]:
-            return False
-
-    # ring count (serial)
-    cdef int nrings = 0
-    cdef int rid
-    for bi in range(n_trial):
-        rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
-        if rid >= nrings:
-            nrings = rid + 1
-
-    # parallel bond rejection (ignore within-ring bonds)
-    cdef int bad = 0
-    with nogil:
-        for bi in prange(n_trial, schedule='static'):
-            if bad:
-                continue
-            ai = <int>trial_comb[bi]
-            for bj in range(bi + 1, n_trial):
-                if bad:
-                    break
-                aj = <int>trial_comb[bj]
-                if _is_bond_mv(ai, aj, listbonds):
-                    rid_i = <int>ring_id_of_atom[ai]
-                    rid_j = <int>ring_id_of_atom[aj]
-                    if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):
-                        bad = 1
-                        break
-
-    if bad:
-        return False
-
-    # terminal-partner collision check (serial)
-    if _has_terminal_partner_collision_mv(trial_comb, listbonds):
-        return False
-
-    return True
-
-
 def find_acceptable_trials_cy(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
 ):
-    """Filter acceptable trial combinations (NumPy fast path)."""
     cdef Py_ssize_t i
-    # Return as a NumPy array (n_acceptable, num_beads)
     acceptable_trials = []
     for i in range(seq_one_beads.shape[0]):
         if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
@@ -391,3 +322,58 @@ def find_acceptable_trials_cy(
     if not acceptable_trials:
         return np.empty((0, 0), dtype=np.int32)
     return np.asarray(acceptable_trials, dtype=np.int32)
+
+
+def find_acceptable_trials_cy_omp(
+    I32[:, ::1] seq_one_beads,
+    I32[:, ::1] listbonds,
+    I32[::1] ring_id_of_atom,
+):
+    """OpenMP-parallel outer loop over trial combinations.
+
+    Each trial is independent, but we can't append to a Python list safely
+    inside `prange` without defeating parallelism. This version uses a
+    2-pass strategy:
+
+    1) parallel: compute a boolean acceptance mask
+    2) serial: pack accepted rows into a dense output array
+
+    Notes
+    -----
+    * This still calls `check_beads(...)`, which includes NumPy work (sorting)
+      and therefore requires the GIL. So speedups may be limited unless
+      `check_beads` is made GIL-free.
+    * If OpenMP isn't enabled at build time, `prange` falls back to a normal
+      serial loop.
+    """
+
+    cdef Py_ssize_t n_trials = seq_one_beads.shape[0]
+    cdef Py_ssize_t n_beads = seq_one_beads.shape[1]
+    cdef Py_ssize_t i, j
+    cdef Py_ssize_t n_acc = 0
+
+    if n_trials == 0:
+        return np.empty((0, 0), dtype=np.int32)
+
+    cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n_trials, dtype=np.uint8)
+
+    for i in prange(n_trials, schedule='static', nogil=True):
+        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
+            mask[i] = 1
+
+    # Count accepted (serial)
+    for i in range(n_trials):
+        n_acc += mask[i]
+
+    if n_acc == 0:
+        return np.empty((0, 0), dtype=np.int32)
+
+    # Pass 2: pack accepted rows (serial)
+    cdef cnp.ndarray[cnp.int32_t, ndim=2] out = np.empty((n_acc, n_beads), dtype=np.int32)
+    j = 0
+    for i in range(n_trials):
+        if mask[i] != 0:
+            out[j, :] = seq_one_beads[i]
+            j += 1
+
+    return out
