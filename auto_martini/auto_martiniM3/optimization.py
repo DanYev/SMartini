@@ -139,9 +139,9 @@ def collect_energies_and_combs(
     p_rvdw_cross = float(bead_params["rvdw_cross"])
     
     # Convert acceptable_trials to int32 numpy array for Cython
-    acceptable_trials_np = np.asarray(acceptable_trials, dtype=np.int32)
-    ene_best_trial, best_trial_comb_cy, energies_array, trials_array = opcy.collect_energies_cy(
-        acceptable_trials_np,
+    # acceptable_trials_np = np.asarray(acceptable_trials, dtype=np.int32)
+    ene_best_trial, best_trial_comb_cy, energies_array, trials_array = opcy.collect_energies(
+        acceptable_trials,
         is_ring,
         bond_dists,
         masses,
