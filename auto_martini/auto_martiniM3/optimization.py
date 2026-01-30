@@ -137,30 +137,36 @@ def collect_energies_and_combs(
     p_rvdw = float(bead_params["rvdw"])
     p_rvdw_ar = float(bead_params["rvdw_aromatic"])
     p_rvdw_cross = float(bead_params["rvdw_cross"])
-
-    for trial_comb in acceptable_trials:
-        # Do the energy evaluation
-        trial_ene = opcy.eval_gaussian_interac(
-                trial_comb,
-                is_ring,
-                bond_dists,
-                masses,
-                p_offset,
-                p_offset_ar,
-                p_lonely,
-                p_overlap,
-                p_at_in,
-                p_rvdw,
-                p_rvdw_ar,
-                p_rvdw_cross,
-            )
-        logger.debug("; %s %s", trial_comb, trial_ene)
-        # Accept the move
-        if trial_ene < ene_best_trial:
-            ene_best_trial = trial_ene
-            best_trial_comb = sorted(trial_comb)
-        list_trial_comb.append([trial_comb, trial_ene])
-    return ene_best_trial, best_trial_comb
+    
+    # Convert acceptable_trials to int32 numpy array for Cython
+    acceptable_trials_np = np.asarray(acceptable_trials, dtype=np.int32)
+    ene_best_trial, best_trial_comb_cy, energies_array, trials_array = opcy.collect_energies_cy(
+        acceptable_trials_np,
+        is_ring,
+        bond_dists,
+        masses,
+        p_offset,
+        p_offset_ar,
+        p_lonely,
+        p_overlap,
+        p_at_in,
+        p_rvdw,
+        p_rvdw_ar,
+        p_rvdw_cross,
+        ene_best_trial,
+    )
+    
+    # If Cython returned a non-empty array, use it; otherwise keep original
+    if len(best_trial_comb_cy) > 0:
+        best_trial_comb = list(best_trial_comb_cy)
+    
+    # Reconstruct list_trial_comb from arrays
+    if len(energies_array) > 0:
+        list_trial_comb = [[trials_array[i], energies_array[i]] for i in range(len(energies_array))]
+    else:
+        list_trial_comb = []
+    
+    return ene_best_trial, best_trial_comb, list_trial_comb
 
 
 @timeit
@@ -265,7 +271,7 @@ def find_bead_pos(
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
         logger.info("Collecting Combinations And Their Energies...")
-        ene_best_trial, best_trial_comb = collect_energies_and_combs(
+        ene_best_trial, best_trial_comb, list_trial_comb = collect_energies_and_combs(
             molecule,
             conformer,
             acceptable_trials,

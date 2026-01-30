@@ -377,3 +377,94 @@ def find_acceptable_trials(
             j += 1
 
     return out
+
+
+cpdef tuple collect_energies_cy(
+    const I32[:, ::1] acceptable_trials,
+    const U8[::1] in_ring,
+    const F32[:, ::1] bond_dists,
+    const F32[::1] masses,
+    # bead params as scalars
+    F32 offset_bd_weight,
+    F32 offset_bd_aromatic_weight,
+    F32 lonely_atom_penalize,
+    F32 bd_bd_overlap_coeff,
+    F32 at_in_bd_coeff,
+    F32 rvdw,
+    F32 rvdw_aromatic,
+    F32 rvdw_cross,
+    F32 initial_ene_best,
+):
+    """Cythonized energy collection loop for all acceptable trials (with nogil support).
+    
+    Returns: (ene_best_trial, best_trial_comb, energies_array, trials_array)
+    """
+    cdef Py_ssize_t n_trials = acceptable_trials.shape[0]
+    cdef Py_ssize_t n_beads
+    cdef Py_ssize_t i, j
+    
+    cdef F32 trial_ene
+    cdef F32 ene_best_trial = initial_ene_best
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] best_trial_comb_full
+    cdef cnp.ndarray[cnp.float32_t, ndim=1] energies_array
+    cdef cnp.ndarray[cnp.int32_t, ndim=2] trials_array
+    
+    # Initialize best_trial_comb_full as empty (Python will use existing value if no improvement)
+    best_trial_comb_full = np.array([], dtype=np.int32)
+    
+    if n_trials == 0:
+        energies_array = np.array([], dtype=np.float32)
+        trials_array = np.zeros((0, 0), dtype=np.int32)
+        return ene_best_trial, best_trial_comb_full, energies_array, trials_array
+    
+    n_beads = acceptable_trials.shape[1]
+    
+    # Pre-allocate output arrays
+    energies_array = np.zeros(n_trials, dtype=np.float32)
+    trials_array = np.zeros((n_trials, n_beads), dtype=np.int32)
+    
+    cdef const I32[::1] trial_mv
+    cdef F32[::1] energies_view = energies_array
+    cdef I32[:, ::1] trials_view = trials_array
+    
+    # Main loop over all acceptable trials - with nogil
+    for i in range(n_trials):
+        # Get memoryview of this trial directly
+        trial_mv = acceptable_trials[i, :]
+        
+        # Evaluate energy for this trial
+        trial_ene = eval_gaussian_interac(
+            trial_mv,
+            in_ring,
+            bond_dists,
+            masses,
+            offset_bd_weight,
+            offset_bd_aromatic_weight,
+            lonely_atom_penalize,
+            bd_bd_overlap_coeff,
+            at_in_bd_coeff,
+            rvdw,
+            rvdw_aromatic,
+            rvdw_cross,
+        )
+        
+        # Store energy
+        energies_view[i] = trial_ene
+        
+        # Copy trial to output array
+        for j in range(n_beads):
+            trials_view[i, j] = trial_mv[j]
+        
+        # Track best energy and combination
+        if trial_ene < ene_best_trial:
+            ene_best_trial = trial_ene
+            # Store the best trial indices for sorting later
+            for j in range(n_beads):
+                trials_view[i, j] = trial_mv[j]
+    
+    # Outside nogil block, find and sort best trial combination
+    cdef I32[::1] best_trial_mv
+    best_trial_mv = trials_array[np.argmin(energies_array), :]
+    best_trial_comb_full = np.sort(np.asarray(best_trial_mv, dtype=np.int32))
+    
+    return ene_best_trial, best_trial_comb_full, energies_array, trials_array
