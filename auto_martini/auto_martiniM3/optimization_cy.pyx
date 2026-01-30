@@ -240,7 +240,7 @@ cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, 
     return False
 
 
-def check_beads_cy_np(
+def check_beads(
     I32[::1] trial_comb,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
@@ -310,7 +310,7 @@ def check_beads_cy_np(
     return True
 
 
-def check_beads_cy_np_omp(
+def check_beads_omp(
     I32[::1] trial_comb,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
@@ -376,6 +376,7 @@ def check_beads_cy_np_omp(
 
     return True
 
+
 def find_acceptable_trials_cy(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
@@ -386,7 +387,7 @@ def find_acceptable_trials_cy(
     # Return as a NumPy array (n_acceptable, num_beads)
     acceptable_trials = []
     for i in range(seq_one_beads.shape[0]):
-        if check_beads_cy_np(seq_one_beads[i], listbonds, ring_id_of_atom):
+        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
             acceptable_trials.append(seq_one_beads[i])
     if not acceptable_trials:
         return np.empty((0, 0), dtype=np.int32)

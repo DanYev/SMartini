@@ -32,7 +32,6 @@ from .common import *
 from . import topology # AutoM3 change
 from reforge.utils import timeit
 from .optimization_cy import (
-    check_beads_cy_np,
     find_acceptable_trials_cy,
     eval_gaussian_interac_np,
 )  
