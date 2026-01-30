@@ -186,7 +186,7 @@ cpdef F32 eval_gaussian_interac_np(
     return weight_sum
 
 
-cdef inline bint _is_bond_mv(int a, int b, I32[:, ::1] bonds) nogil:
+cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
     """Return True if (a,b) appears in bonds (either direction)."""
     cdef Py_ssize_t k
     for k in range(bonds.shape[0]):
@@ -195,7 +195,7 @@ cdef inline bint _is_bond_mv(int a, int b, I32[:, ::1] bonds) nogil:
     return False
 
 
-cdef inline int _degree_in_bonds_mv(int atom, I32[:, ::1] bonds) nogil:
+cdef inline int _degree_in_bonds_mv(int atom, const I32[:, ::1] bonds) nogil:
     """Count occurrences of `atom` in bonds."""
     cdef int deg = 0
     cdef Py_ssize_t k
@@ -205,7 +205,7 @@ cdef inline int _degree_in_bonds_mv(int atom, I32[:, ::1] bonds) nogil:
     return deg
 
 
-cdef inline int _partner_for_terminal_mv(int terminal_atom, I32[:, ::1] bonds) nogil:
+cdef inline int _partner_for_terminal_mv(int terminal_atom, const I32[:, ::1] bonds) nogil:
     """Return the partner atom bonded to a terminal atom (degree==1)."""
     cdef Py_ssize_t k
     for k in range(bonds.shape[0]):
@@ -216,7 +216,7 @@ cdef inline int _partner_for_terminal_mv(int terminal_atom, I32[:, ::1] bonds) n
     return -1
 
 
-cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, ::1] bonds) nogil:
+cdef inline bint _has_terminal_partner_collision_mv(const I32[::1] trial_comb, const I32[:, ::1] bonds) nogil:
     """Return True if two terminal atoms in `trial_comb` share the same partner."""
     cdef Py_ssize_t bi, bj
     cdef int ai, aj
@@ -239,12 +239,12 @@ cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, 
     return False
 
 
-def check_beads(
-    I32[::1] trial_comb,
-    I32[:, ::1] listbonds,
-    I32[::1] ring_id_of_atom,
-):
-    """Fast bead-placement acceptance check.
+cdef bint check_beads(
+    const I32[::1] trial_comb,
+    const I32[:, ::1] listbonds,
+    const I32[::1] ring_id_of_atom,
+) nogil:
+    """Fast bead-placement acceptance check (GIL-free).
 
     Parameters
     ----------
@@ -263,26 +263,25 @@ def check_beads(
     cdef int ai, aj
     cdef int n_trial = trial_comb.shape[0]
     cdef int rid_i, rid_j
+    cdef int k, m
+    cdef int nrings = 0
+    cdef int rid
+    cdef int num_bonds_in_rings = 0
 
     if n_trial <= 1:
         return True
 
-    # Check for beads at the same place (duplicates)
-    # Fast path: sort a copy and check adjacent values.
-    cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
-    tmp.sort()
-    for bi in range(1, n_trial):
-        if tmp[bi] == tmp[bi - 1]:
-            return False
+    # Check for duplicates (inline, O(n²) but n is small)
+    for k in range(n_trial):
+        for m in range(k + 1, n_trial):
+            if trial_comb[k] == trial_comb[m]:
+                return False
 
-    # Track if any bond is found fully within the same ring; reject if so.
-    cdef int nrings = 0
-    cdef int rid
+    # Count rings to track max ring ID
     for bi in range(n_trial):
         rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
         if rid >= nrings:
             nrings = rid + 1
-    cdef I32[::1] bonds_in_rings = np.zeros(nrings, dtype=np.int32)
 
     # Check for beads linked by chemical bond (except in rings)
     for bi in range(n_trial):
@@ -293,14 +292,13 @@ def check_beads(
                 rid_i = <int>ring_id_of_atom[ai]
                 rid_j = <int>ring_id_of_atom[aj]
                 if rid_i != -1 and rid_i == rid_j:
-                    if rid_i >= 0 and rid_i < nrings:
-                        bonds_in_rings[rid_i] += 1
+                    num_bonds_in_rings += 1
                 else:
                     return False
 
-    for bi in range(nrings):
-        if bonds_in_rings[bi] > 0:
-            return False
+    # Reject if any ring had bonds between beads
+    if num_bonds_in_rings > 0:
+        return False
 
     # Check for two terminal beads linked to the same atom
     if _has_terminal_partner_collision_mv(trial_comb, listbonds):

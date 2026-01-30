@@ -184,7 +184,7 @@ def find_acceptable_trials(seq_one_beads,
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
-    return find_acceptable_trials_cy_omp(seq, bonds, ring_id)
+    return find_acceptable_trials_cy(seq, bonds, ring_id)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
