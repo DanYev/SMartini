@@ -100,6 +100,7 @@ def collect_energies_and_combs(
     ene_best_trial,
     best_trial_comb,
     list_trial_comb,
+    dtype=np.int32
 ):
     """Collect energies and combinations for all acceptable trials"""
     logger.debug("Entering collect_energies_and_combs()") 
@@ -128,8 +129,7 @@ def collect_energies_and_combs(
 
     for trial_comb in acceptable_trials:
         # Do the energy evaluation
-        trial_ene = float(
-            opcy.eval_gaussian_interac(
+        trial_ene = opcy.eval_gaussian_interac(
                 trial_comb,
                 is_ring,
                 bond_dists,
@@ -143,7 +143,6 @@ def collect_energies_and_combs(
                 p_rvdw_ar,
                 p_rvdw_cross,
             )
-        )
         logger.debug("; %s %s", trial_comb, trial_ene)
         # Accept the move
         if trial_ene < ene_best_trial:

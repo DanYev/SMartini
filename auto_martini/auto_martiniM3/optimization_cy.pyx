@@ -57,7 +57,7 @@ cdef inline F32 _sigma_for_pair(
     return rvdw
 
 
-cpdef F32 gaussian_overlap_np(
+cpdef F32 gaussian_overlap(
     F32 dist,
     int bead1,
     int bead2,
@@ -71,7 +71,7 @@ cpdef F32 gaussian_overlap_np(
     return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))
 
 
-cpdef tuple atoms_in_gaussian_np(
+cpdef tuple atoms_in_gaussian(
     int bead_id,
     const U8[::1] in_ring,
     const F32[:, ::1] bond_dists,
@@ -97,7 +97,7 @@ cpdef tuple atoms_in_gaussian_np(
     return at_in_bd_coeff * weight_sum, lumped_atoms
 
 
-cpdef F32 penalize_lonely_atoms_np(
+cpdef F32 penalize_lonely_atoms(
     list lumped_atoms,
     const F32[::1] masses,
     F32 lonely_atom_penalize,
@@ -152,7 +152,7 @@ cpdef F32 eval_gaussian_interac(
         bead1 = <int>list_beads[i]
         for j in range(i + 1, nb):
             bead2 = <int>list_beads[j]
-            weight_overlap += gaussian_overlap_np(
+            weight_overlap += gaussian_overlap(
                 bond_dists[bead1, bead2],
                 bead1,
                 bead2,
@@ -167,7 +167,7 @@ cpdef F32 eval_gaussian_interac(
     lumped_atoms_all = []
     for i in range(nb):
         bead1 = <int>list_beads[i]
-        weight, lumped = atoms_in_gaussian_np(
+        weight, lumped = atoms_in_gaussian(
             bead1,
             in_ring,
             bond_dists,
@@ -182,7 +182,7 @@ cpdef F32 eval_gaussian_interac(
                 lumped_atoms_all.append(j)
 
     weight_sum += weight_at_in_bd
-    weight_sum += penalize_lonely_atoms_np(lumped_atoms_all, masses, lonely_atom_penalize)
+    weight_sum += penalize_lonely_atoms(lumped_atoms_all, masses, lonely_atom_penalize)
     return weight_sum
 
 
