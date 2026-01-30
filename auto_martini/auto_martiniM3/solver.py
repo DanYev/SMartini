@@ -147,7 +147,7 @@ class Cg_molecule:
 
         # Optimize coarse-grained bead positions -- keep all possibilities in case something goes
         # wrong later in the code.
-        list_cg_beads, list_bead_pos = optimization.find_bead_pos(
+        list_cg_beads = optimization.find_bead_pos(
             molecule,
             conf,
             list_heavy_atoms,
@@ -169,7 +169,7 @@ class Cg_molecule:
         logger.info("Going through the candidate mappings")
         while attempt < max_attempts:
             cg_beads = list_cg_beads[attempt]
-            bead_pos = list_bead_pos[attempt]
+            bead_pos = optimization._get_bead_pos(cg_beads, conf)
             success = True
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, max_attempts, len(cg_beads))

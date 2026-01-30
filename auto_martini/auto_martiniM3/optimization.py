@@ -91,6 +91,17 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
     return list_bonds
 
 
+def _get_bead_pos(trial_comb, conformer):
+    # Get bead positions
+    beadpos = [[0] * 3 for l in range(len(trial_comb))]
+    for l in range(len(trial_comb)):
+        beadpos[l] = [
+            conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
+            for m in range(3)
+        ]
+    return beadpos
+
+
 @timeit
 def collect_energies_and_combs(
     molecule,
@@ -148,15 +159,7 @@ def collect_energies_and_combs(
         if trial_ene < ene_best_trial:
             ene_best_trial = trial_ene
             best_trial_comb = sorted(trial_comb)
-        # Get bead positions
-        beadpos = [[0] * 3 for l in range(len(trial_comb))]
-        for l in range(len(trial_comb)):
-            beadpos[l] = [
-                conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
-                for m in range(3)
-            ]
-        # Store configuration
-        list_trial_comb.append([trial_comb, beadpos, trial_ene])
+        list_trial_comb.append([trial_comb, trial_ene])
     return ene_best_trial, best_trial_comb
 
 
@@ -276,8 +279,8 @@ def find_bead_pos(
             break
         last_best_trial_comb = best_trial_comb
 
-    sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(2)), dtype="object")
-    return sorted_combs[:, 0], sorted_combs[:, 1]
+    sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(1)), dtype="object")
+    return sorted_combs[:, 0]
 
 
 def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, list_heavyatoms, bondlist, mol, allatom_coords, force_map): #AutoM3 change: added mol, force_map
