@@ -32,7 +32,7 @@ from .common import *
 from . import topology # AutoM3 change
 from reforge.utils import timeit
 from .optimization_cy import (
-    check_beads_cy,
+    check_beads_cy_np,
     find_acceptable_trials_cy,
     eval_gaussian_interac_np,
 )  
@@ -44,17 +44,23 @@ logger = logging.getLogger(__name__)
 def find_acceptable_trials(seq_one_beads, 
     molecule, list_heavy_atoms, heavyatom_coords, ring_atoms, list_bonds,
     allatom_coords, force_map):
-    # Find all acceptable trials for a given sequence of one bead
-    return np.asarray(find_acceptable_trials_cy(
-        seq_one_beads,
-        molecule,
-        list_heavy_atoms,
-        heavyatom_coords,
-        ring_atoms,
-        list_bonds,
-        allatom_coords,
-        force_map,
-    ))
+    # NumPy-only fast path: caller is responsible for dtype/shape normalization.
+    # Here we just build the aux arrays needed by the Cython kernel.
+    bonds = np.asarray(list_bonds, dtype=np.int32)
+    seq = np.asarray(seq_one_beads, dtype=np.int32)
+
+    # Build ring_id mapping sized to include max atom id in bonds/seq
+    max_atom = -1
+    if seq.size:
+        max_atom = max(max_atom, int(seq.max()))
+    if bonds.size:
+        max_atom = max(max_atom, int(bonds.max()))
+    ring_id = np.full(max_atom + 1, -1, dtype=np.int32)
+    for rid, ring in enumerate(ring_atoms):
+        ring = np.asarray(ring, dtype=np.int32)
+        ring_id[ring] = rid
+
+    return find_acceptable_trials_cy(seq, bonds, ring_id)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):

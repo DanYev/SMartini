@@ -38,7 +38,7 @@ this file must *not* behave like a `setup.py` script.
 
 import numpy
 from Cython.Build import cythonize
-from setuptools import Extension
+from setuptools import Extension, setup, find_packages
 
 
 def build(setup_kwargs: dict) -> None:
@@ -63,8 +63,28 @@ def build(setup_kwargs: dict) -> None:
     )
 
 
+def _make_extensions():
+    """Extension list shared by Poetry hook and manual setuptools builds."""
+    return [
+        Extension(
+            name="auto_martiniM3.optimization_cy",
+            sources=["auto_martiniM3/optimization_cy.pyx"],
+            include_dirs=[numpy.get_include()],
+            extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
+            extra_link_args=["-fopenmp"],
+        )
+    ]
+
+
 if __name__ == "__main__":
-    # poetry-core runs the build script as `python build_ext.py` during builds.
-    # The actual hook entrypoint is `build(setup_kwargs)`, so when executed as a
-    # script we must *not* error.
-    pass
+    # Allow manual rebuilds without Poetry:
+    #   python build_ext.py build_ext --inplace
+    setup(
+        name="auto_martiniM3",
+        version="0.0.0",
+        packages=find_packages(),
+        ext_modules=cythonize(
+            _make_extensions(),
+            compiler_directives={"language_level": "3"},
+        ),
+    )

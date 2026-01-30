@@ -10,14 +10,14 @@ This module intentionally mirrors a small subset of pure-Python functions to
 speed up the CG bead trial filtering stage.
 
 Currently implemented:
-  - `check_beads_cy(...)`: fast acceptance check for a trial combination
-  - `find_acceptable_trials_cy(...)`: filter many trial combinations
+    - `check_beads_cy_np(...)`: fast acceptance check for a trial combination
+    - `find_acceptable_trials_cy_np(...)`: filter many trial combinations
 
 Notes
 -----
 * This implementation avoids RDKit objects and focuses on integer-heavy loops.
-* `heavyatom_coords` is accepted for API compatibility but not used (same as the
-  current `optimization.py:check_beads`).
+* This module expects NumPy arrays (or compatible typed memoryviews) as inputs.
+    Type/shape normalization should be handled in Python.
 """
 
 cimport cython
@@ -264,7 +264,6 @@ def check_beads_cy_np(
     cdef int ai, aj
     cdef int n_trial = trial_comb.shape[0]
     cdef int rid_i, rid_j
-    cdef int rid_i, rid_j
 
     if n_trial <= 1:
         return True
@@ -305,9 +304,8 @@ def check_beads_cy_np(
             return False
 
     # Check for two terminal beads linked to the same atom
-    with nogil:
-        if _has_terminal_partner_collision_mv(trial_comb, listbonds):
-            return False
+    if _has_terminal_partner_collision_mv(trial_comb, listbonds):
+        return False
 
     return True
 
@@ -372,76 +370,24 @@ def check_beads_cy_np_omp(
     if bad:
         return False
 
-    # terminal-partner collision check (serial but nogil)
-    with nogil:
-        if _has_terminal_partner_collision_mv(trial_comb, listbonds):
-            return False
+    # terminal-partner collision check (serial)
+    if _has_terminal_partner_collision_mv(trial_comb, listbonds):
+        return False
 
     return True
 
-
-def check_beads_cy(
-    molecule,
-    list_heavyatoms,
-    heavyatom_coords,
-    trial_comb,
-    ring_atoms,
-    listbonds,
-):
-    """Compatibility wrapper.
-
-    Accepts the original Python objects and converts to NumPy once per call.
-    For best performance, call `check_beads_cy_np` directly.
-    """
-    # listbonds: list[[i,j], ...] -> (nbonds,2)
-    bonds = np.asarray(listbonds, dtype=np.int32)
-    trial = np.asarray(trial_comb, dtype=np.int32)
-    # ring_atoms: list[list[int]] -> ring_id_of_atom
-    ring_id = np.full(int(np.max(trial)) + 1 if trial.size else 0, -1, dtype=np.int32)
-    for rid, ring in enumerate(ring_atoms):
-        ring = np.asarray(ring, dtype=np.int32)
-        for a in ring:
-            if a >= ring_id.shape[0]:
-                ring_id = np.pad(ring_id, (0, int(a - ring_id.shape[0] + 1)), constant_values=-1)
-            ring_id[a] = rid
-    return check_beads_cy_np(trial, bonds, ring_id)
-
-
-def find_acceptable_trials_cy_np(
+def find_acceptable_trials_cy(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
 ):
     """Filter acceptable trial combinations (NumPy fast path)."""
     cdef Py_ssize_t i
+    # Return as a NumPy array (n_acceptable, num_beads)
     acceptable_trials = []
     for i in range(seq_one_beads.shape[0]):
-        if check_beads_cy_np_omp(seq_one_beads[i], listbonds, ring_id_of_atom):
+        if check_beads_cy_np(seq_one_beads[i], listbonds, ring_id_of_atom):
             acceptable_trials.append(seq_one_beads[i])
-    return acceptable_trials
-
-
-def find_acceptable_trials_cy(
-    seq_one_beads,
-    molecule,
-    list_heavy_atoms,
-    heavyatom_coords,
-    ring_atoms,
-    list_bonds,
-    allatom_coords,
-    force_map,
-):
-    """Compatibility wrapper matching `optimization.find_acceptable_trials`."""
-    bonds = np.asarray(list_bonds, dtype=np.int32)
-    seq = np.asarray(seq_one_beads, dtype=np.int32)
-    # Build ring_id mapping sized to include max atom id in bonds/seq
-    max_atom = -1
-    if seq.size:
-        max_atom = max(max_atom, int(seq.max()))
-    if bonds.size:
-        max_atom = max(max_atom, int(bonds.max()))
-    ring_id = np.full(max_atom + 1, -1, dtype=np.int32)
-    for rid, ring in enumerate(ring_atoms):
-        ring = np.asarray(ring, dtype=np.int32)
-        ring_id[ring] = rid
-    return find_acceptable_trials_cy_np(seq, bonds, ring_id)
+    if not acceptable_trials:
+        return np.empty((0, 0), dtype=np.int32)
+    return np.asarray(acceptable_trials, dtype=np.int32)
