@@ -171,7 +171,7 @@ def collect_energies_and_combs(
 
 @timeit
 def find_acceptable_trials(seq_iter,
-    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e5)):
+    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e8)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
     
     Parameters
@@ -216,18 +216,12 @@ def find_acceptable_trials(seq_iter,
     for chunk_start in range(0, n_trials, chunk_size):
         chunk_end = min(chunk_start + chunk_size, n_trials)
         seq_chunk = seq_array[chunk_start:chunk_end]
-        
         logger.debug(f"Processing chunk {chunk_start}-{chunk_end} of {n_trials}")
         chunk_acceptable = opcy.find_acceptable_trials(seq_chunk, bonds, ring_id)
-        
-        if chunk_acceptable.size > 0:
-            acceptable_trials_list.append(chunk_acceptable)
+        acceptable_trials_list.append(chunk_acceptable)
     
     # Concatenate all acceptable trials from all chunks
-    if acceptable_trials_list:
-        return np.vstack(acceptable_trials_list)
-    else:
-        return np.empty((0, seq_array.shape[1] if seq_array.ndim > 1 else 1), dtype=dtype)
+    return np.vstack(acceptable_trials_list, dtype=np.int32)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
