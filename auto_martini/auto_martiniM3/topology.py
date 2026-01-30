@@ -188,6 +188,7 @@ def get_hbond_a(features):
                     hbond.append(i)
     return hbond
 
+
 def get_hbond_d(features):
     """Get Hbond donor information"""
     hbond = []
@@ -197,6 +198,7 @@ def get_hbond_d(features):
                 if i not in hbond:
                     hbond.append(i)
     return hbond
+
 
 def get_atoms(molecule):
     """List all heavy atoms"""
@@ -216,6 +218,7 @@ def get_atoms(molecule):
         print("Error. No heavy atom found.")
         exit(1)
     return list_heavyatoms, list_heavyatomnames
+
 
 def get_ring_atoms(mol):
     """
@@ -269,6 +272,7 @@ def extract_features(molecule):
     features = factory.GetFeaturesForMol(molecule)
     return features
 
+
 def cyclic_smi_conversion(smi): # AutoM3 function
     """ Function for converting cyclic atoms in smiles from upper case to lower for them being accepted by rdkit and not raise error : 
     rdkit.Chem.rdchem.AtomKekulizeException: non-ring atom 0 marked aromatic
@@ -281,16 +285,19 @@ def cyclic_smi_conversion(smi): # AutoM3 function
     smi = smi.replace("o","O")
     return (smi)
 
+
 def find_closest_key(dictionary, target_value): # AutoM3 function
     lst=list(dictionary.keys())
     closest_key = lst[min(range(len(lst)), key = lambda i: abs(lst[i]-target_value))]
     return closest_key
+
 
 def rearrange_until_match(input_string): # AutoM3 function
     letters = [char for char in input_string if char.isalpha()]
     random.shuffle(letters)
     result_string = '-'.join(letters)
     return result_string
+
 
 def read_params(val, size):  # AutoM3 function 
     """Returns the closest force value to given parameter, 
@@ -358,6 +365,7 @@ def read_params(val, size):  # AutoM3 function
                     force = v[closest_length]
                     return force
 
+
 def substruct2smi(molecule, partitioning, cg_bead):
     """Substructure to smiles conversion; also output Wildman-Crippen log_p;
     and charge of group."""
@@ -419,6 +427,7 @@ def substruct2smi(molecule, partitioning, cg_bead):
     # smi = smi.lower() if smi.islower() else smi.upper()
     return smi, wc_log_p, chg, atoms_in_smi,converted_smi,real_smi
 
+
 def get_mass(smi): # AutoM3
     """Gets real mass of atoms in smile code"""
     smi_mass=0
@@ -435,12 +444,14 @@ def get_mass(smi): # AutoM3
             i += 1
     return smi_mass
 
+
 def get_standard_mass(bead_type): # AutoM3
     """Gets standard mass of atoms in smile code"""
     if bead_type.startswith('T'): return 36
     else: 
         if bead_type.startswith('S'): return 54
         else: return 72
+
 
 def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partitioning, ringatoms, ringatoms_flat, logp_file, trial=False):
     """
@@ -1485,7 +1496,7 @@ def count_letters(s): ### AutoM3 ###
     return count
 
 
-def find_closest_logPvalue(value, keyslist,in_ring): ### AutoM3 ###
+def find_closest_logPvalue(value, keyslist, in_ring): ### AutoM3 ###
     closest_key = None
     closest_diff = float('inf')
     dict=read_delta_f_types()
@@ -1502,20 +1513,26 @@ def find_closest_logPvalue(value, keyslist,in_ring): ### AutoM3 ###
 def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ### AutoM3 ###
     """Determine CG bead type from delta_f value, charge,
     and hbond acceptor, and donor"""
-    if charge < -1 or charge > +1:
-        print("Charge is too large: %s" % charge)
+    if charge < -2 or charge > +2:
+        logger.error("Charge is too large: %s" % charge)
         exit(1)
-    bead_type = []
+    # bead_type = None
     #smi_frag = ''.join(char for char in smi_frag if char.isalpha() and char!='H')
     if charge != 0:
+        if charge == -2 or charge == -2:
+            if count_letters(str(smi_frag)) == 2:
+                bead_type = "TD"
+            if count_letters(str(smi_frag)) == 3:
+                bead_type = "SD"
+            if count_letters(str(smi_frag)) > 3:
+                bead_type = "D"
         # The compound has a +/- charge -> Q type
-
         if count_letters(str(smi_frag)) == 2:
-            other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5", "TD"]
+            other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
         if count_letters(str(smi_frag)) == 3:
-            othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5", "SD"]
+            othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
         if count_letters(str(smi_frag)) > 3:
-            othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5", "D"]
+            othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5",]
         bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
 
     else:

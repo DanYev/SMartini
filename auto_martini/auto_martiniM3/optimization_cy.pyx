@@ -21,6 +21,7 @@ Notes
 """
 
 cimport cython
+from cython.parallel cimport prange
 from libc.stdint cimport int32_t
 from libc.math cimport exp
 
@@ -216,6 +217,29 @@ cdef inline int _partner_for_terminal_mv(int terminal_atom, I32[:, ::1] bonds) n
     return -1
 
 
+cdef inline bint _has_terminal_partner_collision_mv(I32[::1] trial_comb, I32[:, ::1] bonds) nogil:
+    """Return True if two terminal atoms in `trial_comb` share the same partner."""
+    cdef Py_ssize_t bi, bj
+    cdef int ai, aj
+    cdef int partneri, partnerj
+    cdef int n_trial = <int>trial_comb.shape[0]
+    for bi in range(n_trial):
+        ai = <int>trial_comb[bi]
+        if _degree_in_bonds_mv(ai, bonds) != 1:
+            continue
+        partneri = _partner_for_terminal_mv(ai, bonds)
+        if partneri == -1:
+            continue
+        for bj in range(bi + 1, n_trial):
+            aj = <int>trial_comb[bj]
+            if _degree_in_bonds_mv(aj, bonds) != 1:
+                continue
+            partnerj = _partner_for_terminal_mv(aj, bonds)
+            if partnerj != -1 and partneri == partnerj:
+                return True
+    return False
+
+
 def check_beads_cy_np(
     I32[::1] trial_comb,
     I32[:, ::1] listbonds,
@@ -239,6 +263,8 @@ def check_beads_cy_np(
     cdef Py_ssize_t bi, bj
     cdef int ai, aj
     cdef int n_trial = trial_comb.shape[0]
+    cdef int rid_i, rid_j
+    cdef int rid_i, rid_j
 
     if n_trial <= 1:
         return True
@@ -279,18 +305,77 @@ def check_beads_cy_np(
             return False
 
     # Check for two terminal beads linked to the same atom
+    with nogil:
+        if _has_terminal_partner_collision_mv(trial_comb, listbonds):
+            return False
+
+    return True
+
+
+def check_beads_cy_np_omp(
+    I32[::1] trial_comb,
+    I32[:, ::1] listbonds,
+    I32[::1] ring_id_of_atom,
+):
+    """OpenMP-accelerated variant of :func:`check_beads_cy_np`.
+
+    Same contract as `check_beads_cy_np`, but uses OpenMP parallelization for the
+    pairwise bond check.
+
+    Note
+    ----
+    This requires that the extension is compiled with OpenMP flags (e.g.
+    ``-fopenmp`` on GCC/Clang).
+    """
+
+    cdef Py_ssize_t bi, bj
+    cdef int ai, aj
+    cdef int rid_i, rid_j
+    cdef int n_trial = trial_comb.shape[0]
+
+    if n_trial <= 1:
+        return True
+
+    # duplicates check (serial)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] tmp = np.asarray(trial_comb, dtype=np.int32).copy()
+    tmp.sort()
+    for bi in range(1, n_trial):
+        if tmp[bi] == tmp[bi - 1]:
+            return False
+
+    # ring count (serial)
+    cdef int nrings = 0
+    cdef int rid
     for bi in range(n_trial):
-        ai = <int>trial_comb[bi]
-        if _degree_in_bonds_mv(ai, listbonds) != 1:
-            continue
-        for bj in range(bi + 1, n_trial):
-            aj = <int>trial_comb[bj]
-            if _degree_in_bonds_mv(aj, listbonds) != 1:
+        rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
+        if rid >= nrings:
+            nrings = rid + 1
+
+    # parallel bond rejection (ignore within-ring bonds)
+    cdef int bad = 0
+    with nogil:
+        for bi in prange(n_trial, schedule='static'):
+            if bad:
                 continue
-            partneri = _partner_for_terminal_mv(ai, listbonds)
-            partnerj = _partner_for_terminal_mv(aj, listbonds)
-            if partneri != -1 and partneri == partnerj:
-                return False
+            ai = <int>trial_comb[bi]
+            for bj in range(bi + 1, n_trial):
+                if bad:
+                    break
+                aj = <int>trial_comb[bj]
+                if _is_bond_mv(ai, aj, listbonds):
+                    rid_i = <int>ring_id_of_atom[ai]
+                    rid_j = <int>ring_id_of_atom[aj]
+                    if not (rid_i != -1 and rid_i == rid_j and rid_i >= 0 and rid_i < nrings):
+                        bad = 1
+                        break
+
+    if bad:
+        return False
+
+    # terminal-partner collision check (serial but nogil)
+    with nogil:
+        if _has_terminal_partner_collision_mv(trial_comb, listbonds):
+            return False
 
     return True
 
@@ -331,7 +416,7 @@ def find_acceptable_trials_cy_np(
     cdef Py_ssize_t i
     acceptable_trials = []
     for i in range(seq_one_beads.shape[0]):
-        if check_beads_cy_np(seq_one_beads[i], listbonds, ring_id_of_atom):
+        if check_beads_cy_np_omp(seq_one_beads[i], listbonds, ring_id_of_atom):
             acceptable_trials.append(seq_one_beads[i])
     return acceptable_trials
 
