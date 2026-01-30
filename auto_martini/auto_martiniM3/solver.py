@@ -109,7 +109,7 @@ class Cg_molecule:
         self.cg_bead_coords = []
         self.topout = None
         self.bartender_out = None # AutoM3 new variable 
-        self.molname=molname # AutoM3 change : for pretty GRO file (will be easier to look on a molecule in VMD with its proper name)
+        self.molname = molname # AutoM3 change : for pretty GRO file (will be easier to look on a molecule in VMD with its proper name)
         force_map = False # AutoM3 new variable
 
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", molname, forcepred, simple_model)
