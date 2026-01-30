@@ -30,7 +30,7 @@ and LICENSE files.
 from sys import exit
 from .common import *
 from . import topology # AutoM3 change
-from reforge.utils import timeit
+from reforge.utils import timeit, memprofit
 from . import optimization_cy as opcy
 
 logger = logging.getLogger(__name__)
@@ -170,17 +170,37 @@ def collect_energies_and_combs(
 
 
 @timeit
-def find_acceptable_trials(seq_one_beads, 
-    ring_atoms, list_bonds, *, dtype=np.int32):
-    # NumPy-only fast path: caller is responsible for dtype/shape normalization.
-    # Here we just build the aux arrays needed by the Cython kernel.
+def find_acceptable_trials(seq_iter,
+    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e5)):
+    """Filter acceptable trial combinations, processing in memory-efficient chunks.
+    
+    Parameters
+    ----------
+    seq_one_beads : array-like or iterator
+        Trial combinations to filter. Can be a 2D array or an iterator.
+    ring_atoms : list
+        Ring information for filtering.
+    list_bonds : array-like
+        Bond information for filtering.
+    dtype : np.dtype, optional
+        Data type for arrays (default: np.int32).
+    chunk_size : int, optional
+        Number of trials to process per chunk (default: 10000).
+        Adjust based on available memory.
+    
+    Returns
+    -------
+    np.ndarray
+        2D array of acceptable trial combinations.
+    """
     bonds = np.asarray(list_bonds, dtype=dtype)
-    seq = np.asarray(seq_one_beads, dtype=dtype)
-
+    seq_list = list(seq_iter)
+    seq_array = np.asarray(seq_list, dtype=dtype)
+    
     # Build ring_id mapping sized to include max atom id in bonds/seq
     max_atom = -1
-    if seq.size:
-        max_atom = max(max_atom, seq.max())
+    if seq_array.size:
+        max_atom = max(max_atom, seq_array.max())
     if bonds.size:
         max_atom = max(max_atom, bonds.max())
 
@@ -188,7 +208,26 @@ def find_acceptable_trials(seq_one_beads,
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
-    return opcy.find_acceptable_trials(seq, bonds, ring_id)
+    
+    # Process in chunks to manage memory efficiently
+    acceptable_trials_list = []
+    n_trials = len(seq_array)
+    
+    for chunk_start in range(0, n_trials, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, n_trials)
+        seq_chunk = seq_array[chunk_start:chunk_end]
+        
+        logger.debug(f"Processing chunk {chunk_start}-{chunk_end} of {n_trials}")
+        chunk_acceptable = opcy.find_acceptable_trials(seq_chunk, bonds, ring_id)
+        
+        if chunk_acceptable.size > 0:
+            acceptable_trials_list.append(chunk_acceptable)
+    
+    # Concatenate all acceptable trials from all chunks
+    if acceptable_trials_list:
+        return np.vstack(acceptable_trials_list)
+    else:
+        return np.empty((0, seq_array.shape[1] if seq_array.ndim > 1 else 1), dtype=dtype)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
@@ -259,7 +298,8 @@ def find_bead_pos(
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
         if num_beads==0: num_beads=1
-        seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)), dtype=dtype)
+        # seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)), dtype=dtype)
+        seq_one_beads = itertools.combinations(list_heavy_atoms, num_beads)
 
         logger.info("Filtering Acceptable Trials...")
         acceptable_trials = find_acceptable_trials(
