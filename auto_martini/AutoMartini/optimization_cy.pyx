@@ -380,8 +380,8 @@ def find_acceptable_trials_tmp(
     return np.asarray(acceptable_trials, dtype=np.int32)
 
 
-def find_acceptable_trials(
-    I32[:, ::1] seq_one_beads,
+def find_acceptable_combinations(
+    I32[:, ::1] trial_combinations,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
 ):
@@ -401,7 +401,7 @@ def find_acceptable_trials(
 
     Parameters
     ----------
-    seq_one_beads : (n_trials, n_beads) int32 array
+    trial_combinations : (n_trials, n_beads) int32 array
         Each row is a trial combination of atom indices for CG bead centers.
     listbonds : (nbonds, 2) int32 array
         Heavy-atom bonds in (begin_atom, end_atom) format.
@@ -420,8 +420,8 @@ def find_acceptable_trials(
     * For maximum performance, ensure input arrays are C-contiguous.
     """
 
-    cdef Py_ssize_t n_trials = seq_one_beads.shape[0]
-    cdef Py_ssize_t n_beads = seq_one_beads.shape[1]
+    cdef Py_ssize_t n_trials = trial_combinations.shape[0]
+    cdef Py_ssize_t n_beads = trial_combinations.shape[1]
     cdef Py_ssize_t i, j
     cdef Py_ssize_t n_acc = 0
 
@@ -431,7 +431,7 @@ def find_acceptable_trials(
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n_trials, dtype=np.uint8)
 
     for i in prange(n_trials, schedule='static', nogil=True):
-        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
+        if check_beads(trial_combinations[i], listbonds, ring_id_of_atom):
             mask[i] = 1
 
     # Count accepted (serial)
@@ -446,7 +446,7 @@ def find_acceptable_trials(
     j = 0
     for i in range(n_trials):
         if mask[i] != 0:
-            out[j, :] = seq_one_beads[i]
+            out[j, :] = trial_combinations[i]
             j += 1
 
     return out

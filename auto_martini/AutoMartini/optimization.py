@@ -148,7 +148,7 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
     
     # Process first chunk
     logger.info(f"Processing chunk {chunk_num} ({len(first_chunk_array)} trials)")
-    chunk_acceptable = opcy.find_acceptable_trials(first_chunk_array, bonds, ring_id)
+    chunk_acceptable = opcy.find_acceptable_combinations(first_chunk_array, bonds, ring_id)
     if chunk_acceptable.size > 0:
         acceptable_trials_list.append(chunk_acceptable)
     chunk_num += 1
@@ -167,7 +167,7 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         if chunk_array.size == 0:
             break
         logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
-        chunk_acceptable = opcy.find_acceptable_trials(chunk_array, bonds, ring_id)
+        chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)
         chunk_num += 1

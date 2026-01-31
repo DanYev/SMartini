@@ -86,7 +86,7 @@ if __name__ == "__main__":
     
     setup(
         name="AutoMartini",
-        version="0.0.0",
+        version="0.0.1",
         packages=find_packages(),
         ext_modules=cythonize(
             _make_extensions(),
