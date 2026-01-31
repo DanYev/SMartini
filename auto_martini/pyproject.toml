@@ -23,17 +23,17 @@ build-backend = "poetry.core.masonry.api"
 # Project package metadata ----------
 
 [tool.poetry]
-name = "auto_martiniM3"
+name = "AutoMartini"
 version = "0.0.0"
 packages = [
-  { include = "auto_martiniM3" }
+  { include = "AutoMartini" }
 ]
 exclude = [
   "*/tests/"
 ]
 include = [
-  {path = "auto_martiniM3/optimization.pyx", format = "wheel"},
-  {path = "auto_martiniM3/*.so", format = "wheel"},
+  {path = "AutoMartini/optimization.pyx", format = "wheel"},
+  {path = "AutoMartini/*.so", format = "wheel"},
 ]
 description = "A tool for automatic MARTINI 3 force field mapping and parametrization of small organic molecules"
 authors = ["Magdalena Szczuka", "Tristan Bereau", "Andrew Abi-Mansour"]
@@ -107,7 +107,7 @@ line-length = 99
 # Coverage settings
 [tool.coverage.run]
 branch = true
-source = ["auto_martiniM3"]
+source = ["AutoMartini"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -118,7 +118,7 @@ exclude_lines = [
     "pytest.mark.skip"
 ]
 omit = [
-    "auto_martiniM3/tests/*"
+    "AutoMartini/tests/*"
 ]
 show_missing = true
 fail_under = 0 # coverage not working
@@ -130,4 +130,4 @@ profile = "black"
 # Pytest options
 [tool.pytest.ini_options]
 xfail_strict = true
-testpaths = "auto_martiniM3/tests"
+testpaths = "AutoMartini/tests"

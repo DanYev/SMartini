@@ -29,7 +29,7 @@ and LICENSE files.
 
 from sys import exit
 
-from auto_martiniM3._version import __version__
+from AutoMartini._version import __version__
 
 from .common import *
 

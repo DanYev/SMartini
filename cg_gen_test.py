@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-import auto_martiniM3 as am
+import AutoMartini as am
 import rdkit
 from rdkit import Chem
 
@@ -9,7 +9,7 @@ logging.basicConfig(
     format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
     force=True,  # override any prior logging config set by imported libs
 )
-logging.getLogger("auto_martiniM3").setLevel(logging.INFO)  # or DEBUG
+logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
@@ -21,8 +21,8 @@ if __name__ == "__main__":
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
-    sdf_file = "anp.sdf"
-    n_beads = 10
+    sdf_file = "aspirin.sdf"
+    n_beads = None
     # mol_aa = Chem.MolFromPDBFile(str(pdb_file), removeHs=False, sanitize=True)
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))

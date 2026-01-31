@@ -48,8 +48,8 @@ def build(setup_kwargs: dict) -> None:
     # If OpenMP isn't available, compilation may fail; in that case remove
     # "-fopenmp" or adjust for your compiler toolchain.
     ext = Extension(
-        name="auto_martiniM3.optimization_cy",
-        sources=["auto_martiniM3/optimization_cy.pyx"],
+        name="AutoMartini.optimization_cy",
+        sources=["AutoMartini/optimization_cy.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
         extra_link_args=["-fopenmp"],
@@ -67,8 +67,8 @@ def _make_extensions():
     """Extension list shared by Poetry hook and manual setuptools builds."""
     return [
         Extension(
-            name="auto_martiniM3.optimization_cy",
-            sources=["auto_martiniM3/optimization_cy.pyx"],
+            name="AutoMartini.optimization_cy",
+            sources=["AutoMartini/optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     # Allow manual rebuilds without Poetry:
     #   python build_ext.py build_ext --inplace
     setup(
-        name="auto_martiniM3",
+        name="AutoMartini",
         version="0.0.0",
         packages=find_packages(),
         ext_modules=cythonize(
