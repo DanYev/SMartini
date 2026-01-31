@@ -30,7 +30,7 @@ and LICENSE files.
 from sys import exit
 from .common import *
 from . import topology # AutoM3 change
-from reforge.utils import timeit, memprofit
+from .utils import timeit, memprofit
 from . import optimization_cy as opcy
 
 logger = logging.getLogger(__name__)
@@ -93,13 +93,14 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
 
 @timeit
 def find_acceptable_trials(seq_iter,
-    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e8)):
+    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e6)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
     
     Parameters
     ----------
-    seq_one_beads : array-like or iterator
-        Trial combinations to filter. Can be a 2D array or an iterator.
+    seq_iter : iterator or array-like
+        Trial combinations to filter. Typically an itertools.combinations iterator
+        for memory efficiency.
     ring_atoms : list
         Ring information for filtering.
     list_bonds : array-like
@@ -114,36 +115,52 @@ def find_acceptable_trials(seq_iter,
     -------
     np.ndarray
         2D array of acceptable trial combinations.
+    
+    Notes
+    -----
+    Processes the iterator in chunks to avoid materializing the entire
+    sequence in memory. This is critical for large combinatorial spaces.
     """
     bonds = np.asarray(list_bonds, dtype=dtype)
-    seq_list = list(seq_iter)
-    seq_array = np.asarray(seq_list, dtype=dtype)
     
-    # Build ring_id mapping sized to include max atom id in bonds/seq
-    max_atom = -1
-    if seq_array.size:
-        max_atom = max(max_atom, seq_array.max())
-    if bonds.size:
-        max_atom = max(max_atom, bonds.max())
+    # Compute max atom ID from bonds for ring_id initialization
+    max_atom = bonds.max() if bonds.size > 0 else -1
+    
+    # We need to peek at the first chunk to determine max atom from seq
+    # Store first chunk separately
+    first_chunk_list = list(itertools.islice(seq_iter, chunk_size))
+    first_chunk_array = np.asarray(first_chunk_list, dtype=dtype)
+    max_atom = max(max_atom, first_chunk_array.max())
 
     ring_id = np.full(max_atom + 1, -1, dtype=dtype)
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
     
-    # Process in chunks to manage memory efficiently
+    # Process chunks efficiently
     acceptable_trials_list = []
-    n_trials = len(seq_array)
+    chunk_num = 0
     
-    for chunk_start in range(0, n_trials, chunk_size):
-        chunk_end = min(chunk_start + chunk_size, n_trials)
-        seq_chunk = seq_array[chunk_start:chunk_end]
-        logger.debug(f"Processing chunk {chunk_start}-{chunk_end} of {n_trials}")
-        chunk_acceptable = opcy.find_acceptable_trials(seq_chunk, bonds, ring_id)
+    # Process first chunk
+    logger.info(f"Processing chunk {chunk_num} ({len(first_chunk_array)} trials)")
+    chunk_acceptable = opcy.find_acceptable_trials(first_chunk_array, bonds, ring_id)
+    if chunk_acceptable.size > 0:
         acceptable_trials_list.append(chunk_acceptable)
+    chunk_num += 1
     
-    # Concatenate all acceptable trials from all chunks
-    return np.vstack(acceptable_trials_list, dtype=np.int32)
+    # Process remaining chunks from iterator
+    while True:
+        chunk_list = list(itertools.islice(seq_iter, chunk_size))
+        if not chunk_list:
+            break
+        chunk_array = np.asarray(chunk_list, dtype=dtype)
+        logger.debug(f"Processing chunk {chunk_num} ({len(chunk_array)} trials)")
+        chunk_acceptable = opcy.find_acceptable_trials(chunk_array, bonds, ring_id)
+        if chunk_acceptable.size > 0:
+            acceptable_trials_list.append(chunk_acceptable)
+        chunk_num += 1
+    
+    return np.vstack(acceptable_trials_list)
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):

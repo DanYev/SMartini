@@ -5,7 +5,7 @@ import re
 import pytest
 
 
-SMILES_LIST = ["N=Cc1ccccc1", "CC(=O)OC1=CC=CC=C1C(=O)O", ] # "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"]
+SMILES_LIST = ["CCC", "N=Cc1ccccc1", "CC(=O)OC1=CC=CC=C1C(=O)O", ] # "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"]
 
 
 def _normalize_itp(text: str) -> str:
