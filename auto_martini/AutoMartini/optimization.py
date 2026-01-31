@@ -32,6 +32,9 @@ from .common import *
 from . import topology # AutoM3 change
 from .utils import timeit, memprofit
 from . import optimization_cy as opcy
+import math
+import multiprocessing as mp
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +52,6 @@ def read_bead_params():
     bead_params["bd_bd_overlap_coeff"] = 1.0 #AutoM3 change: was 9.0
     bead_params["at_in_bd_coeff"] = 0.9
     return bead_params
-
-
-"""Energy evaluation has been moved to Cython (`energy_cy.pyx`)."""
 
 
 def _get_bond_distances(conformer):
@@ -91,6 +91,24 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
     return list_bonds
 
 
+def _filter_chunk(args):
+    """Multiprocessing worker: generate one chunk and return acceptable combos.
+
+    Notes
+    -----
+    * Must be top-level for multiprocessing pickling.
+    * Returns a numpy array (can be large). This is the "Option 2" approach.
+    """
+    chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id = args
+    start_index = int(chunk_num) * int(chunk_size)
+    chunk_array = opcy.generate_combinations(
+        int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size)
+    )
+    if chunk_array.size == 0:
+        return np.empty((0, int(num_beads)), dtype=np.int32)
+    return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
+
+
 @timeit(level=logging.INFO)
 def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds, 
     dtype=np.int32, chunk_size=int(1e7)):
@@ -125,7 +143,6 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         chunk_size = 2147483646
     logger.info("Max chunk size: %d", chunk_size)
     bonds = np.asarray(list_bonds, dtype=dtype)
-    # seq_iter = itertools.combinations(list_heavy_atoms, num_beads)
     
     # Compute max atom ID from bonds for ring_id initialization
     max_atom = bonds.max()     
@@ -136,14 +153,12 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
     
     # Process chunks 
     acceptable_trials_list = []
-    chunk_num = 0
-    n_heavy_atoms = len(list_heavy_atoms)
+    n_heavy_atoms = len(list_heavy_atoms)    
+    total = math.comb(int(n_heavy_atoms), int(num_beads))
+    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
+
     logger.info("Starting processing chunks")
-    while True:
-        # chunk_list = list(itertools.islice(seq_iter, chunk_size))
-        # chunk_array = np.array(chunk_list, dtype=dtype)
-        # if not chunk_list:
-        #     break
+    for chunk_num in range(n_chunks):
         start_index = int(chunk_num) * int(chunk_size)
         chunk_array = opcy.generate_combinations(int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size))
         logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
@@ -152,8 +167,59 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)
-        chunk_num += 1
     
+    return np.vstack(acceptable_trials_list)
+
+
+@timeit(level=logging.INFO)
+def find_acceptable_trials_mp(
+    list_heavy_atoms,
+    num_beads,
+    ring_atoms,
+    list_bonds,
+    dtype=np.int32,
+    chunk_size=int(1e7),
+    nprocs=None,
+):
+    """Multiprocessing version of acceptable-trial filtering (Option 2).
+
+    Each process generates its own chunk and filters it, then returns the full
+    accepted combinations array back to the parent (IPC/pickling heavy).
+    """
+    if chunk_size >= 2147483647:
+        chunk_size = 2147483646
+    bonds = np.asarray(list_bonds, dtype=dtype)
+
+    max_atom = bonds.max()
+    ring_id = np.full(max_atom + 1, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        ring = np.asarray(ring, dtype=dtype)
+        ring_id[ring] = rid
+
+    n_heavy_atoms = len(list_heavy_atoms)
+    total = math.comb(int(n_heavy_atoms), int(num_beads))
+    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
+
+    if nprocs is None:
+        nprocs = int(os.environ.get("SLURM_CPUS_PER_TASK") or (os.cpu_count() or 1))
+    nprocs = max(1, int(nprocs))
+
+    # Avoid OpenMP oversubscription if the cython filter uses OpenMP internally.
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+    work = [
+        (chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id)
+        for chunk_num in range(int(n_chunks))
+    ]
+
+    acceptable_trials_list = []
+    with mp.Pool(processes=nprocs) as pool:
+        for chunk_acceptable in pool.imap_unordered(_filter_chunk, work, chunksize=1):
+            if chunk_acceptable.size:
+                acceptable_trials_list.append(chunk_acceptable)
+
+    if not acceptable_trials_list:
+        return np.empty((0, int(num_beads)), dtype=dtype)
     return np.vstack(acceptable_trials_list)
 
 
@@ -282,7 +348,7 @@ def find_bead_pos(
         if num_beads==0: num_beads=1
 
         logger.info("Finding Acceptable Mapping Combinations...")
-        acceptable_trials = find_acceptable_trials(
+        acceptable_trials = find_acceptable_trials_mp(
             list_heavy_atoms, num_beads,
             ring_atoms,
             list_bonds,
