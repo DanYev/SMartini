@@ -79,6 +79,11 @@ def _make_extensions():
 if __name__ == "__main__":
     # Allow manual rebuilds without Poetry:
     #   python build_ext.py build_ext --inplace
+    import sys
+    # If invoked without commands (e.g., by Poetry's build system), assume build_ext
+    if len(sys.argv) == 1:
+        sys.argv.extend(["build_ext", "--inplace"])
+    
     setup(
         name="AutoMartini",
         version="0.0.0",
