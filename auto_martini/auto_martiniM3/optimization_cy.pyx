@@ -6,18 +6,34 @@
 
 """Cython-accelerated helpers for hot loops in `auto_martiniM3.optimization`.
 
-This module intentionally mirrors a small subset of pure-Python functions to
-speed up the CG bead trial filtering stage.
+This module provides high-performance Cython implementations for the CG bead 
+trial filtering and energy evaluation stages of coarse-graining. It uses 
+parallel processing (OpenMP via Cython's prange) and GIL-free execution where 
+possible to maximize performance.
 
 Currently implemented:
-    - `check_beads_cy_np(...)`: fast acceptance check for a trial combination
-    - `find_acceptable_trials_cy_np(...)`: filter many trial combinations
+    - `check_beads(...)`: fast acceptance check for a trial combination
+    - `find_acceptable_trials(...)`: OpenMP-parallel filter for many trial 
+      combinations
+    - `eval_gaussian_interac(...)`: fast energy evaluation for a bead combination
+    - `collect_energies(...)`: batch energy collection for all acceptable trials
+    - `gaussian_overlap(...)`: bead-bead overlap penalty calculation
+
+Features:
+    - OpenMP parallelization via prange for trial filtering
+    - GIL-free critical loops for performance
+    - Proper handling of ring and aromatic atoms
+    - Bond connectivity validation
+    - Terminal atom collision detection
+    - Mass-weighted energy terms
 
 Notes
 -----
-* This implementation avoids RDKit objects and focuses on integer-heavy loops.
-* This module expects NumPy arrays (or compatible typed memoryviews) as inputs.
-    Type/shape normalization should be handled in Python.
+* This implementation avoids RDKit objects and focuses on integer-heavy and 
+  float-heavy loops.
+* This module expects NumPy arrays or compatible typed memoryviews as inputs.
+  Type/shape normalization should be handled in Python.
+* All critical loops are marked with nogil to allow parallel execution.
 """
 
 cimport cython
@@ -40,7 +56,20 @@ ctypedef cnp.uint8_t U8
 ############################################################################# 
 
 cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
-    """Return True if (a,b) appears in bonds (either direction)."""
+    """Check if atoms a and b are bonded (GIL-free).
+    
+    Parameters
+    ----------
+    a, b : int
+        Atom indices to check.
+    bonds : (nbonds, 2) int32 memoryview
+        Array of bond pairs (symmetric).
+    
+    Returns
+    -------
+    bool
+        True if bond exists between a and b in either direction.
+    """
     cdef Py_ssize_t k
     for k in range(bonds.shape[0]):
         if (bonds[k, 0] == a and bonds[k, 1] == b) or (bonds[k, 0] == b and bonds[k, 1] == a):
@@ -49,7 +78,20 @@ cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
 
 
 cdef inline int _degree_in_bonds_mv(int atom, const I32[:, ::1] bonds) nogil:
-    """Count occurrences of `atom` in bonds."""
+    """Count number of bonds incident to an atom (GIL-free).
+    
+    Parameters
+    ----------
+    atom : int
+        Atom index to check degree for.
+    bonds : (nbonds, 2) int32 memoryview
+        Array of bond pairs.
+    
+    Returns
+    -------
+    int
+        Number of bonds connected to this atom.
+    """
     cdef int deg = 0
     cdef Py_ssize_t k
     for k in range(bonds.shape[0]):
@@ -59,7 +101,20 @@ cdef inline int _degree_in_bonds_mv(int atom, const I32[:, ::1] bonds) nogil:
 
 
 cdef inline int _partner_for_terminal_mv(int terminal_atom, const I32[:, ::1] bonds) nogil:
-    """Return the partner atom bonded to a terminal atom (degree==1)."""
+    """Find bonded partner of a terminal atom (degree 1) (GIL-free).
+    
+    Parameters
+    ----------
+    terminal_atom : int
+        Atom index assumed to have degree 1.
+    bonds : (nbonds, 2) int32 memoryview
+        Array of bond pairs.
+    
+    Returns
+    -------
+    int
+        Index of partner atom, or -1 if terminal atom has no bonds.
+    """
     cdef Py_ssize_t k
     for k in range(bonds.shape[0]):
         if bonds[k, 0] == terminal_atom:
@@ -70,7 +125,23 @@ cdef inline int _partner_for_terminal_mv(int terminal_atom, const I32[:, ::1] bo
 
 
 cdef inline bint _has_terminal_partner_collision_mv(const I32[::1] trial_comb, const I32[:, ::1] bonds) nogil:
-    """Return True if two terminal atoms in `trial_comb` share the same partner."""
+    """Detect if two terminal atoms in trial share same bonded partner (GIL-free).
+    
+    Terminal atoms (degree 1) linked to the same non-bead atom indicate 
+    problematic CG mapping.
+    
+    Parameters
+    ----------
+    trial_comb : (n_beads,) int32 memoryview
+        Atom indices for CG beads in this trial.
+    bonds : (nbonds, 2) int32 memoryview
+        Array of bond pairs.
+    
+    Returns
+    -------
+    bool
+        True if collision detected (two terminals share partner), False otherwise.
+    """
     cdef Py_ssize_t bi, bj
     cdef int ai, aj
     cdef int partneri, partnerj
@@ -97,20 +168,33 @@ cdef bint check_beads(
     const I32[:, ::1] listbonds,
     const I32[::1] ring_id_of_atom,
 ) nogil:
-    """Fast bead-placement acceptance check (GIL-free).
+    """Validate a CG bead trial combination against chemical constraints (GIL-free).
+
+    Checks performed:
+        1. No duplicate atoms within trial
+        2. No two beads bonded together (except ring-to-ring)
+        3. No terminal atoms sharing same bonded partner
+        4. Handles aromatic/ring atoms specially
 
     Parameters
     ----------
     trial_comb
-        1D array of atom indices for bead centers.
+        1D array of atom indices for proposed bead centers.
     listbonds
-        2D array (nbonds, 2) of heavy-atom bonds.
+        2D array (nbonds, 2) of heavy-atom bonds; symmetric pairs.
     ring_id_of_atom
-        1D array indexed by atom-id. Value is ring-id (0..nrings-1) or -1.
+        1D array indexed by atom ID. Value is ring ID or -1 if not in ring.
 
     Returns
     -------
     bool
+        True if trial passes all constraints, False otherwise.
+
+    Notes
+    -----
+    * All checks performed with nogil for parallel safety.
+    * Single-bead or empty trials always pass.
+    * Bond check makes special exception for ring beads in same ring.
     """
     cdef Py_ssize_t bi, bj
     cdef int ai, aj
@@ -180,22 +264,39 @@ def find_acceptable_trials(
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
 ):
-    """OpenMP-parallel outer loop over trial combinations.
+    """OpenMP-parallel filter for valid CG bead trial combinations.
 
-    Each trial is independent, but we can't append to a Python list safely
-    inside `prange` without defeating parallelism. This version uses a
-    2-pass strategy:
+    Validates each trial combination against chemical constraints:
+        - No duplicate atoms within a bead
+        - No two beads connected by a chemical bond (except ring atoms)
+        - No two terminal atoms sharing the same bonded partner
+        - Proper handling of aromatic/ring atoms
 
-    1) parallel: compute a boolean acceptance mask
-    2) serial: pack accepted rows into a dense output array
+    Strategy
+    --------
+    Uses a 2-pass approach to enable OpenMP parallelism with Python lists:
+        1) Parallel: compute boolean acceptance mask for each trial
+        2) Serial: pack accepted rows into dense output array
+
+    Parameters
+    ----------
+    seq_one_beads : (n_trials, n_beads) int32 array
+        Each row is a trial combination of atom indices for CG bead centers.
+    listbonds : (nbonds, 2) int32 array
+        Heavy-atom bonds in (begin_atom, end_atom) format.
+    ring_id_of_atom : (n_atoms,) int32 array
+        Indexed by atom ID. Value is ring ID (0..nrings-1) or -1 if not in ring.
+
+    Returns
+    -------
+    (n_accepted, n_beads) int32 array
+        Subset of input trials that pass all acceptance checks.
 
     Notes
     -----
-    * This still calls `check_beads(...)`, which includes NumPy work (sorting)
-      and therefore requires the GIL. So speedups may be limited unless
-      `check_beads` is made GIL-free.
-    * If OpenMP isn't enabled at build time, `prange` falls back to a normal
-      serial loop.
+    * Each trial call to `check_beads()` is independent.
+    * If OpenMP isn't enabled at build time, `prange` falls back to serial loop.
+    * For maximum performance, ensure input arrays are C-contiguous.
     """
 
     cdef Py_ssize_t n_trials = seq_one_beads.shape[0]
@@ -241,6 +342,26 @@ cdef inline F32 _sigma_for_pair(
     F32 rvdw_aromatic,
     F32 rvdw_cross,
 ) nogil:
+    """Select vdW radius for bead pair based on ring/aromatic status (GIL-free).
+    
+    Parameters
+    ----------
+    bead1, bead2 : int
+        Bead indices in trial.
+    in_ring : (n_beads,) uint8 memoryview
+        Boolean mask for aromatic/ring beads.
+    rvdw : float32
+        vdW radius for non-aromatic beads.
+    rvdw_aromatic : float32
+        vdW radius for aromatic beads.
+    rvdw_cross : float32
+        Cross-term radius (aromatic-non-aromatic pair).
+    
+    Returns
+    -------
+    float32
+        Appropriate sigma for this bead pair.
+    """
     cdef bint b1 = in_ring[bead1] != 0
     cdef bint b2 = in_ring[bead2] != 0
     if b1 and b2:
@@ -260,6 +381,29 @@ cpdef F32 gaussian_overlap(
     F32 rvdw_aromatic,
     F32 rvdw_cross,
 ) nogil:
+    """Compute Gaussian overlap penalty between two beads (GIL-free).
+    
+    Evaluates: coeff * exp(-(dist²) / (4·σ²))
+    where σ is selected based on aromatic status of beads.
+    
+    Parameters
+    ----------
+    dist : float32
+        Distance between bead centers.
+    bead1, bead2 : int
+        Bead indices for ring lookup.
+    in_ring : (n_beads,) uint8 memoryview
+        Aromatic/ring status mask.
+    bd_bd_overlap_coeff : float32
+        Scaling coefficient.
+    rvdw, rvdw_aromatic, rvdw_cross : float32
+        vdW radii parameters.
+    
+    Returns
+    -------
+    float32
+        Gaussian overlap energy penalty.
+    """
     cdef F32 sigma = _sigma_for_pair(bead1, bead2, in_ring, rvdw, rvdw_aromatic, rvdw_cross)
     return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))
 
@@ -274,7 +418,33 @@ cdef F32 atoms_in_gaussian(
     F32 rvdw_aromatic,
     U8[::1] lumped_mask,
 ) nogil:
-    """Compute weight and mark lumped atoms in a mask."""
+    """Evaluate atom-in-bead penalty and mark lumped atoms (GIL-free).
+    
+    Computes mass-weighted penalty for atoms within Gaussian radius of bead.
+    Marks atoms that are lumped into this bead in lumped_mask.
+    
+    Parameters
+    ----------
+    bead_id : int
+        Index of bead being evaluated.
+    in_ring : (n_beads,) uint8 memoryview
+        Aromatic status of beads.
+    bond_dists : (n_atoms, n_atoms) float32 memoryview
+        Distance matrix; bond_dists[i, bead_id] = distance from atom i to bead.
+    masses : (n_atoms,) float32 memoryview
+        Atomic masses.
+    at_in_bd_coeff : float32
+        Energy scaling coefficient.
+    rvdw, rvdw_aromatic : float32
+        vdW radii for Gaussian radius selection.
+    lumped_mask : (n_atoms,) uint8 memoryview
+        Output mask; set to 1 for atoms lumped into this bead.
+    
+    Returns
+    -------
+    float32
+        Negative mass-weighted energy penalty for atoms in bead.
+    """
     cdef Py_ssize_t n = bond_dists.shape[0]
     cdef Py_ssize_t i
     cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw
@@ -296,7 +466,22 @@ cdef F32 penalize_lonely_atoms(
     const F32[::1] masses,
     F32 lonely_atom_penalize,
 ) nogil:
-    """Compute penalty for atoms not in lumped_mask."""
+    """Compute energy penalty for atoms not mapped to any bead (GIL-free).
+    
+    Parameters
+    ----------
+    lumped_mask : (n_atoms,) uint8 memoryview
+        Binary mask; 1 if atom lumped into a bead, 0 if lonely.
+    masses : (n_atoms,) float32 memoryview
+        Atomic masses.
+    lonely_atom_penalize : float32
+        Energy scaling coefficient.
+    
+    Returns
+    -------
+    float32
+        Mass-weighted penalty energy.
+    """
     cdef Py_ssize_t n = masses.shape[0]
     cdef Py_ssize_t i
     cdef F32 weight_sum = 0.0
@@ -325,6 +510,44 @@ cpdef F32 eval_gaussian_interac(
     U8[::1] lumped_mask,
     U8[::1] local_mask,
 ) nogil:
+    """Evaluate total Gaussian interaction energy for a bead combination (GIL-free).
+    
+    Computes sum of all energy components:
+        - Offset penalty (beads × aromatic_factor)
+        - Bead-bead Gaussian overlaps
+        - Atom-in-bead penalties
+        - Lonely atom penalties
+    
+    Parameters
+    ----------
+    list_beads : (n_beads,) int32 memoryview
+        Atom indices for CG beads in this trial.
+    in_ring : (n_beads,) uint8 memoryview
+        Aromatic status of each bead.
+    bond_dists : (n_atoms, n_atoms) float32 memoryview
+        Distance matrix.
+    masses : (n_atoms,) float32 memoryview
+        Atomic masses.
+    offset_bd_weight, offset_bd_aromatic_weight : float32
+        Penalty coefficients for non-aromatic and aromatic beads.
+    lonely_atom_penalize : float32
+        Penalty for unmapped atoms.
+    bd_bd_overlap_coeff : float32
+        Scaling for bead-bead Gaussian overlap.
+    at_in_bd_coeff : float32
+        Scaling for atom-in-bead penalty.
+    rvdw, rvdw_aromatic, rvdw_cross : float32
+        vdW radius parameters.
+    lumped_mask : (n_atoms,) uint8 memoryview
+        Cumulative mask of lumped atoms (updated).
+    local_mask : (n_atoms,) uint8 memoryview
+        Work buffer for per-bead lumping.
+    
+    Returns
+    -------
+    float32
+        Total interaction energy for this bead combination.
+    """
     cdef Py_ssize_t nb = list_beads.shape[0]
     cdef Py_ssize_t i, j
     cdef int bead1, bead2
@@ -399,9 +622,59 @@ cpdef tuple collect_energies(
     F32 rvdw_cross,
     F32 initial_ene_best,
 ):
-    """Cythonized energy collection loop for all acceptable trials (with nogil support).
-    
-    Returns: (ene_best_trial, best_trial_comb, energies_array, trials_array)
+    """Cythonized batch energy evaluation for all acceptable trial combinations.
+
+    Computes Gaussian-based energy scores reflecting how well each CG bead 
+    combination maps the molecular structure. Used during bead optimization to 
+    rank candidate mappings.
+
+    Energy components evaluated for each trial:
+        - Offset penalty: penalizes beads (weighted by aromatic content)
+        - Bead-bead overlap: Gaussian overlap between pairs of beads
+        - Atom-in-bead: penalty for atoms mapped into beads
+        - Lonely atoms: penalty for unmapped atoms
+
+    Parameters
+    ----------
+    acceptable_trials : (n_trials, n_beads) int32 array
+        Pre-filtered valid trial combinations from find_acceptable_trials().
+    in_ring : (n_atoms,) uint8 array
+        Boolean mask; 1 if atom is aromatic/ring, 0 otherwise.
+    bond_dists : (n_atoms, n_atoms) float32 array
+        Symmetric distance matrix; bond_dists[i,j] = distance atom i to atom j.
+    masses : (n_atoms,) float32 array
+        Atomic masses for all atoms in molecule.
+    offset_bd_weight : float32
+        Penalty weight for non-aromatic beads (Martini 3: 20.0)
+    offset_bd_aromatic_weight : float32
+        Penalty weight for aromatic beads (Martini 3: 5.0)
+    lonely_atom_penalize : float32
+        Penalty coefficient for unmapped atoms (Martini 3: 0.28)
+    bd_bd_overlap_coeff : float32
+        Bead-bead overlap scaling (Martini 3: 1.0)
+    at_in_bd_coeff : float32
+        Atom-in-bead weight scaling (Martini 3: 0.9)
+    rvdw : float32
+        vdW radius for non-aromatic beads (Martini 3: 2.35 Å)
+    rvdw_aromatic : float32
+        vdW radius for aromatic beads (Martini 3: 2.05 Å)
+    rvdw_cross : float32
+        Cross-term vdW radius for aromatic/non-aromatic pairs
+    initial_ene_best : float32
+        Initial best energy (typically 1e6) for tracking best trial found.
+
+    Returns
+    -------
+    tuple
+        (ene_best_trial, energies_array)
+        - ene_best_trial: lowest energy among all trials
+        - energies_array: (n_trials,) float32 array of individual energies
+
+    Notes
+    -----
+    * All inner loops are nogil for performance.
+    * Masks are reset per iteration to track atom lumping correctly.
+    * Energy minimization target in bead optimization process.
     """
     cdef Py_ssize_t n_trials = acceptable_trials.shape[0]
     cdef Py_ssize_t n_beads
