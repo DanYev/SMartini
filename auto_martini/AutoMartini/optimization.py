@@ -92,7 +92,7 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
 
 
 @timeit(level=logging.INFO)
-def find_acceptable_trials(seq_iter, ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e7)):
+def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e7)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
     
     Parameters
@@ -121,6 +121,7 @@ def find_acceptable_trials(seq_iter, ring_atoms, list_bonds, dtype=np.int32, chu
     sequence in memory. This is critical for large combinatorial spaces.
     """
     bonds = np.asarray(list_bonds, dtype=dtype)
+    seq_iter = itertools.combinations(list_heavy_atoms, num_beads)
     
     # Compute max atom ID from bonds for ring_id initialization
     max_atom = bonds.max() if bonds.size > 0 else -1
@@ -129,6 +130,7 @@ def find_acceptable_trials(seq_iter, ring_atoms, list_bonds, dtype=np.int32, chu
     # Store first chunk separately
     first_chunk_list = list(itertools.islice(seq_iter, chunk_size))
     first_chunk_array = np.asarray(first_chunk_list, dtype=dtype)
+    # chunk_array = opcy.generate_combinations_chunk(list_heavy_atoms, num_beads, chunk_idx, chunk_size)
     max_atom = max(max_atom, first_chunk_array.max())
 
     ring_id = np.full(max_atom + 1, -1, dtype=dtype)
@@ -287,9 +289,8 @@ def find_bead_pos(
         if num_beads==0: num_beads=1
 
         logger.info("Finding Acceptable Mapping Combinations...")
-        seq_one_beads = itertools.combinations(list_heavy_atoms, num_beads)
         acceptable_trials = find_acceptable_trials(
-            seq_one_beads,
+            list_heavy_atoms, num_beads,
             ring_atoms,
             list_bonds,
             dtype=dtype,

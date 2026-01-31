@@ -12,6 +12,7 @@ parallel processing (OpenMP via Cython's prange) and GIL-free execution where
 possible to maximize performance.
 
 Currently implemented:
+    - `generate_combinations_chunk(...)`: nogil combination generation for memory efficiency
     - `check_beads(...)`: fast acceptance check for a trial combination
     - `find_acceptable_trials(...)`: OpenMP-parallel filter for many trial 
       combinations
@@ -20,6 +21,7 @@ Currently implemented:
     - `gaussian_overlap(...)`: bead-bead overlap penalty calculation
 
 Features:
+    - GIL-free combination generation for efficient chunking
     - OpenMP parallelization via prange for trial filtering
     - GIL-free critical loops for performance
     - Proper handling of ring and aromatic atoms
@@ -52,8 +54,158 @@ ctypedef cnp.uint8_t U8
 
 
 #############################################################################
+### COMBINATION GENERATION (nogil) ###  
+############################################################################# 
+
+cdef int _next_combination(int[:] comb, int n, int r) nogil:
+    """Generate next lexicographic combination in-place (GIL-free).
+    
+    Generates combinations in lexicographic order. Returns 1 if next combination
+    exists and updates comb in-place, returns 0 if this was the last combination.
+    
+    Parameters
+    ----------
+    comb : 1D int array
+        Current combination, updated in-place. Must be length r.
+    n : int
+        Size of set to choose from (0 to n-1).
+    r : int
+        Size of each combination.
+    
+    Returns
+    -------
+    int
+        1 if next combination generated, 0 if was the last.
+    """
+    cdef int i, j
+    
+    # Find rightmost element that can be incremented
+    i = r - 1
+    while i >= 0 and comb[i] == n - r + i:
+        i -= 1
+    
+    if i < 0:
+        return 0  # No more combinations
+    
+    # Increment element and reset all to the right
+    comb[i] += 1
+    for j in range(i + 1, r):
+        comb[j] = comb[j - 1] + 1
+    
+    return 1
+
+
+def generate_combinations_chunk(
+    I32[::1] list_heavy_atoms,
+    int num_beads,
+    int chunk_index,
+    int chunk_size,
+):
+    """Generate a chunk of combinations (GIL-minimal).
+    
+    Generates combinations of size num_beads from list_heavy_atoms,
+    returning chunk_size combinations starting from combination number
+    chunk_index * chunk_size.
+    
+    Parameters
+    ----------
+    list_heavy_atoms : (n_atoms,) int32 array
+        Atom indices to combine.
+    num_beads : int
+        Size of each combination (r in C(n,r)).
+    chunk_index : int
+        Which chunk to generate (0-based).
+    chunk_size : int
+        Number of combinations per chunk.
+    
+    Returns
+    -------
+    (n_generated, num_beads) int32 array
+        Generated combinations for this chunk.
+    
+    Notes
+    -----
+    This function generates combinations by skipping to the correct starting
+    position, then generating combinations nogil for performance.
+    """
+    cdef int n = <int>list_heavy_atoms.shape[0]
+    cdef int r = num_beads
+    cdef int start_idx = chunk_index * chunk_size
+    cdef int current_idx = 0
+    cdef int generated = 0
+    cdef int has_next
+    
+    # Calculate total number of combinations C(n, r)
+    cdef int total_combs = _comb(n, r)
+    
+    if start_idx >= total_combs:
+        # Empty chunk
+        return np.empty((0, r), dtype=np.int32)
+    
+    # Initialize combination array
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] comb = np.arange(r, dtype=np.int32)
+    
+    # Skip to starting position
+    while current_idx < start_idx:
+        if not _next_combination(comb, n, r):
+            break
+        current_idx += 1
+    
+    # Generate chunk
+    cdef cnp.ndarray[cnp.int32_t, ndim=2] chunk = np.empty(
+        (min(chunk_size, total_combs - start_idx), r),
+        dtype=np.int32
+    )
+    
+    # GIL-free generation loop
+    cdef int i
+    with nogil:
+        generated = 0
+        while generated < chunk.shape[0]:
+            # Map indices to actual atom IDs
+            for i in range(r):
+                chunk[generated, i] = list_heavy_atoms[comb[i]]
+            generated += 1
+            
+            if generated < chunk.shape[0]:
+                if not _next_combination(comb, n, r):
+                    break
+    
+    return chunk
+
+
+cdef int _comb(int n, int r) nogil:
+    """Compute binomial coefficient C(n, r) (GIL-free).
+    
+    Parameters
+    ----------
+    n, r : int
+        Arguments to C(n, r).
+    
+    Returns
+    -------
+    int
+        Binomial coefficient.
+    """
+    if r > n or r < 0:
+        return 0
+    if r == 0 or r == n:
+        return 1
+    if r > n - r:
+        r = n - r
+    
+    cdef int result = 1
+    cdef int i
+    for i in range(r):
+        result = result * (n - i) / (i + 1)
+    
+    return result
+
+
+#############################################################################
 ### BEAD COMBINATION FILTERING ###  
 ############################################################################# 
+
 
 cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
     """Check if atoms a and b are bonded (GIL-free).
