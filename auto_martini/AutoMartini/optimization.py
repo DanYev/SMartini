@@ -123,20 +123,12 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
     """
     if chunk_size >= 2147483647:
         chunk_size = 2147483646
+    logger.info("Max chunk size: %d", chunk_size)
     bonds = np.asarray(list_bonds, dtype=dtype)
     # seq_iter = itertools.combinations(list_heavy_atoms, num_beads)
     
     # Compute max atom ID from bonds for ring_id initialization
-    max_atom = bonds.max() if bonds.size > 0 else -1
-    
-    # We need to peek at the first chunk to determine max atom from seq
-    # Store first chunk separately
-    # first_chunk_list = list(itertools.islice(seq_iter, chunk_size))
-    # first_chunk_array = np.array(first_chunk_list, dtype=dtype)
-    n_heavy_atoms = len(list_heavy_atoms)
-    first_chunk_array = opcy.generate_combinations(int(n_heavy_atoms), int(num_beads), 0, int(chunk_size))
-    max_atom = max(max_atom, int(first_chunk_array.max()))
-
+    max_atom = bonds.max()     
     ring_id = np.full(max_atom + 1, -1, dtype=dtype)
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
@@ -145,18 +137,8 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
     # Process chunks 
     acceptable_trials_list = []
     chunk_num = 0
-    
-    # Process first chunk
-    logger.info(f"Processing chunk {chunk_num} ({len(first_chunk_array)} trials)")
-    chunk_acceptable = opcy.find_acceptable_combinations(first_chunk_array, bonds, ring_id)
-    if chunk_acceptable.size > 0:
-        acceptable_trials_list.append(chunk_acceptable)
-    chunk_num += 1
-
-    if first_chunk_array.shape[0] < chunk_size:
-        return np.vstack(acceptable_trials_list)
-    
-    # Process remaining chunks from iterator
+    n_heavy_atoms = len(list_heavy_atoms)
+    logger.info("Starting processing chunks")
     while True:
         # chunk_list = list(itertools.islice(seq_iter, chunk_size))
         # chunk_array = np.array(chunk_list, dtype=dtype)
@@ -164,9 +146,9 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         #     break
         start_index = int(chunk_num) * int(chunk_size)
         chunk_array = opcy.generate_combinations(int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size))
+        logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
         if chunk_array.size == 0:
             break
-        logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
         chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)

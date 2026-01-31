@@ -107,7 +107,7 @@ cdef inline void _get_first_combination(
     int r,
     long long start_index,
     I32[::1] comb,
-) nogil:
+) noexcept nogil:
     """Fill `comb` with the start_index-th combination in itertools order.
 
     This is a standard lexicographic unranking routine.
