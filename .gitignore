@@ -3,6 +3,7 @@ output/
 systems/
 *.log
 *.tmp
+*.itp
 
 # ---- Python ----
 __pycache__/

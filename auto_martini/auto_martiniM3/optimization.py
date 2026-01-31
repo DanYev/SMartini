@@ -219,9 +219,9 @@ def collect_energies_and_combs(
         ene_best_trial,
     )
     
-    list_trial_comb = [[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))]
+    list_trial_comb.extend([[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))])
 
-    return ene_best_trial, list_trial_comb
+    return list_trial_comb, ene_best_trial
 
 
 @timeit
@@ -281,7 +281,7 @@ def find_bead_pos(
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
         logger.info("Collecting Combinations And Their Energies...")
-        ene_best_trial, list_trial_comb = collect_energies_and_combs(
+        list_trial_comb, ene_best_trial = collect_energies_and_combs(
             molecule,
             conformer,
             acceptable_trials,
