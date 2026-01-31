@@ -28,7 +28,7 @@ and LICENSE files.
 """ 
 
 from . import output, topology
-from . import optimization_legacy as optimization
+from . import optimization as optimization
 from .common import *
 
 logger = logging.getLogger(__name__)

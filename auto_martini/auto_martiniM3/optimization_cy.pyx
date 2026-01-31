@@ -412,7 +412,6 @@ cpdef tuple collect_energies(
     cdef F32 ene_best_trial = initial_ene_best
     cdef cnp.ndarray[cnp.int32_t, ndim=1] best_trial_comb_full
     cdef cnp.ndarray[cnp.float32_t, ndim=1] energies_array
-    cdef cnp.ndarray[cnp.int32_t, ndim=2] trials_array
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] lumped_mask
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] local_mask
     
@@ -421,21 +420,18 @@ cpdef tuple collect_energies(
     
     if n_trials == 0:
         energies_array = np.array([], dtype=np.float32)
-        trials_array = np.zeros((0, 0), dtype=np.int32)
-        return ene_best_trial, best_trial_comb_full, energies_array, trials_array
+        return ene_best_trial, best_trial_comb_full, energies_array
     
     n_beads = acceptable_trials.shape[1]
     n_atoms = masses.shape[0]
     
     # Pre-allocate output arrays and work arrays
     energies_array = np.zeros(n_trials, dtype=np.float32)
-    trials_array = np.zeros((n_trials, n_beads), dtype=np.int32)
     lumped_mask = np.zeros(n_atoms, dtype=np.uint8)
     local_mask = np.zeros(n_atoms, dtype=np.uint8)
     
     cdef const I32[::1] trial_mv
     cdef F32[::1] energies_view = energies_array
-    cdef I32[:, ::1] trials_view = trials_array
     cdef U8[::1] lumped_mask_view = lumped_mask
     cdef U8[::1] local_mask_view = local_mask
     
@@ -471,20 +467,14 @@ cpdef tuple collect_energies(
             # Store energy
             energies_view[i] = trial_ene
             
-            # Copy trial to output array
-            for j in range(n_beads):
-                trials_view[i, j] = trial_mv[j]
-            
             # Track best energy and combination
             if trial_ene < ene_best_trial:
                 ene_best_trial = trial_ene
-                # Store the best trial indices for sorting later
-                for j in range(n_beads):
-                    trials_view[i, j] = trial_mv[j]
+
     
     # Outside nogil block, find and sort best trial combination (requires GIL)
     cdef I32[::1] best_trial_mv
     best_trial_mv = trials_array[np.argmin(energies_array), :]
     best_trial_comb_full = np.sort(np.asarray(best_trial_mv, dtype=np.int32))
     
-    return ene_best_trial, best_trial_comb_full, energies_array, trials_array
+    return ene_best_trial, best_trial_comb_full, energies_array

@@ -92,73 +92,6 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
 
 
 @timeit
-def collect_energies_and_combs(
-    molecule,
-    conformer,
-    acceptable_trials,
-    ringatoms_flat,
-    ene_best_trial,
-    best_trial_comb,
-    list_trial_comb,
-    dtype=np.int32
-):
-    """Collect energies and combinations for all acceptable trials"""
-    logger.debug("Entering collect_energies_and_combs()") 
-    # Trial positions: any heavy atom
-    bead_params = read_bead_params()
-    bond_dists = _get_bond_distances(conformer)
-    masses = _get_masses(molecule)
-
-    # Precompute ring mask once
-    n_atoms = bond_dists.shape[0]
-    is_ring = np.zeros(n_atoms, dtype=np.uint8)
-    for a in ringatoms_flat:
-        ia = int(a)
-        if 0 <= ia < n_atoms:
-            is_ring[ia] = 1
-
-    # Scalarize bead params once (avoid dict lookups in the inner loop)
-    p_offset = float(bead_params["offset_bd_weight"])
-    p_offset_ar = float(bead_params["offset_bd_aromatic_weight"])
-    p_lonely = float(bead_params["lonely_atom_penalize"])
-    p_overlap = float(bead_params["bd_bd_overlap_coeff"])
-    p_at_in = float(bead_params["at_in_bd_coeff"])
-    p_rvdw = float(bead_params["rvdw"])
-    p_rvdw_ar = float(bead_params["rvdw_aromatic"])
-    p_rvdw_cross = float(bead_params["rvdw_cross"])
-    
-    # Convert acceptable_trials to int32 numpy array for Cython
-    # acceptable_trials_np = np.asarray(acceptable_trials, dtype=np.int32)
-    ene_best_trial, best_trial_comb_cy, energies_array, trials_array = opcy.collect_energies(
-        acceptable_trials,
-        is_ring,
-        bond_dists,
-        masses,
-        p_offset,
-        p_offset_ar,
-        p_lonely,
-        p_overlap,
-        p_at_in,
-        p_rvdw,
-        p_rvdw_ar,
-        p_rvdw_cross,
-        ene_best_trial,
-    )
-    
-    # If Cython returned a non-empty array, use it; otherwise keep original
-    if len(best_trial_comb_cy) > 0:
-        best_trial_comb = list(best_trial_comb_cy)
-    
-    # Reconstruct list_trial_comb from arrays
-    if len(energies_array) > 0:
-        list_trial_comb = [[trials_array[i], energies_array[i]] for i in range(len(energies_array))]
-    else:
-        list_trial_comb = []
-    
-    return ene_best_trial, best_trial_comb, list_trial_comb
-
-
-@timeit
 def find_acceptable_trials(seq_iter,
     ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e8)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
@@ -233,6 +166,70 @@ def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
             ring_id = np.pad(ring_id, (0, mx - ring_id.shape[0] + 1), constant_values=-1)
         ring_id[arr] = rid
     return ring_id
+
+
+@timeit
+def collect_energies_and_combs(
+    molecule,
+    conformer,
+    acceptable_trials,
+    ringatoms_flat,
+    ene_best_trial,
+    best_trial_comb,
+    list_trial_comb,
+    dtype=np.int32
+):
+    """Collect energies and combinations for all acceptable trials"""
+    logger.debug("Entering collect_energies_and_combs()") 
+    # Trial positions: any heavy atom
+    bead_params = read_bead_params()
+    bond_dists = _get_bond_distances(conformer)
+    masses = _get_masses(molecule)
+
+    # Precompute ring mask once
+    n_atoms = bond_dists.shape[0]
+    is_ring = np.zeros(n_atoms, dtype=np.uint8)
+    for a in ringatoms_flat:
+        ia = int(a)
+        if 0 <= ia < n_atoms:
+            is_ring[ia] = 1
+
+    # Scalarize bead params once (avoid dict lookups in the inner loop)
+    p_offset = float(bead_params["offset_bd_weight"])
+    p_offset_ar = float(bead_params["offset_bd_aromatic_weight"])
+    p_lonely = float(bead_params["lonely_atom_penalize"])
+    p_overlap = float(bead_params["bd_bd_overlap_coeff"])
+    p_at_in = float(bead_params["at_in_bd_coeff"])
+    p_rvdw = float(bead_params["rvdw"])
+    p_rvdw_ar = float(bead_params["rvdw_aromatic"])
+    p_rvdw_cross = float(bead_params["rvdw_cross"])
+    
+    ene_best_trial, best_trial_comb_cy, energies_array = opcy.collect_energies(
+        acceptable_trials,
+        is_ring,
+        bond_dists,
+        masses,
+        p_offset,
+        p_offset_ar,
+        p_lonely,
+        p_overlap,
+        p_at_in,
+        p_rvdw,
+        p_rvdw_ar,
+        p_rvdw_cross,
+        ene_best_trial,
+    )
+    # If Cython returned a non-empty array, use it; otherwise keep original
+    if len(best_trial_comb_cy) > 0:
+        best_trial_comb = list(best_trial_comb_cy)
+    
+    # Reconstruct list_trial_comb from arrays
+    if len(energies_array) > 0:
+        list_trial_comb = [[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))]
+    else:
+        list_trial_comb = []
+    
+    return ene_best_trial, best_trial_comb, list_trial_comb
 
 
 @timeit
