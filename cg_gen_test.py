@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
     sdf_file = "anp.sdf"
-    n_beads = 8
+    n_beads = 9
     # mol_aa = Chem.MolFromPDBFile(str(pdb_file), removeHs=False, sanitize=True)
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))

@@ -58,6 +58,36 @@ ctypedef cnp.uint8_t U8
 ############################################################################# 
 
 
+cdef inline int _binom_int(int n, int r) nogil:
+    """Compute C(n, r) in int arithmetic (assumes small n, no overflow)."""
+    cdef int i
+    cdef int res = 1
+    if r < 0 or n < 0 or r > n:
+        return 0
+    if r == 0 or r == n:
+        return 1
+    if r > n - r:
+        r = n - r
+    for i in range(1, r + 1):
+        res = (res * (n - r + i)) // i
+    return res
+
+
+cdef inline long long _binom_ll(int n, int r) nogil:
+    """Compute C(n, r) in 64-bit arithmetic (for range checks)."""
+    cdef int i
+    cdef long long res = 1
+    if r < 0 or n < 0 or r > n:
+        return 0
+    if r == 0 or r == n:
+        return 1
+    if r > n - r:
+        r = n - r
+    for i in range(1, r + 1):
+        res = (res * (n - r + i)) // i
+    return res
+
+
 cdef inline int _next_combination_indices(I32[::1] comb, int n, int r) nogil:
     """In-place next combination for index array (0..n-1), like itertools."""
     cdef int i, j
@@ -72,41 +102,66 @@ cdef inline int _next_combination_indices(I32[::1] comb, int n, int r) nogil:
     return 1
 
 
+cdef inline void _get_first_combination(
+    int n,
+    int r,
+    long long start_index,
+    I32[::1] comb,
+) nogil:
+    """Fill `comb` with the start_index-th combination in itertools order.
+
+    This is a standard lexicographic unranking routine.
+    """
+    cdef int pos
+    cdef int chosen
+    cdef int start = 0
+    cdef long long k = start_index
+    cdef int cnt
+
+    for pos in range(r):
+        chosen = start
+        while chosen <= n - (r - pos):
+            cnt = _binom_int(n - chosen - 1, r - pos - 1)
+            if k >= cnt:
+                k -= cnt
+                chosen += 1
+            else:
+                break
+        comb[pos] = <I32>chosen
+        start = chosen + 1
+
+
 def generate_combinations(
     int n,
     int r,
-    int start_index,
+    long long start_index,
     int chunk_size,
 ):
-    """Minimal itertools-style combinations generator.
+    """Generate combinations of indices (0..n-1) in itertools order.
 
-    Generates combinations of indices (0..n-1) of length r, in lex order.
-    Starts from the `start_index`-th combination by advancing the iterator
-    `start_index` times, and returns up to `chunk_size` rows.
-
-    Note: this is O(start_index) to skip.
+    Returns a dense int32 array with at most `chunk_size` rows.
     """
-    cdef int i, j
-    cdef int skipped = 0
+    cdef int j
+    cdef int out_rows = 0
 
-    if r < 0 or n < 0:
-        return np.empty((0, 0), dtype=np.int32)
-    if r == 0:
+    # Minimal sanity only; caller is expected to provide valid values.
+    if r <= 0:
         return np.empty((1, 0), dtype=np.int32)
-
-    cdef cnp.ndarray[cnp.int32_t, ndim=1] comb = np.arange(r, dtype=np.int32)
-
-    # Skip to start_index
-    while skipped < start_index:
-        if not _next_combination_indices(comb, n, r):
-            break
-        skipped += 1
-
-    if skipped < start_index:
+    if chunk_size <= 0:
         return np.empty((0, r), dtype=np.int32)
 
-    cdef cnp.ndarray[cnp.int32_t, ndim=2] out = np.empty((chunk_size, r), dtype=np.int32)
-    cdef int out_rows = 0
+    # Out-of-range chunk start: return empty.
+    if start_index >= _binom_ll(n, r):
+        return np.empty((0, r), dtype=np.int32)
+
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] comb_arr = np.empty((r,), dtype=np.int32)
+    cdef I32[::1] comb = comb_arr
+    _get_first_combination(n, r, start_index, comb)
+
+    cdef cnp.ndarray[cnp.int32_t, ndim=2] out_arr = np.empty((chunk_size, r), dtype=np.int32)
+    cdef I32[:, ::1] out = out_arr
+
+    # Generate chunk
     while out_rows < chunk_size:
         for j in range(r):
             out[out_rows, j] = comb[j]
@@ -114,7 +169,7 @@ def generate_combinations(
         if not _next_combination_indices(comb, n, r):
             break
 
-    return out[:out_rows]
+    return out_arr[:out_rows, :]
 
 #############################################################################
 ### BEAD COMBINATION FILTERING ###  

@@ -2,7 +2,7 @@
 Basic version test for the auto_martini package.
 """
 import pytest
-import auto_martiniM3
+import AutoMartini
 
 try:
     from importlib import metadata
@@ -12,8 +12,8 @@ except ImportError:
 
 def test_auto_martini_version():
     try:
-        dist_version = metadata.version("auto_martiniM3")
+        dist_version = metadata.version("AutoMartini")
     except metadata.PackageNotFoundError:
         pytest.skip("auto_martiniM3 distribution metadata not installed in this environment")
 
-    assert auto_martiniM3.__version__ == dist_version
+    assert AutoMartini.__version__ == dist_version

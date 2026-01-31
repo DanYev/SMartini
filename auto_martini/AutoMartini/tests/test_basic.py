@@ -9,7 +9,7 @@ import pytest
 rdkit = pytest.importorskip("rdkit")
 from rdkit import Chem
 
-import auto_martiniM3
+import AutoMartini
 
 dpath = Path("tests/files")
 
@@ -17,7 +17,7 @@ dpath = Path("tests/files")
 def test_auto_martini_imported():
     """Sample test, will always pass so long as import statement worked"""
     import sys
-    assert "auto_martiniM3" in sys.modules
+    assert "AutoMartini" in sys.modules
 
 
 @pytest.mark.parametrize(
@@ -27,7 +27,7 @@ def test_auto_martini_imported():
     ],
 )
 def test_connection_to_ALOGPS(smiles: str):
-    logp = auto_martiniM3.topology.smi2alogps(False, smiles, None, "MOL", False, None, logp_file=None, trial=False)
+    logp = AutoMartini.topology.smi2alogps(False, smiles, None, "MOL", False, None, logp_file=None, trial=False)
     assert logp is not None
 
 
@@ -39,8 +39,8 @@ def test_connection_to_ALOGPS(smiles: str):
     ],  
 )
 def test_auto_martini_run_smiles(smiles: str, name: str, num_beads: int):
-    mol, _ = auto_martiniM3.topology.gen_molecule_smi(smiles)
-    cg_mol = auto_martiniM3.solver.Cg_molecule(mol, smiles, name, forcepred=True, )
+    mol, _ = AutoMartini.topology.gen_molecule_smi(smiles)
+    cg_mol = AutoMartini.solver.Cg_molecule(mol, smiles, name, forcepred=True, )
     assert len(cg_mol.cg_bead_names) == num_beads
 
 
@@ -52,7 +52,7 @@ def test_auto_martini_run_smiles(smiles: str, name: str, num_beads: int):
     ],
 )
 def test_auto_martini_run_sdf(sdf_file: str, name:str, num_beads: int):
-    mol = auto_martiniM3.topology.gen_molecule_sdf(str(sdf_file))
+    mol = AutoMartini.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
-    cg_mol = auto_martiniM3.solver.Cg_molecule(mol, smiles, name, forcepred=True, )
+    cg_mol = AutoMartini.solver.Cg_molecule(mol, smiles, name, forcepred=True, )
     assert len(cg_mol.cg_bead_names) == num_beads
