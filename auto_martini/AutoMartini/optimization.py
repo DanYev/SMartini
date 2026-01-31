@@ -92,8 +92,7 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
 
 
 @timeit(level=logging.INFO)
-def find_acceptable_trials(seq_iter,
-    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e7)):
+def find_acceptable_trials(seq_iter, ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e7)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
     
     Parameters
@@ -108,7 +107,7 @@ def find_acceptable_trials(seq_iter,
     dtype : np.dtype, optional
         Data type for arrays (default: np.int32).
     chunk_size : int, optional
-        Number of trials to process per chunk (default: 10000).
+        Number of trials to process per chunk (default: 1e7).
         Adjust based on available memory.
     
     Returns
@@ -137,7 +136,7 @@ def find_acceptable_trials(seq_iter,
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
     
-    # Process chunks efficiently
+    # Process chunks 
     acceptable_trials_list = []
     chunk_num = 0
     
@@ -163,7 +162,7 @@ def find_acceptable_trials(seq_iter,
     return np.vstack(acceptable_trials_list)
 
 
-def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
+def _ring_id_of_atom_from_rings(ring_atoms, dtype=np.int32):
     """Build a dense `ring_id_of_atom` array.
 
     ring_id_of_atom[atom_id] = ring index, or -1 when not in any ring.
@@ -286,17 +285,16 @@ def find_bead_pos(
         # Use recursive function to loop through all possible
         # combinations of CG bead positions.
         if num_beads==0: num_beads=1
-        # seq_one_beads = np.array(list(itertools.combinations(list_heavy_atoms, num_beads)), dtype=dtype)
-        seq_one_beads = itertools.combinations(list_heavy_atoms, num_beads)
 
-        logger.info("Filtering Acceptable Trials...")
+        logger.info("Finding Acceptable Mapping Combinations...")
+        seq_one_beads = itertools.combinations(list_heavy_atoms, num_beads)
         acceptable_trials = find_acceptable_trials(
             seq_one_beads,
             ring_atoms,
             list_bonds,
             dtype=dtype,
         )
-        logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
+        logger.info("Number of Acceptable Combinations: %d", len(acceptable_trials))
 
         logger.info("Collecting Combinations And Their Energies...")
         list_trial_comb, ene_best_trial = collect_energies_and_combs(
