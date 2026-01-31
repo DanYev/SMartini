@@ -408,7 +408,7 @@ cpdef tuple collect_energies(
     cdef Py_ssize_t n_atoms
     cdef Py_ssize_t i, j
     
-    cdef F32 trial_ene
+    cdef F32 trial_energy
     cdef F32 ene_best_trial = initial_ene_best
     cdef cnp.ndarray[cnp.float32_t, ndim=1] energies_array
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] lumped_mask
@@ -439,7 +439,7 @@ cpdef tuple collect_energies(
             trial_mv = acceptable_trials[i, :]
             
             # Evaluate energy for this trial
-            trial_ene = eval_gaussian_interac(
+            trial_energy = eval_gaussian_interac(
                 trial_mv,
                 in_ring,
                 bond_dists,
@@ -457,10 +457,10 @@ cpdef tuple collect_energies(
             )
             
             # Store energy
-            energies_view[i] = trial_ene
+            energies_view[i] = trial_energy
             
             # Track best energy and combination
-            if trial_ene < ene_best_trial:
-                ene_best_trial = trial_ene
+            if trial_energy < ene_best_trial:
+                ene_best_trial = trial_energy
     
     return ene_best_trial, energies_array

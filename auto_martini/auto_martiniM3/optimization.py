@@ -175,7 +175,6 @@ def collect_energies_and_combs(
     acceptable_trials,
     ringatoms_flat,
     ene_best_trial,
-    best_trial_comb,
     list_trial_comb,
     dtype=np.int32
 ):
@@ -220,13 +219,9 @@ def collect_energies_and_combs(
         ene_best_trial,
     )
     
-    # Reconstruct list_trial_comb from arrays
-    if len(energies_array) > 0:
-        list_trial_comb = [[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))]
-    else:
-        list_trial_comb = []
-    
-    return ene_best_trial, best_trial_comb, list_trial_comb
+    list_trial_comb = [[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))]
+
+    return ene_best_trial, list_trial_comb
 
 
 @timeit
@@ -261,10 +256,8 @@ def find_bead_pos(
         max_beads = int(len(list_heavy_atoms) / 2.0)
 
     # Collect all possible combinations of bead positions
-    best_trial_comb = []
     list_trial_comb = []
-    ene_best_trial = 1e6
-    last_best_trial_comb = []
+    current_lowest_energy = 1e6
 
     # # Keep track of all combinations and scores
     # list_combs = []
@@ -288,19 +281,18 @@ def find_bead_pos(
         logger.info("Number of Acceptable Trials: %d", len(acceptable_trials))
 
         logger.info("Collecting Combinations And Their Energies...")
-        ene_best_trial, best_trial_comb, list_trial_comb = collect_energies_and_combs(
+        ene_best_trial, list_trial_comb = collect_energies_and_combs(
             molecule,
             conformer,
             acceptable_trials,
             ringatoms_flat,
-            ene_best_trial,
-            best_trial_comb,
+            current_lowest_energy,
             list_trial_comb,
         )
 
-        if last_best_trial_comb == best_trial_comb:
+        if ene_best_trial >= current_lowest_energy:
             break
-        last_best_trial_comb = best_trial_comb
+        current_lowest_energy = ene_best_trial
 
     sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(1)), dtype="object")
     return sorted_combs[:, 0]
