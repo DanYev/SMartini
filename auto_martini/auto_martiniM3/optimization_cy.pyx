@@ -410,18 +410,10 @@ cpdef tuple collect_energies(
     
     cdef F32 trial_ene
     cdef F32 ene_best_trial = initial_ene_best
-    cdef cnp.ndarray[cnp.int32_t, ndim=1] best_trial_comb_full
     cdef cnp.ndarray[cnp.float32_t, ndim=1] energies_array
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] lumped_mask
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] local_mask
-    
-    # Initialize best_trial_comb_full as empty (Python will use existing value if no improvement)
-    best_trial_comb_full = np.array([], dtype=np.int32)
-    
-    if n_trials == 0:
-        energies_array = np.array([], dtype=np.float32)
-        return ene_best_trial, best_trial_comb_full, energies_array
-    
+
     n_beads = acceptable_trials.shape[1]
     n_atoms = masses.shape[0]
     
@@ -470,11 +462,5 @@ cpdef tuple collect_energies(
             # Track best energy and combination
             if trial_ene < ene_best_trial:
                 ene_best_trial = trial_ene
-
     
-    # Outside nogil block, find and sort best trial combination (requires GIL)
-    cdef I32[::1] best_trial_mv
-    best_trial_mv = trials_array[np.argmin(energies_array), :]
-    best_trial_comb_full = np.sort(np.asarray(best_trial_mv, dtype=np.int32))
-    
-    return ene_best_trial, best_trial_comb_full, energies_array
+    return ene_best_trial, energies_array

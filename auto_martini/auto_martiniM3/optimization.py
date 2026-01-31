@@ -204,7 +204,7 @@ def collect_energies_and_combs(
     p_rvdw_ar = float(bead_params["rvdw_aromatic"])
     p_rvdw_cross = float(bead_params["rvdw_cross"])
     
-    ene_best_trial, best_trial_comb_cy, energies_array = opcy.collect_energies(
+    ene_best_trial, energies_array = opcy.collect_energies(
         acceptable_trials,
         is_ring,
         bond_dists,
@@ -219,9 +219,6 @@ def collect_energies_and_combs(
         p_rvdw_cross,
         ene_best_trial,
     )
-    # If Cython returned a non-empty array, use it; otherwise keep original
-    if len(best_trial_comb_cy) > 0:
-        best_trial_comb = list(best_trial_comb_cy)
     
     # Reconstruct list_trial_comb from arrays
     if len(energies_array) > 0:
