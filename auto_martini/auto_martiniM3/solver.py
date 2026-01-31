@@ -93,6 +93,17 @@ def check_additivity(forcepred, beadtypes, molecule, mol_smi): #AutoM3 change : 
         return False
 
 
+def _get_bead_pos(trial_comb, conformer):
+    # Get bead positions
+    beadpos = [[0] * 3 for l in range(len(trial_comb))]
+    for l in range(len(trial_comb)):
+        beadpos[l] = [
+            conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
+            for m in range(3)
+        ]
+    return beadpos
+
+
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
@@ -169,7 +180,7 @@ class Cg_molecule:
         logger.info("Going through the candidate mappings")
         while attempt < max_attempts:
             cg_beads = list_cg_beads[attempt]
-            bead_pos = optimization._get_bead_pos(cg_beads, conf)
+            bead_pos = _get_bead_pos(cg_beads, conf)
             success = True
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, max_attempts, len(cg_beads))

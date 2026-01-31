@@ -35,160 +35,9 @@ ctypedef cnp.float32_t F32
 ctypedef cnp.uint8_t U8
 
 
-# ---------------------------------------------------------------------------
-# Energy evaluation (moved from energy_cy.pyx / optimization_energy_cy.pyx)
-# ---------------------------------------------------------------------------
-
-
-cdef inline F32 _sigma_for_pair(
-    int bead1,
-    int bead2,
-    const U8[::1] in_ring,
-    F32 rvdw,
-    F32 rvdw_aromatic,
-    F32 rvdw_cross,
-) nogil:
-    cdef bint b1 = in_ring[bead1] != 0
-    cdef bint b2 = in_ring[bead2] != 0
-    if b1 and b2:
-        return rvdw_aromatic
-    if b1 != b2:
-        return rvdw_cross
-    return rvdw
-
-
-cpdef F32 gaussian_overlap(
-    F32 dist,
-    int bead1,
-    int bead2,
-    const U8[::1] in_ring,
-    F32 bd_bd_overlap_coeff,
-    F32 rvdw,
-    F32 rvdw_aromatic,
-    F32 rvdw_cross,
-) nogil:
-    cdef F32 sigma = _sigma_for_pair(bead1, bead2, in_ring, rvdw, rvdw_aromatic, rvdw_cross)
-    return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))
-
-
-cdef F32 atoms_in_gaussian(
-    int bead_id,
-    const U8[::1] in_ring,
-    const F32[:, ::1] bond_dists,
-    const F32[::1] masses,
-    F32 at_in_bd_coeff,
-    F32 rvdw,
-    F32 rvdw_aromatic,
-    U8[::1] lumped_mask,
-) nogil:
-    """Compute weight and mark lumped atoms in a mask."""
-    cdef Py_ssize_t n = bond_dists.shape[0]
-    cdef Py_ssize_t i
-    cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw
-    cdef F32 sigma2 = sigma * sigma
-    cdef F32 weight_sum = 0.0
-    cdef F32 dist
-
-    for i in range(n):
-        dist = bond_dists[i, bead_id]
-        if dist < sigma:
-            lumped_mask[i] = 1
-        weight_sum -= masses[i] * exp(-(dist * dist) / (2.0 * sigma2))
-
-    return at_in_bd_coeff * weight_sum
-
-
-cdef F32 penalize_lonely_atoms(
-    const U8[::1] lumped_mask,
-    const F32[::1] masses,
-    F32 lonely_atom_penalize,
-) nogil:
-    """Compute penalty for atoms not in lumped_mask."""
-    cdef Py_ssize_t n = masses.shape[0]
-    cdef Py_ssize_t i
-    cdef F32 weight_sum = 0.0
-
-    for i in range(n):
-        if lumped_mask[i] == 0:
-            weight_sum += masses[i]
-
-    return lonely_atom_penalize * weight_sum
-
-
-cpdef F32 eval_gaussian_interac(
-    const I32[::1] list_beads,
-    const U8[::1] in_ring,
-    const F32[:, ::1] bond_dists,
-    const F32[::1] masses,
-    # bead params as scalars
-    F32 offset_bd_weight,
-    F32 offset_bd_aromatic_weight,
-    F32 lonely_atom_penalize,
-    F32 bd_bd_overlap_coeff,
-    F32 at_in_bd_coeff,
-    F32 rvdw,
-    F32 rvdw_aromatic,
-    F32 rvdw_cross,
-    U8[::1] lumped_mask,
-    U8[::1] local_mask,
-) nogil:
-    cdef Py_ssize_t nb = list_beads.shape[0]
-    cdef Py_ssize_t i, j
-    cdef int bead1, bead2
-    cdef int num_aromatics = 0
-    cdef F32 weight_sum = 0.0
-    cdef F32 weight_overlap = 0.0
-    cdef F32 weight_at_in_bd = 0.0
-    cdef Py_ssize_t n_atoms = masses.shape[0]
-
-    for i in range(nb):
-        bead1 = <int>list_beads[i]
-        if in_ring[bead1] != 0:
-            num_aromatics += 1
-
-    weight_sum += offset_bd_weight * (nb - num_aromatics) + offset_bd_aromatic_weight * num_aromatics
-
-    for i in range(nb):
-        bead1 = <int>list_beads[i]
-        for j in range(i + 1, nb):
-            bead2 = <int>list_beads[j]
-            weight_overlap += gaussian_overlap(
-                bond_dists[bead1, bead2],
-                bead1,
-                bead2,
-                in_ring,
-                bd_bd_overlap_coeff,
-                rvdw,
-                rvdw_aromatic,
-                rvdw_cross,
-            )
-    weight_sum += weight_overlap
-    
-    for i in range(nb):
-        bead1 = <int>list_beads[i]
-        # Reset local mask
-        for j in range(n_atoms):
-            local_mask[j] = 0
-        
-        weight_at_in_bd += atoms_in_gaussian(
-            bead1,
-            in_ring,
-            bond_dists,
-            masses,
-            at_in_bd_coeff,
-            rvdw,
-            rvdw_aromatic,
-            local_mask,
-        )
-        # Accumulate lumped atoms
-        for j in range(n_atoms):
-            if local_mask[j] != 0:
-                lumped_mask[j] = 1
-
-    weight_sum += weight_at_in_bd
-    weight_sum += penalize_lonely_atoms(lumped_mask, masses, lonely_atom_penalize)
-    return weight_sum
-
+#############################################################################
+### BEAD COMBINATION FILTERING ###  
+############################################################################# 
 
 cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
     """Return True if (a,b) appears in bonds (either direction)."""
@@ -379,6 +228,159 @@ def find_acceptable_trials(
             j += 1
 
     return out
+
+#############################################################################
+### ENERGY EVALUTATION ###  
+############################################################################# 
+
+cdef inline F32 _sigma_for_pair(
+    int bead1,
+    int bead2,
+    const U8[::1] in_ring,
+    F32 rvdw,
+    F32 rvdw_aromatic,
+    F32 rvdw_cross,
+) nogil:
+    cdef bint b1 = in_ring[bead1] != 0
+    cdef bint b2 = in_ring[bead2] != 0
+    if b1 and b2:
+        return rvdw_aromatic
+    if b1 != b2:
+        return rvdw_cross
+    return rvdw
+
+
+cpdef F32 gaussian_overlap(
+    F32 dist,
+    int bead1,
+    int bead2,
+    const U8[::1] in_ring,
+    F32 bd_bd_overlap_coeff,
+    F32 rvdw,
+    F32 rvdw_aromatic,
+    F32 rvdw_cross,
+) nogil:
+    cdef F32 sigma = _sigma_for_pair(bead1, bead2, in_ring, rvdw, rvdw_aromatic, rvdw_cross)
+    return bd_bd_overlap_coeff * exp(-(dist * dist) / (4.0 * sigma * sigma))
+
+
+cdef F32 atoms_in_gaussian(
+    int bead_id,
+    const U8[::1] in_ring,
+    const F32[:, ::1] bond_dists,
+    const F32[::1] masses,
+    F32 at_in_bd_coeff,
+    F32 rvdw,
+    F32 rvdw_aromatic,
+    U8[::1] lumped_mask,
+) nogil:
+    """Compute weight and mark lumped atoms in a mask."""
+    cdef Py_ssize_t n = bond_dists.shape[0]
+    cdef Py_ssize_t i
+    cdef F32 sigma = rvdw_aromatic if in_ring[bead_id] != 0 else rvdw
+    cdef F32 sigma2 = sigma * sigma
+    cdef F32 weight_sum = 0.0
+    cdef F32 dist
+
+    for i in range(n):
+        dist = bond_dists[i, bead_id]
+        if dist < sigma:
+            lumped_mask[i] = 1
+        weight_sum -= masses[i] * exp(-(dist * dist) / (2.0 * sigma2))
+
+    return at_in_bd_coeff * weight_sum
+
+
+cdef F32 penalize_lonely_atoms(
+    const U8[::1] lumped_mask,
+    const F32[::1] masses,
+    F32 lonely_atom_penalize,
+) nogil:
+    """Compute penalty for atoms not in lumped_mask."""
+    cdef Py_ssize_t n = masses.shape[0]
+    cdef Py_ssize_t i
+    cdef F32 weight_sum = 0.0
+
+    for i in range(n):
+        if lumped_mask[i] == 0:
+            weight_sum += masses[i]
+
+    return lonely_atom_penalize * weight_sum
+
+
+cpdef F32 eval_gaussian_interac(
+    const I32[::1] list_beads,
+    const U8[::1] in_ring,
+    const F32[:, ::1] bond_dists,
+    const F32[::1] masses,
+    # bead params as scalars
+    F32 offset_bd_weight,
+    F32 offset_bd_aromatic_weight,
+    F32 lonely_atom_penalize,
+    F32 bd_bd_overlap_coeff,
+    F32 at_in_bd_coeff,
+    F32 rvdw,
+    F32 rvdw_aromatic,
+    F32 rvdw_cross,
+    U8[::1] lumped_mask,
+    U8[::1] local_mask,
+) nogil:
+    cdef Py_ssize_t nb = list_beads.shape[0]
+    cdef Py_ssize_t i, j
+    cdef int bead1, bead2
+    cdef int num_aromatics = 0
+    cdef F32 weight_sum = 0.0
+    cdef F32 weight_overlap = 0.0
+    cdef F32 weight_at_in_bd = 0.0
+    cdef Py_ssize_t n_atoms = masses.shape[0]
+
+    for i in range(nb):
+        bead1 = <int>list_beads[i]
+        if in_ring[bead1] != 0:
+            num_aromatics += 1
+
+    weight_sum += offset_bd_weight * (nb - num_aromatics) + offset_bd_aromatic_weight * num_aromatics
+
+    for i in range(nb):
+        bead1 = <int>list_beads[i]
+        for j in range(i + 1, nb):
+            bead2 = <int>list_beads[j]
+            weight_overlap += gaussian_overlap(
+                bond_dists[bead1, bead2],
+                bead1,
+                bead2,
+                in_ring,
+                bd_bd_overlap_coeff,
+                rvdw,
+                rvdw_aromatic,
+                rvdw_cross,
+            )
+    weight_sum += weight_overlap
+    
+    for i in range(nb):
+        bead1 = <int>list_beads[i]
+        # Reset local mask
+        for j in range(n_atoms):
+            local_mask[j] = 0
+        
+        weight_at_in_bd += atoms_in_gaussian(
+            bead1,
+            in_ring,
+            bond_dists,
+            masses,
+            at_in_bd_coeff,
+            rvdw,
+            rvdw_aromatic,
+            local_mask,
+        )
+        # Accumulate lumped atoms
+        for j in range(n_atoms):
+            if local_mask[j] != 0:
+                lumped_mask[j] = 1
+
+    weight_sum += weight_at_in_bd
+    weight_sum += penalize_lonely_atoms(lumped_mask, masses, lonely_atom_penalize)
+    return weight_sum
 
 
 cpdef tuple collect_energies(

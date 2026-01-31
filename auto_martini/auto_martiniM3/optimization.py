@@ -91,17 +91,6 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
     return list_bonds
 
 
-def _get_bead_pos(trial_comb, conformer):
-    # Get bead positions
-    beadpos = [[0] * 3 for l in range(len(trial_comb))]
-    for l in range(len(trial_comb)):
-        beadpos[l] = [
-            conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
-            for m in range(3)
-        ]
-    return beadpos
-
-
 @timeit
 def collect_energies_and_combs(
     molecule,
