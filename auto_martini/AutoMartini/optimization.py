@@ -161,11 +161,14 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         chunk_list = list(itertools.islice(seq_iter, chunk_size))
         if not chunk_list:
             break
+        logger.info(f"Processing chunk {chunk_num}")
         chunk_array_ref = np.asarray(chunk_list, dtype=dtype)
         chunk_array = opcy.generate_combinations(int(n_heavy_atoms), int(num_beads), int(chunk_num), int(chunk_size))
+        print(chunk_array)
+        print(chunk_array_ref)
         if np.array_equal(chunk_array_ref, chunk_array):
             print("WORKED")
-        logger.info(f"Processing chunk {chunk_num} ({len(chunk_array)} trials)")
+        exit()
         chunk_acceptable = opcy.find_acceptable_trials(chunk_array, bonds, ring_id)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)

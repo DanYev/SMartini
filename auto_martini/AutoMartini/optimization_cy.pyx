@@ -97,11 +97,10 @@ def generate_combinations(
     cdef cnp.ndarray[cnp.int32_t, ndim=1] comb = np.arange(r, dtype=np.int32)
 
     # Skip to start_index
-    with nogil:
-        while skipped < start_index:
-            if not _next_combination_indices(comb, n, r):
-                break
-            skipped += 1
+    while skipped < start_index:
+        if not _next_combination_indices(comb, n, r):
+            break
+        skipped += 1
 
     if skipped < start_index:
         return np.empty((0, r), dtype=np.int32)
