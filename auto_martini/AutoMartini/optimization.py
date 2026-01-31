@@ -91,9 +91,9 @@ def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
     return list_bonds
 
 
-@timeit
+@timeit(level=logging.INFO)
 def find_acceptable_trials(seq_iter,
-    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e6)):
+    ring_atoms, list_bonds, dtype=np.int32, chunk_size=int(1e7)):
     """Filter acceptable trial combinations, processing in memory-efficient chunks.
     
     Parameters
@@ -154,7 +154,7 @@ def find_acceptable_trials(seq_iter,
         if not chunk_list:
             break
         chunk_array = np.asarray(chunk_list, dtype=dtype)
-        logger.debug(f"Processing chunk {chunk_num} ({len(chunk_array)} trials)")
+        logger.info(f"Processing chunk {chunk_num} ({len(chunk_array)} trials)")
         chunk_acceptable = opcy.find_acceptable_trials(chunk_array, bonds, ring_id)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)
@@ -185,7 +185,8 @@ def _ring_id_of_atom_from_rings(ring_atoms, *, dtype=np.int32):
     return ring_id
 
 
-@timeit
+
+@timeit(level=logging.INFO)
 def collect_energies_and_combs(
     molecule,
     conformer,
@@ -241,7 +242,7 @@ def collect_energies_and_combs(
     return list_trial_comb, ene_best_trial
 
 
-@timeit
+@timeit(level=logging.INFO)
 def find_bead_pos(
     molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
     min_beads=None, max_beads=None, dtype=np.int32, 
