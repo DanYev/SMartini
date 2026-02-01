@@ -174,6 +174,7 @@ class Cg_molecule:
 
         # Loop through best 1% cg_beads and avg_pos
         max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
+        max_attempts = len(list_cg_beads)
         logger.info("Max. number of attempts: %d", max_attempts)
         attempt = 0
 

@@ -123,8 +123,8 @@ def gen_molecule_smi(smi):
 
 def gen_molecule_sdf(sdf):
     """Generate mol object from SD file"""
-    logger.info("Entering gen_molecule_sdf()")
-    logger.debug("Input SDF: %s", sdf)
+    logger.debug("Entering gen_molecule_sdf()")
+    logger.info("Input SDF: %s", sdf)
     suppl = Chem.SDMolSupplier(sdf)
     if len(suppl) > 1:
         print("Error. Only one molecule may be provided.")
@@ -156,7 +156,7 @@ def print_header(molname, mol_smi):
         "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
         + "; updated to Martini 3 force field by Magdalena Szczuka\n"
         + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
-        + "; SMILES code : "+mol_smi +"\n\n"
+        + "; SMILES code : " + mol_smi + "\n\n"
         + "\n[moleculetype]\n"
         + "; molname       nrexcl\n"
         + "  {:5s}         2\n\n".format(molname)
@@ -174,9 +174,11 @@ def letter_occurrences(string):
             frequencies[character.upper()] += 1
     return frequencies
 
+
 def get_charge(molecule):
     """Get net charge of molecule"""
     return Chem.rdmolops.GetFormalCharge(molecule)
+
 
 def get_hbond_a(features):
     """Get Hbond acceptor information"""
@@ -206,14 +208,12 @@ def get_atoms(molecule):
     num_atoms = conformer.GetNumAtoms()
     list_heavyatoms = []
     list_heavyatomnames = []
-
     atoms = np.arange(num_atoms)
     for i in np.nditer(atoms):
         atom_name = molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
         if atom_name != "H":
             list_heavyatoms.append(atoms[i])
             list_heavyatomnames.append(atom_name)
-
     if len(list_heavyatoms) == 0:
         print("Error. No heavy atom found.")
         exit(1)
@@ -338,8 +338,7 @@ def read_params(val, size):  # AutoM3 function
                  'T-T-S-T': {-45.0: 200.0},
                  'S-S-S-S': {180.0: 1.96, 0.0: 0.18}}
     
-   
-    if len(size)==3: #bonds
+    if len(size) == 3: #bonds
         if size not in bonds.keys(): size = size[2]+'-'+size[0]
         for k,v in bonds.items():
             if k == size:
@@ -347,8 +346,8 @@ def read_params(val, size):  # AutoM3 function
                 force = v[closest_length]
                 return force
 
-    if len(size)==5: #angles
-        key_exists=False
+    if len(size) == 5: #angles
+        key_exists = False
         if size in angles.keys():
             for k,v in angles.items():
                 if k == size:
@@ -356,8 +355,8 @@ def read_params(val, size):  # AutoM3 function
                     force = v[closest_length]
                     return force
 
-    if len(size)==7: #dihedrals
-        key_exists=False
+    if len(size) == 7: #dihedrals
+        key_exists = False
         if size in dihedrals.keys():
             for k,v in dihedrals.items():
                 if k == size:
@@ -372,7 +371,6 @@ def substruct2smi(molecule, partitioning, cg_bead):
     frag = rdchem.EditableMol(molecule)
     # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
     num_atoms = molecule.GetConformer().GetNumAtoms()
-
     # First delete all hydrogens
     for i in range(num_atoms):
         if molecule.GetAtomWithIdx(i).GetSymbol() == "H":
@@ -398,7 +396,6 @@ def substruct2smi(molecule, partitioning, cg_bead):
                     frag.RemoveAtom(j)
     # Wildman-Crippen log_p
     wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(frag.GetMol())[0]
-
     # Charge -- look at atoms that are only part of the bead (no ring rule)
     chg = 0
     for i in partitioning.keys():
@@ -406,23 +403,18 @@ def substruct2smi(molecule, partitioning, cg_bead):
             chg += molecule.GetAtomWithIdx(i).GetFormalCharge()
 
     smi = Chem.MolToSmiles(Chem.rdmolops.AddHs(frag.GetMol(), addCoords=True))
-    
     ### AutoM3 ###
-    
     atoms_in_smi=" ; atoms: "
     converted_smi=False
     real_smi=None
-
     for at, bd in partitioning.items():
         if bd == cg_bead:
             at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
             atoms_in_smi += at_symbol + str(at) + ", "
-     
     if "c" in smi or "n" in smi or "s" in smi:
         converted_smi = True
         real_smi=smi
         smi = cyclic_smi_conversion(smi)
-
     # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
     # smi = smi.lower() if smi.islower() else smi.upper()
     return smi, wc_log_p, chg, atoms_in_smi,converted_smi,real_smi

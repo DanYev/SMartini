@@ -245,7 +245,6 @@ def _ring_id_of_atom_from_rings(ring_atoms, dtype=np.int32):
     return ring_id
 
 
-
 @timeit(level=logging.INFO)
 def collect_energies_and_combs(
     molecule,
