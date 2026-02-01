@@ -176,7 +176,7 @@ def generate_combinations(
 ############################################################################# 
 
 
-cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
+cdef inline bint _is_bond(int a, int b, const I32[:, ::1] bonds) nogil:
     """Check if atoms a and b are bonded (GIL-free).
     
     Parameters
@@ -198,7 +198,7 @@ cdef inline bint _is_bond_mv(int a, int b, const I32[:, ::1] bonds) nogil:
     return False
 
 
-cdef inline int _degree_in_bonds_mv(int atom, const I32[:, ::1] bonds) nogil:
+cdef inline int _degree_in_bonds(int atom, const I32[:, ::1] bonds) nogil:
     """Count number of bonds incident to an atom (GIL-free).
     
     Parameters
@@ -221,7 +221,7 @@ cdef inline int _degree_in_bonds_mv(int atom, const I32[:, ::1] bonds) nogil:
     return deg
 
 
-cdef inline int _partner_for_terminal_mv(int terminal_atom, const I32[:, ::1] bonds) nogil:
+cdef inline int _partner_for_terminal(int terminal_atom, const I32[:, ::1] bonds) nogil:
     """Find bonded partner of a terminal atom (degree 1) (GIL-free).
     
     Parameters
@@ -245,7 +245,7 @@ cdef inline int _partner_for_terminal_mv(int terminal_atom, const I32[:, ::1] bo
     return -1
 
 
-cdef inline bint _has_terminal_partner_collision_mv(const I32[::1] trial_comb, const I32[:, ::1] bonds) nogil:
+cdef inline bint _has_terminal_partner_collision(const I32[::1] trial_comb, const I32[:, ::1] bonds) nogil:
     """Detect if two terminal atoms in trial share same bonded partner (GIL-free).
     
     Terminal atoms (degree 1) linked to the same non-bead atom indicate 
@@ -269,16 +269,16 @@ cdef inline bint _has_terminal_partner_collision_mv(const I32[::1] trial_comb, c
     cdef int n_trial = <int>trial_comb.shape[0]
     for bi in range(n_trial):
         ai = <int>trial_comb[bi]
-        if _degree_in_bonds_mv(ai, bonds) != 1:
+        if _degree_in_bonds(ai, bonds) != 1:
             continue
-        partneri = _partner_for_terminal_mv(ai, bonds)
+        partneri = _partner_for_terminal(ai, bonds)
         if partneri == -1:
             continue
         for bj in range(bi + 1, n_trial):
             aj = <int>trial_comb[bj]
-            if _degree_in_bonds_mv(aj, bonds) != 1:
+            if _degree_in_bonds(aj, bonds) != 1:
                 continue
-            partnerj = _partner_for_terminal_mv(aj, bonds)
+            partnerj = _partner_for_terminal(aj, bonds)
             if partnerj != -1 and partneri == partnerj:
                 return True
     return False
@@ -329,11 +329,11 @@ cdef bint check_beads(
     if n_trial <= 1:
         return True
 
-    # Check for duplicates (inline, O(n²) but n is small)
-    for k in range(n_trial):
-        for m in range(k + 1, n_trial):
-            if trial_comb[k] == trial_comb[m]:
-                return False
+    # # Check for duplicates (inline, O(n²) but n is small)
+    # for k in range(n_trial):
+    #     for m in range(k + 1, n_trial):
+    #         if trial_comb[k] == trial_comb[m]:
+    #             return False
 
     # Count rings to track max ring ID
     for bi in range(n_trial):
@@ -346,20 +346,21 @@ cdef bint check_beads(
         ai = <int>trial_comb[bi]
         for bj in range(bi + 1, n_trial):
             aj = <int>trial_comb[bj]
-            if _is_bond_mv(ai, aj, listbonds):
-                rid_i = <int>ring_id_of_atom[ai]
-                rid_j = <int>ring_id_of_atom[aj]
-                if rid_i != -1 and rid_i == rid_j:
-                    num_bonds_in_rings += 1
-                else:
-                    return False
+            if _is_bond(ai, aj, listbonds):
+                return False
+    #             rid_i = <int>ring_id_of_atom[ai]
+    #             rid_j = <int>ring_id_of_atom[aj]
+    #             if rid_i != -1 and rid_i == rid_j:
+    #                 num_bonds_in_rings += 1
+    #             else:
+    #                 return False
 
-    # Reject if any ring had bonds between beads
-    if num_bonds_in_rings > 0:
-        return False
+    # # Reject if any ring had bonds between beads
+    # if num_bonds_in_rings > 0:
+    #     return False
 
     # Check for two terminal beads linked to the same atom
-    if _has_terminal_partner_collision_mv(trial_comb, listbonds):
+    if _has_terminal_partner_collision(trial_comb, listbonds):
         return False
 
     return True

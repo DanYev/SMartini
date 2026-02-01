@@ -76,7 +76,7 @@ def check_additivity(forcepred, beadtypes, molecule, mol_smi): #AutoM3 change : 
     wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(molecule)[0]
     # Get SMILES string of entire molecule
 
-    whole_mol_dg,_ = topology.smi2alogps(forcepred, mol_smi, wc_log_p, "MOL",None,None,True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
+    whole_mol_dg,_ = topology.smi2alogps(forcepred, mol_smi, wc_log_p, "MOL", None, None, True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
     if whole_mol_dg != 0:
         m_ad = math.fabs((whole_mol_dg - sum_frag) / whole_mol_dg)
         logger.info(
@@ -173,7 +173,7 @@ class Cg_molecule:
         logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
 
         # Loop through best 1% cg_beads and avg_pos
-        max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
+        # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
         max_attempts = len(list_cg_beads)
         logger.info("Max. number of attempts: %d", max_attempts)
         attempt = 0
@@ -199,9 +199,10 @@ class Cg_molecule:
                 success = False
                 attempt += 1
                 continue
-                
+            logger.info("Connection check successful")
+
             # Extract position of coarse-grained beads
-            logger.debug("Extracting coordinates for CG beads")
+            logger.info("Extracting coordinates for CG beads")
             cg_bead_coords = get_coords(conf, cg_beads, bead_pos, ring_atoms_flat)
 
             ### AutoM3 change : different partition of atoms into coarse-grained beads, depending on the number of aromatic cycles ###
@@ -217,7 +218,7 @@ class Cg_molecule:
                     cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
                 )
 
-            logger.debug("Partitioned atoms into %d beads", len(self.cg_bead_coords))
+            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
             
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
             #    Max 2 aromatic atoms per bead ; 
@@ -226,11 +227,11 @@ class Cg_molecule:
             max_fails = 1
             fails = 0
 
-            if is_arom and (num_arom % 2) == 0: #only for pair number of aromatic atoms (actual code prevents sharing/mismatch)
+            if is_arom and (num_arom % 2) == 0: # only for pair number of aromatic atoms (actual code prevents sharing/mismatch)
                 if not optimization.max2arperbead(self.atom_partitioning, ring_atoms):
                     fails += 1
 
-            if not optimization.functional_groups_ok(self.atom_partitioning,molecule, ring_atoms):
+            if not optimization.functional_groups_ok(self.atom_partitioning, molecule, ring_atoms):
                 fails += 1
             
             if force_map:
@@ -242,8 +243,7 @@ class Cg_molecule:
                 if fails>0: 
                     success=False
 
-
-            logger.debug("Atom partitioning created (%d atoms mapped)", len(self.atom_partitioning) if self.atom_partitioning else 0)
+            logger.info("Atom partitioning created (%d atoms mapped)", len(self.atom_partitioning) if self.atom_partitioning else 0)
 
             # cgbeads should take atom rings number if ring atom in bead
             cg_beads_rings = cg_beads.copy()
@@ -255,21 +255,23 @@ class Cg_molecule:
                     for a in atoms_in_b:
                         if a in ring_atoms_flat:
                             cg_beads_rings[i]=a
-                    
+            logger.info("CG beads rings updated")
 
+            logger.info("Printing Atoms")
             self.cg_bead_names, bead_types, _, _ = topology.print_atoms(
-                molname,
-                forcepred,
-                cg_beads,
-                molecule,
-                hbond_a,
-                hbond_d,
-                self.atom_partitioning,
-                ring_atoms,
-                ring_atoms_flat,
-                logp_file, # AutoM3 new argument
-                True,
+                    molname,
+                    forcepred,
+                    cg_beads,
+                    molecule,
+                    hbond_a,
+                    hbond_d,
+                    self.atom_partitioning,
+                    ring_atoms,
+                    ring_atoms_flat,
+                    logp_file, # AutoM3 new argument
+                    True,
             )
+     
 
             if not self.cg_bead_names:
                 success = False

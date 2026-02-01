@@ -336,10 +336,6 @@ def find_bead_pos(
     list_trial_comb = []
     current_lowest_energy = 1e6
 
-    # # Keep track of all combinations and scores
-    # list_combs = []
-    # list_energies = []
-
     for num_beads in range(min_beads, max_beads + 1):
         logger.info("Trying %d beads..." % num_beads)
         # Use recursive function to loop through all possible
@@ -383,9 +379,8 @@ def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, list_heavyatoms, 
         cgbead_coords.append(heavyatom_coords[list_heavyatoms.index(trial_comb[i])])
     
     _, num_arom = topology.is_aromatic(mol) #AutoM3 change
-
     ### AutoM3 change of mapping approach to differenciate molecules with 0-1 and more cycles
-    if not force_map and num_arom<7: #AutoM3 change
+    if not force_map and num_arom < 7: #AutoM3 change
         voronoi, _  = voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, mol) #AutoM3 change
     else:
         voronoi, _  = voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, mol) #AutoM3 change
@@ -398,10 +393,8 @@ def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, list_heavyatoms, 
         sub_bond_list = []
         for j in range(len(bondlist)):
             if (
-                voronoi[list_heavyatoms.index(bondlist[j][0])]
-                == voronoi[list_heavyatoms.index(cg_bead)]
-                and voronoi[list_heavyatoms.index(bondlist[j][1])]
-                == voronoi[list_heavyatoms.index(cg_bead)]
+                voronoi[list_heavyatoms.index(bondlist[j][0])] == voronoi[list_heavyatoms.index(cg_bead)]
+                and voronoi[list_heavyatoms.index(bondlist[j][1])] == voronoi[list_heavyatoms.index(cg_bead)]
             ):
                 sub_bond_list.append(bondlist[j])
         num_bonds = len(sub_bond_list)
@@ -634,7 +627,8 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
 
     return partitioning, bead_cog
 
-def functional_groups_ok(atom_partitioning,molecule,ringatoms): # AutoM3
+
+def functional_groups_ok(atom_partitioning, molecule, ringatoms): # AutoM3
     """
     Checking if functional groups are conserved in distinctive bead, within atom number per bead limit.
     """
