@@ -450,7 +450,6 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
     Print CG Atoms in itp format
     AutoM3 added argument : logp_file
     """
-
     logger.debug("Entering print_atoms()")
     atomnames = []
     beadtypes = []
@@ -466,7 +465,6 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
         except Exception:
             raise
         atoms_in_smi_dict[bead+1]=atoms_in_smi.replace(" ; atoms: ","") # AutoM3
-        print(atoms_in_smi_dict)
 
         atom_name = ""
         for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):

@@ -13,7 +13,7 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "TEST"
+    molname = "ANP"
     in_dir = Path("ligands") / "anp"
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
@@ -26,8 +26,8 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
 
-    sdf_file = "aspirin.sdf"
-    n_beads = None
+    sdf_file = "anp.sdf"
+    n_beads = 11
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     print(f"Wrote: {sdf_path}")
     
     # # Use auto_martiniM3's built-in .itp writer via topfname
-    itp_path = f"{molname.lower()}.itp"
+    itp_path = outdir / f"{molname.lower()}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
         min_beads=n_beads, max_beads=n_beads)
     print(f"Wrote: {itp_path}")
