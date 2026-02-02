@@ -1,4 +1,4 @@
-"""
+r"""
 Created on March 13, 2019 by Andrew Abi-Mansour
 Updated to Martini 3 force field on January 31, 2025 by Magdalena Szczuka
 
@@ -26,22 +26,45 @@ received a copy of the GNU General Public License along with PyGran.
 If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """
-
+from pathlib import Path
+import logging
+from sys import exit
 from .common import *
 
-logger = logging.getLogger(__name__)
 
-from sys import exit
+logger = logging.getLogger(__name__)
 
 
 def output_gro(sites, site_names, molname):
     """Output GRO file of CG structure"""
-    logger.debug("Entering output_gro()")
+    logger.info("Writing GRO file")
     num_beads = len(sites)
     gro_out = ""
     if len(sites) != len(site_names):
         logger.warning("Error. Incompatible number of beads and bead names.")
         exit(1)
+    gro_out += "{:s} generated from auto_martiniM3\n".format(molname)
+    gro_out += "{:5d}\n".format(num_beads)
+    if len(molname)>4:molname=molname[:4]
+    for i in range(num_beads):
+        gro_out += "{:5d}{:<6s} {:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+            1, # was i +1, but this is GRO file for one molecule, so all beads should be a part of the same molecule
+            molname,
+            site_names[i],
+            i + 1,
+            sites[i][0] / 10.0,
+            sites[i][1] / 10.0,
+            sites[i][2] / 10.0,
+        )
+    gro_out += "{:10.5f}{:10.5f}{:10.5f}\n".format(10.0, 10.0, 10.0)
+    return gro_out
+
+
+def output_map(sites, site_names, molname):
+    """Output MAP file of CG structure"""
+    logger.info("Writing MAP file")
+    num_beads = len(sites)
+    gro_out = ""
     gro_out += "{:s} generated from auto_martiniM3\n".format(molname)
     gro_out += "{:5d}\n".format(num_beads)
     if len(molname)>4:molname=molname[:4]
@@ -57,3 +80,170 @@ def output_gro(sites, site_names, molname):
         )
     gro_out += "{:10.5f}{:10.5f}{:10.5f}\n".format(10.0, 10.0, 10.0)
     return gro_out
+
+
+def _parse_itp_atoms_mapping(itp_text: str):
+    """Parse AutoMartini-generated `[atoms]` block and extract bead->atom mapping.
+
+    Expected input format (as produced by `topology.print_header()` + `topology.print_atoms()`)
+    includes per-atom comment fragments like:
+
+        ; atoms: P0, O5, O14, ...
+
+    Returns
+    -------
+    (molname, bead_atomnames, chiral_blocks)
+      - molname: str or None
+      - bead_atomnames: dict[str, list[str]] mapping bead name (e.g. "D01") -> list of atom labels (e.g. ["P0","O5"]).
+      - chiral_blocks: list[list[str]] raw lines from any `[ chiral ]` sections (optional; may be empty)
+    """
+
+    molname = None
+    bead_atomnames: dict[str, list[str]] = {}
+
+    lines = itp_text.splitlines()
+    # Molname from [moleculetype]
+    for i, ln in enumerate(lines):
+        if ln.strip().lower() == "[moleculetype]":
+            # find first non-empty, non-comment line after it
+            for j in range(i + 1, min(i + 20, len(lines))):
+                s = lines[j].strip()
+                if not s or s.startswith(";"):
+                    continue
+                molname = s.split()[0]
+                break
+            break
+
+    in_atoms = False
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        if s.startswith("[") and s.endswith("]"):
+            in_atoms = s.lower() == "[atoms]"
+            continue
+        if not in_atoms:
+            continue
+        if s.startswith(";"):
+            continue
+
+        # Split into pre-comment columns and optional comment
+        pre, _, comment = ln.partition(";")
+        cols = pre.split()
+        if len(cols) < 5:
+            continue
+        bead_name = cols[4]
+
+        # Find 'atoms:' segment in comment
+        if "atoms:" not in comment:
+            continue
+        after = comment.split("atoms:", 1)[1]
+        # Trim at next ';' if present (some lines contain "; ALOGPS..." etc)
+        after = after.split(";", 1)[0]
+
+        atom_labels = []
+        for tok in after.replace(",", " ").split():
+            tok = tok.strip()
+            # Keep things like P0, O14, Cl12, etc.
+            if not tok:
+                continue
+            # Defensive: avoid trailing punctuation
+            tok = tok.strip(",")
+            atom_labels.append(tok)
+        if not atom_labels:
+            continue
+        bead_atomnames[bead_name] = atom_labels
+
+    # Collect any `[ chiral ]` blocks as raw text, if present.
+    chiral_blocks: list[list[str]] = []
+    in_chiral = False
+    current: list[str] = []
+    for ln in lines:
+        s = ln.strip()
+        if s.lower() == "[ chiral ]":
+            if current:
+                chiral_blocks.append(current)
+                current = []
+            in_chiral = True
+            continue
+        if s.startswith("[") and s.endswith("]"):
+            if in_chiral and current:
+                chiral_blocks.append(current)
+                current = []
+            in_chiral = False
+            continue
+        if in_chiral:
+            if s and not s.startswith(";"):
+                current.append(ln.rstrip())
+    if in_chiral and current:
+        chiral_blocks.append(current)
+
+    return molname, bead_atomnames, chiral_blocks
+
+
+def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, from_ff: str = "amber", to_ff: str = "martini3001"):
+    """Create a `.map` file (similar to `gln.amber.map`) from an AutoMartini `.itp`.
+
+    This is intentionally minimal: we only require that the `.itp` contains an `[atoms]`
+    section whose lines include an `atoms:` list in the comment (as produced by AutoMartini M3).
+
+    Parameters
+    ----------
+    itp_text:
+        Full `.itp` file content.
+    resname:
+        Optional residue name placed in `[ molecule ]`. If omitted, uses molname parsed from
+        `[moleculetype]` (fallback: "MOL").
+    from_ff / to_ff:
+        Strings for the `[from]` and `[to]` blocks.
+    """
+    itp_text = Path(itp_file).read_text()
+
+    molname, bead_atomnames, chiral_blocks = _parse_itp_atoms_mapping(itp_text)
+    if not bead_atomnames:
+        raise ValueError("Could not find any bead `atoms:` annotations in the `[atoms]` section.")
+
+    if resname is None:
+        resname = molname or "MOL"
+
+    # The `.map` format expects a `[ martini ]` list of bead names.
+    # Keep ITP ordering: atoms section is bead id order => bead name order should be stable.
+    # We reconstruct ordering by scanning the ITP again.
+    bead_order: list[str] = []
+    for ln in itp_text.splitlines():
+        pre, _, _comment = ln.partition(";")
+        cols = pre.split()
+        if len(cols) >= 5 and cols[0].isdigit():
+            bead = cols[4]
+            if bead in bead_atomnames and bead not in bead_order:
+                bead_order.append(bead)
+    if not bead_order:
+        bead_order = list(bead_atomnames.keys())
+
+    out = ""
+    out += "[ molecule ]\n"
+    out += f"{resname}\n\n"
+    out += "[from]\n"
+    out += f"{from_ff}\n\n"
+    out += "[to]\n"
+    out += f"{to_ff}\n\n"
+    out += "[ martini ]\n"
+    out += "  " + " ".join(bead_order) + "\n\n"
+    out += "[ mapping ]\n"
+    # Keep gln.amber.map style; allow multiple amber versions.
+    out += "amber27 amber36\n\n"
+    out += "[ atoms ]\n"
+    for bead in bead_order:
+        for atom in bead_atomnames.get(bead, []):
+            out += f"{atom:>6s}  {bead:>6s}\n"
+
+    if chiral_blocks:
+        # Preserve chiral info if present (can be used by martinize-type tools).
+        for block in chiral_blocks:
+            out += "\n[ chiral ]\n"
+            for ln in block:
+                out += f"{ln}\n"
+
+    out += "\n"
+    with open(Path(map_file), "w") as f:
+        f.write(out)

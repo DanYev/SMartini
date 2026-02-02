@@ -495,7 +495,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
                     alogps, logporigin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1,converted_smi, real_smi,logp_file, trial)
                 else:
                     alogps = 0.0
-                    logporigin = "Charged fragment"
+                    logporigin = "; Charged fragment"
             except (NameError, TypeError, ValueError):
                 return atomnames, beadtypes, errval
 
