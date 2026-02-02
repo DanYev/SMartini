@@ -404,20 +404,20 @@ def substruct2smi(molecule, partitioning, cg_bead):
 
     smi = Chem.MolToSmiles(Chem.rdmolops.AddHs(frag.GetMol(), addCoords=True))
     ### AutoM3 ###
-    atoms_in_smi=" ; atoms: "
-    converted_smi=False
-    real_smi=None
+    atoms_in_smi = " ; atoms: "
+    converted_smi = False
+    real_smi = None
     for at, bd in partitioning.items():
         if bd == cg_bead:
             at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
-            atoms_in_smi += at_symbol + str(at) + ", "
+            atoms_in_smi += at_symbol + str(at+1) + ", "
     if "c" in smi or "n" in smi or "s" in smi:
         converted_smi = True
-        real_smi=smi
+        real_smi = smi
         smi = cyclic_smi_conversion(smi)
     # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
     # smi = smi.lower() if smi.islower() else smi.upper()
-    return smi, wc_log_p, chg, atoms_in_smi,converted_smi,real_smi
+    return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi
 
 
 def get_mass(smi): # AutoM3
@@ -466,6 +466,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
         except Exception:
             raise
         atoms_in_smi_dict[bead+1]=atoms_in_smi.replace(" ; atoms: ","") # AutoM3
+        print(atoms_in_smi_dict)
 
         atom_name = ""
         for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
@@ -476,7 +477,6 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
                     atom_name += "{:s}".format(character)
                 else:
                     atom_name += "{:s}{:s}".format(character, str(count))
-
         # Get charge for smi_frag
         mol_frag, errval = gen_molecule_smi(smi_frag)
         charge_frag = get_charge(mol_frag)
