@@ -594,7 +594,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                         bondlist.append([i, j, dist])
 
                     else: ### AutoM3 ### 
-                        if cpt_ringatoms<7 and len(cgbeads)<5 and [i, j, dist] not in constlist:
+                        if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
                             constlist.append([i, j, dist])
         
         # AutoM3 : check if there are beads with ring atoms, that are not connected
@@ -649,7 +649,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                             
         if not trial:
             ### AutoM3 ###
-            beadlist=[]
+            beadlist = []
             for bead in beadtypes:
                 if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
                 else: beadlist.append(bead[0])
@@ -775,7 +775,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
 
         
         ### AutoM3 ###
-        beadlist=[]
+        beadlist = []
         for bead in beadtypes:
             if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
             else: beadlist.append(bead[0])
@@ -847,6 +847,7 @@ def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
                                 if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
                                     already_dih = True
                                     break
+
                             if three_in_ring and close_enough and not already_dih:
                                 r1 = cgbead_coords[j] - cgbead_coords[i]
                                 r2 = cgbead_coords[k] - cgbead_coords[j]
@@ -862,20 +863,20 @@ def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
                                 angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
                                 angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
                                 forc_const = 10.0
-                                if angle_ijk<145.0 and angle_jkl<145.0 : # look Restricted bending potential in gromacs manual
+                                if angle_ijk < 145.0 and angle_jkl < 145.0 : # look Restricted bending potential in gromacs manual
                                     dihed_list.append([i, j, k, l, angle, forc_const])
 
         ### AutoM3 ###
-        bead_in_ring_coords={}
-        for nb,bead_nb in enumerate(cgbeads):
+        bead_in_ring_coords = {}
+        for nb, bead_nb in enumerate(cgbeads):
             for ring in ringatoms:
-                if bead_nb in ring: bead_in_ring_coords[nb]=cgbead_coords[nb]
-        beadlist=[]
+                if bead_nb in ring: bead_in_ring_coords[nb] = cgbead_coords[nb]
+        beadlist = []
         for bead in beadtypes:
             if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
             else: beadlist.append(bead[0])
         
-        new_dihed_list=dihed_list
+        new_dihed_list = dihed_list
         if len(dihed_list) > 0:
             text = text + "\n[dihedrals]\n"
             text = text + ";  i  j  k  l  funct  angle  force.c.\n"
@@ -889,9 +890,9 @@ def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
                     
             for d in new_dihed_list:
                 ### AutoM3 ###
-                force=read_params(d[4],beadlist[d[0]]+"-"+beadlist[d[1]]+"-"+beadlist[d[2]]+"-"+beadlist[d[3]])
-                if num_ar>0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None: force=force/2 #for dihedral between cycle-bead and non-cycled bead: dicrease of force
-                if force is None: force=d[5]
+                force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
+                if num_ar > 0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None: force = force / 2 #for dihedral between cycle-bead and non-cycled bead: dicrease of force
+                if force is None: force = d[5]
                 text = (
                     text
                     + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
@@ -901,7 +902,7 @@ def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
     return text
 
 
-def print_virtualsites(ringatoms,cg_bead_coords,partitionning,mol): ### AutoM3 ###
+def print_virtualsites(ringatoms, cg_bead_coords, partitionning, mol): ### AutoM3 ###
     """
     Introduced in AutoM3.
     Prints CG virtual sites in itp format.

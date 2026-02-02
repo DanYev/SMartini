@@ -181,7 +181,7 @@ def _parse_itp_atoms_mapping(itp_text: str):
     return molname, bead_atomnames, chiral_blocks
 
 
-def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, from_ff: str = "amber", to_ff: str = "martini3001"):
+def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, to_ff: str = "martini3001"):
     """Create a `.map` file (similar to `gln.amber.map`) from an AutoMartini `.itp`.
 
     This is intentionally minimal: we only require that the `.itp` contains an `[atoms]`
@@ -224,18 +224,19 @@ def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, f
     out += "[ molecule ]\n"
     out += f"{resname}\n\n"
     out += "[from]\n"
-    out += f"{from_ff}\n\n"
+    out += "amber charmm\n\n"
     out += "[to]\n"
     out += f"{to_ff}\n\n"
     out += "[ martini ]\n"
     out += "  " + " ".join(bead_order) + "\n\n"
     out += "[ mapping ]\n"
-    # Keep gln.amber.map style; allow multiple amber versions.
-    out += "amber27 amber36\n\n"
+    out += "amber charmm\n\n"
     out += "[ atoms ]\n"
+    num = 1
     for bead in bead_order:
         for atom in bead_atomnames.get(bead, []):
-            out += f"{atom:>6s}  {bead:>6s}\n"
+            out += f"{num:>6d}  {atom:>6s}  {bead:>6s}\n"
+            num += 1
 
     if chiral_blocks:
         # Preserve chiral info if present (can be used by martinize-type tools).

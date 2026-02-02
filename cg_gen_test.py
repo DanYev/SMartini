@@ -26,8 +26,8 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
 
-    sdf_file = "anp.sdf"
-    n_beads = 11
+    sdf_file = "aspirin.sdf"
+    n_beads = None
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     w.close()
     print(f"Wrote: {sdf_path}")
     
-    # # Use auto_martiniM3's built-in .itp writer via topfname
+    # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname.lower()}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
         min_beads=n_beads, max_beads=n_beads)
@@ -56,5 +56,5 @@ if __name__ == "__main__":
 
     # Make .map file
     map_path = outdir / f"{molname.lower()}.map"
-    am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname, from_ff="amber", to_ff="martini3001")
+    am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname)
     print(f"Wrote: {map_path}")

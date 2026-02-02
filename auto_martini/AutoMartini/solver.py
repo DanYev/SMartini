@@ -126,12 +126,12 @@ class Cg_molecule:
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", molname, forcepred, simple_model)
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", topfname, bartender, bartenderfname, logp_file)
 
-        ### AutoM3 : MINIMIZATION with RDkit ###
+        ## AutoM3 : MINIMIZATION with RDkit ###
         molecule = Chem.Mol(molecule)
         logger.debug("Embedding + MMFF optimization")
         AllChem.EmbedMolecule(molecule, randomSeed=1)
         AllChem.MMFFOptimizeMolecule(molecule, maxIters=1000, mmffVariant='MMFF94s')
-        #AllChem.NormalizeDepiction(molecule, scaleFactor=1.12) 
+        AllChem.NormalizeDepiction(molecule, scaleFactor=1.12) 
 
         feats = topology.extract_features(molecule)
 
