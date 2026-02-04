@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import AutoMartini as am
+# import auto_martiniM3 as am
 import rdkit
 from rdkit import Chem
 
@@ -13,8 +14,7 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "ANP"
-    in_dir = Path("ligands") / "anp"
+    molname = "FTA"
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
 
-    sdf_file = "aspirin.sdf"
+    sdf_file = Path("ligands") / "FTA.sdf"
     n_beads = None
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     itp_path = outdir / f"{molname.lower()}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
         min_beads=n_beads, max_beads=n_beads)
+    # cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True)
     print(f"Wrote: {itp_path}")
 
     # Save CG structure (.gro)

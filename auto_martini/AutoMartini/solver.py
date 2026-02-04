@@ -126,6 +126,9 @@ class Cg_molecule:
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", molname, forcepred, simple_model)
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", topfname, bartender, bartenderfname, logp_file)
 
+        # _, _, instance_coords = topology.get_heavy_atom_coords(molecule)
+        # print(instance_coords)
+
         ## AutoM3 : MINIMIZATION with RDkit ###
         molecule = Chem.Mol(molecule)
         logger.debug("Embedding + MMFF optimization")
@@ -137,9 +140,8 @@ class Cg_molecule:
 
         # Get list of heavy atoms and their coordinates
         list_heavy_atoms, self.list_heavyatom_names = topology.get_atoms(molecule)
-        logger.info("Detected %d heavy atoms", len(list_heavy_atoms))
-
         conf, self.heavy_atom_coords, self.atom_coords = topology.get_heavy_atom_coords(molecule)
+        logger.info("Detected %d heavy atoms", len(list_heavy_atoms))
 
         # Identify ring-type atoms
         ring_atoms = topology.get_ring_atoms(molecule)

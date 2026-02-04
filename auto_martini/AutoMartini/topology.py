@@ -542,7 +542,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
     return atomnames, beadtypes, text, atoms_in_smi_dict    # AutoM3 new variable : atoms_in_smi_dict
 
 
-def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False):
+def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False, cutoff=20000):
     """print CG bonds in itp format"""
 
     logger.debug("Entering print_bonds()")
@@ -604,7 +604,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                 if distr < 0.65:  #AutoM3 change : was  0.5
                     # Are atoms part of the same ring
                     for ring in ringatoms:
-                        if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr<=0.45 
+                        if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
                             ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
                             constlist.append([ir, jr, distr])
         
@@ -646,33 +646,45 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                         # If not in bondlist and in the same ring, add the contraint
                         if not in_bond_list and in_ring and [i, j, dist] not in constlist:
                             constlist.append([i, j, dist])
-                            
+
         if not trial:
             ### AutoM3 ###
             beadlist = []
             for bead in beadtypes:
                 if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
                 else: beadlist.append(bead[0])
-            
+
+            # filtered_bondlist = []
+            # for bond in bondlist:
+            #     fc = read_params(bond[2], beadlist[bond[0]]+"-"+beadlist[bond[1]])
+            #     if float(fc) > cutoff:
+            #         constlist.append(bond)
+            #     else:
+            #         filtered_bondlist.append(bond)
+
             if len(bondlist) > 0:
                 text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
                 for b in bondlist:
                     # Make sure atoms in bond are not part of the same ring
-                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.2f}".format(
-                        b[0] + 1, b[1] + 1, b[2], read_params(b[2],beadlist[b[0]]+"-"+beadlist[b[1]])
+                    fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
+                    if fc >= cutoff:
+                        fc = cutoff
+                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
+                        b[0] + 1, b[1] + 1, b[2], fc,
                     )
             else: text = "\n[bonds]\n"
 
             if len(constlist) > 0:
-                text = text + "\n[constraints]\n" + ";  i   j     funct   length"
+                text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
 
                 for c in constlist:
                     if c not in bondlist:
-                        if cpt_ringatoms>18 and c[2]>0.415: 
+                        if cpt_ringatoms > 18 and c[2] > 0.415:
                             continue
                         text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
                             c[0] + 1, c[1] + 1, c[2]
                         )
+
             # Make sure there's at least a bond to every atom
             for i in range(len(cgbeads)):
                 bond_to_i = False
@@ -685,7 +697,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
     return bondlist, constlist, text
 
 
-def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bondlist, constlist, ringatoms): 
+def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bondlist, constlist, ringatoms, type_2_cutoff=160.0): 
     """print CG angles in itp format and returns the angles list"""
     logger.debug("Entering print_angles()")
 
@@ -721,7 +733,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                         all_constraints = True
                     if (
                         not all_in_ring
-                        and (ij_bonded or jk_bonded) # AutoM3 change : was ( _ and _ )
+                        and (ij_bonded and jk_bonded) # AutoM3 change : was ( _ and _ )
                         and i != j
                         and j != k
                         and i != k
@@ -747,7 +759,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                         for aa in partitioning.keys():
                             if partitioning[aa] == j:
                                 atoms_in_fragment.append(aa)
-                        forc_const = 100.0 # AutoM3 change : was 25.0
+                        force_const = 100.0 # AutoM3 change : was 25.0
                         for ib in range(len(molecule.GetBonds())):
                             abond = molecule.GetBondWithIdx(ib)
                             if (
@@ -758,7 +770,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                                     abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
                                 ).GetBondType()
                                 if bondtype == rdchem.BondType.DOUBLE:
-                                    forc_const = 45.0
+                                    force_const = 45.0
                         new_angle = True
                         for a in angle_list:
                             if i in a and j in a and k in a:
@@ -771,8 +783,10 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                                     if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
                                         new_angle = False
                         if new_angle :
-                            angle_list.append([i, j, k, angle, forc_const])
-
+                            funct = 1
+                            if angle > type_2_cutoff:
+                                funct = 2
+                            angle_list.append([i, j, k, funct, angle, force_const])
         
         ### AutoM3 ###
         beadlist = []
@@ -784,10 +798,10 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
             text = text + "\n[angles]\n"
             text = text + ";  i  j  k    funct  angle  force.c.\n"
             for a in angle_list:
-                force = read_params(a[3],beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
-                if force is None : force=a[4]
-                text = text + "  {:2} {:2} {:2}       1    {:<5.1f}  {:5.1f}\n".format(
-                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], force
+                force = read_params(a[4], beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
+                if force is None : force=a[5]
+                text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
+                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
                 )
             text = text
     return text, angle_list
