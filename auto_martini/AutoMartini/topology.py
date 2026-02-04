@@ -562,43 +562,51 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
     for i in range(len(cgbeads)):
         for j in range(i + 1, len(cgbeads)):
             dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-            if dist < 0.61:  #AutoM3 change : was  0.5
-                # Are atoms part of the same ring
-                for ring in ringatoms:
-                    if cgbeads[i] in ring and cgbeads[j] in ring and [i, j, dist] not in constlist:
-                        constlist.append([i, j, dist])   # AutoM3 change : removed boolean 
+            if dist > 0.61:  #AutoM3 change : was  0.5
+                break
 
-                if dist < 0.134: # AutoM3 change : was 0.2
-                    raise NameError("Bond too short") 
+            # Are atoms part of the same ring
+            added_to_constraints = False
+            for ring in ringatoms:
+                if cgbeads[i] in ring and cgbeads[j] in ring: #  and [i, j, dist] not in constlist:
+                    constlist.append([i, j, dist])   # AutoM3 change : removed boolean 
+                    added_to_constraints = True
+                    break
+
+            if added_to_constraints:
+                continue
+
+            if dist < 0.134: # AutoM3 change : was 0.2
+                raise NameError("Bond too short") 
+        
+            # Look for a bond between an atom of i and an atom of j
+            found_connection = False
+            atoms_in_bead_i = []
+            for ii in partitioning.keys():
+                if partitioning[ii] == i:
+                    atoms_in_bead_i.append(ii)
             
-                # Look for a bond between an atom of i and an atom of j
-                found_connection = False
-                atoms_in_bead_i = []
-                for ii in partitioning.keys():
-                    if partitioning[ii] == i:
-                        atoms_in_bead_i.append(ii)
-                
-                atoms_in_bead_j = []
-                for jj in partitioning.keys():
-                    if partitioning[jj] == j:
-                        atoms_in_bead_j.append(jj)
-                for ib in range(len(molecule.GetBonds())):
-                    abond = molecule.GetBondWithIdx(ib)
-                    if (
-                        abond.GetBeginAtomIdx() in atoms_in_bead_i
-                        and abond.GetEndAtomIdx() in atoms_in_bead_j
-                    ) or (
-                        abond.GetBeginAtomIdx() in atoms_in_bead_j
-                        and abond.GetEndAtomIdx() in atoms_in_bead_i
-                    ):
-                        found_connection = True
-                
-                if found_connection:
-                    bondlist.append([i, j, dist])
+            atoms_in_bead_j = []
+            for jj in partitioning.keys():
+                if partitioning[jj] == j:
+                    atoms_in_bead_j.append(jj)
+            for ib in range(len(molecule.GetBonds())):
+                abond = molecule.GetBondWithIdx(ib)
+                if (
+                    abond.GetBeginAtomIdx() in atoms_in_bead_i
+                    and abond.GetEndAtomIdx() in atoms_in_bead_j
+                ) or (
+                    abond.GetBeginAtomIdx() in atoms_in_bead_j
+                    and abond.GetEndAtomIdx() in atoms_in_bead_i
+                ):
+                    found_connection = True
+            
+            if found_connection:
+                bondlist.append([i, j, dist])
 
-                else: ### AutoM3 ### 
-                    if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
-                        constlist.append([i, j, dist])
+            else: ### AutoM3 ### 
+                if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
+                    constlist.append([i, j, dist])
 
     # AutoM3 : check if there are beads with ring atoms, that are not connected
     for ir in range(len(cgbeads_ring)):
@@ -705,10 +713,6 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
 
     text = ""
     angle_list = []
-    print(ringatoms)
-    print(cgbeads)
-    print(bondlist)
-    print(constlist)
 
     # Angles
     if len(cgbeads) <= 2:
@@ -741,7 +745,6 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                         ij_bonded = True
                     if j in [b[0], b[1]] and k in [b[0], b[1]]:
                         jk_bonded = True
-                        print(j, k)
                 if not (ij_bonded and jk_bonded):
                     continue
 
@@ -802,13 +805,11 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
         text = text + "\n[angles]\n"
         text = text + ";  i  j  k    funct  angle  force.c.\n"
         for a in angle_list:
-            print(a)
             force = read_params(a[4], beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
             if force is None : force=a[5]
             text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
                 a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
             )
-    print(text)      
     return text, angle_list
 
 
