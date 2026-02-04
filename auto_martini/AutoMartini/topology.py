@@ -710,108 +710,104 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
     print(cgbeads)
     print(bondlist + constlist)
 
-    if len(cgbeads) > 2:
-        # Angles
-        for k in range(len(cgbeads)):
-            for j in range(len(cgbeads)): 
-                for i in range(len(cgbeads)):     
+    # Angles
+    if len(cgbeads) <= 2:
+        return text, angle_list
 
-                    # Check if all indices are different
-                    if i == j or j == k or i == k:
+    for i in range(len(cgbeads)):
+        for j in range(len(cgbeads)): 
+            for k in range(len(cgbeads)):     
+
+                # Check if all indices are different
+                if i == j or j == k or i == k:
+                    break
+
+                # Check if angle already exists
+                for a in angle_list:
+                    it, jt, kt = a[0], a[1], a[2]
+                    if i == kt and j == jt and k == it:
                         break
 
-                    # Check if all of them are in one ring
-                    for ring in ringatoms:
-                        if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
-                            print(cgbeads[i], cgbeads[j], cgbeads[k], ring)
-                            break
+                # Check if all of them are in one ring
+                for ring in ringatoms:
+                    if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
+                        break
 
-                    # Forbid all atoms linked by constraints
-                    all_constraints = False
-                    ij_bonded = False
-                    jk_bonded = False
-                    ij_const = False
-                    jk_const = False
-                    for b in bondlist + constlist:
-                        if i in [b[0], b[1]] and j in [b[0], b[1]]:
-                            ij_bonded = True
-                            if b in constlist:
-                                ij_const = True
-                        if j in [b[0], b[1]] and k in [b[0], b[1]]:
-                            jk_bonded = True
-                            if b in constlist:
-                                jk_const = True
-                    if ij_const and jk_const:
-                        all_constraints = True
-                    if (
-                        (ij_bonded and jk_bonded) # AutoM3 change : was ( _ and _ )
-                        and not all_constraints
-                    ):
-                        # Measure angle between i, j, and k.
-                        angle = (
-                            180.0
-                            / math.pi
-                            * math.acos(
-                                np.dot(
-                                    cgbead_coords[i] - cgbead_coords[j],
-                                    cgbead_coords[k] - cgbead_coords[j],
-                                )
-                                / (
-                                    np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
-                                    * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
-                                )
-                            )
+                # Check if all are bonded
+                ij_bonded = False
+                jk_bonded = False
+                for b in bondlist + constlist:
+                    if i in [b[0], b[1]] and j in [b[0], b[1]]:
+                        ij_bonded = True
+                    if j in [b[0], b[1]] and k in [b[0], b[1]]:
+                        jk_bonded = True
+                if not (ij_bonded and jk_bonded):
+                    break
+
+                # Measure angle between i, j, and k.
+                angle = (
+                    180.0
+                    / math.pi
+                    * math.acos(
+                        np.dot(
+                            cgbead_coords[i] - cgbead_coords[j],
+                            cgbead_coords[k] - cgbead_coords[j],
                         )
-                        # Look for any double bond between atoms belonging to these CG beads.
-                        atoms_in_fragment = []
-                        for aa in partitioning.keys():
-                            if partitioning[aa] == j:
-                                atoms_in_fragment.append(aa)
-                        force_const = 100.0 # AutoM3 change : was 25.0
-                        for ib in range(len(molecule.GetBonds())):
-                            abond = molecule.GetBondWithIdx(ib)
-                            if (
-                                abond.GetBeginAtomIdx() in atoms_in_fragment
-                                and abond.GetEndAtomIdx() in atoms_in_fragment
-                            ):
-                                bondtype = molecule.GetBondBetweenAtoms(
-                                    abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
-                                ).GetBondType()
-                                if bondtype == rdchem.BondType.DOUBLE:
-                                    force_const = 45.0
-                        new_angle = True
-                        for a in angle_list:
-                            if i in a and j in a and k in a:
-                                new_angle = False
-                        
-                        ### AutoM3 ###
-                        if len(partitioning) > 15:
-                            for a1 in range(len(angle_list)):
-                                for a2 in range(len(angle_list)):
-                                    if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
-                                        new_angle = False
-                        if new_angle :
-                            funct = 1
-                            if angle > type_2_cutoff:
-                                funct = 10
-                            angle_list.append([i, j, k, funct, angle, force_const])
-        
-        ### AutoM3 ###
-        beadlist = []
-        for bead in beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
-            else: beadlist.append(bead[0])
-
-        if len(angle_list) > 0:
-            text = text + "\n[angles]\n"
-            text = text + ";  i  j  k    funct  angle  force.c.\n"
-            for a in angle_list:
-                force = read_params(a[4], beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
-                if force is None : force=a[5]
-                text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
-                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
+                        / (
+                            np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
+                            * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
+                        )
+                    )
                 )
-            text = text
+                # Look for any double bond between atoms belonging to these CG beads.
+                atoms_in_fragment = []
+                for aa in partitioning.keys():
+                    if partitioning[aa] == j:
+                        atoms_in_fragment.append(aa)
+                force_const = 100.0 # AutoM3 change : was 25.0
+                for ib in range(len(molecule.GetBonds())):
+                    abond = molecule.GetBondWithIdx(ib)
+                    if (
+                        abond.GetBeginAtomIdx() in atoms_in_fragment
+                        and abond.GetEndAtomIdx() in atoms_in_fragment
+                    ):
+                        bondtype = molecule.GetBondBetweenAtoms(
+                            abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
+                        ).GetBondType()
+                        if bondtype == rdchem.BondType.DOUBLE:
+                            force_const = 45.0
+
+
+                
+                ### AutoM3 ###
+                if len(partitioning) > 15:
+                    for a1 in range(len(angle_list)):
+                        for a2 in range(len(angle_list)):
+                            if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
+                                break
+                
+                funct = 1
+                if angle > type_2_cutoff:
+                    funct = 10
+                angle_list.append([i, j, k, funct, angle, force_const])
+
+    ### AutoM3 ###
+    beadlist = []
+    for bead in beadtypes:
+        if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
+        else: beadlist.append(bead[0])
+
+    if len(angle_list) > 0:
+        text = text + "\n[angles]\n"
+        text = text + ";  i  j  k    funct  angle  force.c.\n"
+        for a in angle_list:
+            print(a)
+            force = read_params(a[4], beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
+            if force is None : force=a[5]
+            text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
+                a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
+            )
+    print(text)      
     return text, angle_list
 
 
@@ -1082,10 +1078,10 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
         if line != "":
             x = line.split()
             molname=x[3]
-    modified_header_write=header_write
-    modified_bonds_write=bonds_write
-    exclusions_net=""
-    if len(ring_atoms[0])>4 and len(ring_atoms[0])<10 and len(bead_coords)<6:
+    modified_header_write = header_write
+    modified_bonds_write = bonds_write
+    exclusions_net = ""
+    if len(ring_atoms[0]) > 4 and len(ring_atoms[0]) < 10 and len(bead_coords) < 6:
         #changing nrexcl to 1 if 1 cycle and max 5 beads
         modified_lines_header=[]
         for line in list(header_write.split("\n")):
@@ -1097,10 +1093,10 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
         modified_header_write="\n".join(modified_lines_header)
 
         #Adding force to constraints 
-        modified_lines_bonds=[]
+        modified_lines_bonds = []
         for line in list(bonds_write.split("\n")):
-            if "1" in line and len(line.split("   "))<7: 
-                modified_lines_bonds.append(line+"    1000000")
+            if "1" in line and len(line.split("   ")) < 7: 
+                modified_lines_bonds.append(line + "    1000000")
             else: modified_lines_bonds.append(line)
             if line=="[constraints]":
                 if line in modified_lines_bonds : modified_lines_bonds.remove(line)
@@ -1108,11 +1104,11 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
                 modified_lines_bonds.append(txt)
 
         #adding exclusions for two most distant beads in ring
-        if len(bead_coords)>3:
-            remote_dist=0
+        if len(bead_coords) > 3:
+            remote_dist = 0
             remote_beads = []
-            bead_in_ring_coords={}
-            ring_atoms=ring_atoms[0]
+            bead_in_ring_coords = {}
+            ring_atoms = ring_atoms[0]
 
             for nb,bead_nb in enumerate(cg_beads):
                 bead_in_ring_coords[nb+1]=bead_coords[nb]
@@ -1124,10 +1120,10 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
                     if dist > remote_dist and nb_bead1!=nb_bead2:
                         remote_beads=[nb_bead1,nb_bead2]
                         remote_dist=dist
-            exclusions_net=""
+            exclusions_net = ""
             exclusions_net = exclusions_net + "\n[exclusions]\n"
             exclusions_net = exclusions_net + "  " + str(remote_beads[0])+ " " + str(remote_beads[1])
-            exclusions_net=exclusions_net+"\n"
+            exclusions_net = exclusions_net+"\n"
 
             for line in modified_lines_bonds:
                 if line!="" and len(line.split("   "))>6:
@@ -1140,7 +1136,7 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
 
         modified_bonds_write="\n".join(modified_lines_bonds)
 
-    if len(cg_beads)>4:
+    if len(cg_beads) > 4:
         #Clean angles already described by dihedrals
         modified_lines_angles = []
         for lineA in list(angles_write.split("\n")):
@@ -1150,13 +1146,14 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
                 dihed_line = lineD.split()
                 if len(dihed_line)>2 and not lineD.startswith(";") and len(angle_line)>2 and not lineA.startswith(";"):
                     if angle_line[0] in dihed_line[:4] and angle_line[1] in dihed_line[:4] and angle_line[2] in dihed_line[:4] and lineA in modified_lines_angles:
-                        modified_lines_angles.remove(lineA)
+                        pass
+                        # modified_lines_angles.remove(lineA)
         modified_angles_write = "\n".join(modified_lines_angles)
     else : modified_angles_write = angles_write
 
     #bartender info search
-    bartender_input_info={}
-    bartender_input_info["BONDS"]=[]
+    bartender_input_info = {}
+    bartender_input_info["BONDS"] = []
     for line in list(modified_bonds_write.split("\n")):
         if ";" not in line and len(line.split())>4:
             bartender_input_info["BONDS"].append(line.split()[:2])
