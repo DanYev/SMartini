@@ -542,7 +542,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
     return atomnames, beadtypes, text, atoms_in_smi_dict    # AutoM3 new variable : atoms_in_smi_dict
 
 
-def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False, cutoff=20000):
+def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False, cutoff=1e4):
     """print CG bonds in itp format"""
 
     logger.debug("Entering print_bonds()")
@@ -555,145 +555,148 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
 
     if ringatoms != []: 
         cpt_ringatoms=len(sum(ringatoms,[])) #AutoM3 change
-    if len(cgbeads) > 1:
-        for i in range(len(cgbeads)):
-            for j in range(i + 1, len(cgbeads)):
-                dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                if dist < 0.61:  #AutoM3 change : was  0.5
-                    # Are atoms part of the same ring
-                    for ring in ringatoms:
-                        if cgbeads[i] in ring and cgbeads[j] in ring and [i, j, dist] not in constlist:
-                            constlist.append([i, j, dist])   # AutoM3 change : removed boolean 
 
-                    if dist < 0.134: # AutoM3 change : was 0.2
-                        raise NameError("Bond too short") 
+    if len(cgbeads) <= 1:
+        return bondlist, constlist, text
+
+    for i in range(len(cgbeads)):
+        for j in range(i + 1, len(cgbeads)):
+            dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+            if dist < 0.61:  #AutoM3 change : was  0.5
+                # Are atoms part of the same ring
+                for ring in ringatoms:
+                    if cgbeads[i] in ring and cgbeads[j] in ring and [i, j, dist] not in constlist:
+                        constlist.append([i, j, dist])   # AutoM3 change : removed boolean 
+
+                if dist < 0.134: # AutoM3 change : was 0.2
+                    raise NameError("Bond too short") 
+            
+                # Look for a bond between an atom of i and an atom of j
+                found_connection = False
+                atoms_in_bead_i = []
+                for ii in partitioning.keys():
+                    if partitioning[ii] == i:
+                        atoms_in_bead_i.append(ii)
                 
-                    # Look for a bond between an atom of i and an atom of j
-                    found_connection = False
-                    atoms_in_bead_i = []
-                    for ii in partitioning.keys():
-                        if partitioning[ii] == i:
-                            atoms_in_bead_i.append(ii)
-                    
-                    atoms_in_bead_j = []
-                    for jj in partitioning.keys():
-                        if partitioning[jj] == j:
-                            atoms_in_bead_j.append(jj)
-                    for ib in range(len(molecule.GetBonds())):
-                        abond = molecule.GetBondWithIdx(ib)
-                        if (
-                            abond.GetBeginAtomIdx() in atoms_in_bead_i
-                            and abond.GetEndAtomIdx() in atoms_in_bead_j
-                        ) or (
-                            abond.GetBeginAtomIdx() in atoms_in_bead_j
-                            and abond.GetEndAtomIdx() in atoms_in_bead_i
-                        ):
-                            found_connection = True
-                    
-                    if found_connection:
-                        bondlist.append([i, j, dist])
+                atoms_in_bead_j = []
+                for jj in partitioning.keys():
+                    if partitioning[jj] == j:
+                        atoms_in_bead_j.append(jj)
+                for ib in range(len(molecule.GetBonds())):
+                    abond = molecule.GetBondWithIdx(ib)
+                    if (
+                        abond.GetBeginAtomIdx() in atoms_in_bead_i
+                        and abond.GetEndAtomIdx() in atoms_in_bead_j
+                    ) or (
+                        abond.GetBeginAtomIdx() in atoms_in_bead_j
+                        and abond.GetEndAtomIdx() in atoms_in_bead_i
+                    ):
+                        found_connection = True
+                
+                if found_connection:
+                    bondlist.append([i, j, dist])
 
-                    else: ### AutoM3 ### 
-                        if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
-                            constlist.append([i, j, dist])
-        
-        # AutoM3 : check if there are beads with ring atoms, that are not connected
-        for ir in range(len(cgbeads_ring)):
-            for jr in range(ir + 1, len(cgbeads_ring)):
-                distr = np.linalg.norm(cgbead_coords[ir] - cgbead_coords[jr]) * 0.1
-                if distr < 0.65:  #AutoM3 change : was  0.5
+                else: ### AutoM3 ### 
+                    if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
+                        constlist.append([i, j, dist])
+    
+    # AutoM3 : check if there are beads with ring atoms, that are not connected
+    for ir in range(len(cgbeads_ring)):
+        for jr in range(ir + 1, len(cgbeads_ring)):
+            distr = np.linalg.norm(cgbead_coords[ir] - cgbead_coords[jr]) * 0.1
+            if distr < 0.65:  #AutoM3 change : was  0.5
+                # Are atoms part of the same ring
+                for ring in ringatoms:
+                    if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
+                        ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
+                        constlist.append([ir, jr, distr])
+    
+    # AutoM3 : removed chunk
+
+    # Go through list of constraints. If we find an extra
+    # possible constraint between beads that have constraints,
+    # add it.
+    beads_with_const = []
+    for c in constlist:
+        if c[0] not in beads_with_const:
+            beads_with_const.append(c[0])
+        if c[1] not in beads_with_const:
+            beads_with_const.append(c[1])
+
+    beads_with_const = sorted(beads_with_const)
+    for i in range(len(beads_with_const)):
+        for j in range(1 + i, len(beads_with_const)):
+            const_exists = False
+            for c in constlist:
+                if (c[0] == i and c[1] == j) or (c[0] == j and c[1] == i):
+                    const_exists = True
+                    break
+            if not const_exists:
+                dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+                if any(dist  != bl[2] for bl in bondlist): # AutoM3 change : was   if dist < 0.35:
+                    # Check that it's not in the bond list
+                    in_bond_list = False
+                    for b in bondlist:
+                        if (b[0] == i and b[1] == j) or (b[0] == j and b[0] == i):
+                            in_bond_list = True
+                            break
                     # Are atoms part of the same ring
+                    in_ring = False
                     for ring in ringatoms:
-                        if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
-                            ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
-                            constlist.append([ir, jr, distr])
-        
-        # AutoM3 : removed chunk
+                        if cgbeads[i] in ring and cgbeads[j] in ring and len(ring)<5:
+                            in_ring = True
+                            break
+                    # If not in bondlist and in the same ring, add the contraint
+                    if not in_bond_list and in_ring and [i, j, dist] not in constlist:
+                        constlist.append([i, j, dist])
 
-        # Go through list of constraints. If we find an extra
-        # possible constraint between beads that have constraints,
-        # add it.
-        beads_with_const = []
-        for c in constlist:
-            if c[0] not in beads_with_const:
-                beads_with_const.append(c[0])
-            if c[1] not in beads_with_const:
-                beads_with_const.append(c[1])
+    if not trial:
+        ### AutoM3 ###
+        beadlist = []
+        for bead in beadtypes:
+            if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
+            else: beadlist.append(bead[0])
 
-        beads_with_const = sorted(beads_with_const)
-        for i in range(len(beads_with_const)):
-            for j in range(1 + i, len(beads_with_const)):
-                const_exists = False
-                for c in constlist:
-                    if (c[0] == i and c[1] == j) or (c[0] == j and c[1] == i):
-                        const_exists = True
-                        break
-                if not const_exists:
-                    dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                    if any(dist  != bl[2] for bl in bondlist): # AutoM3 change : was   if dist < 0.35:
-                        # Check that it's not in the bond list
-                        in_bond_list = False
-                        for b in bondlist:
-                            if (b[0] == i and b[1] == j) or (b[0] == j and b[0] == i):
-                                in_bond_list = True
-                                break
-                        # Are atoms part of the same ring
-                        in_ring = False
-                        for ring in ringatoms:
-                            if cgbeads[i] in ring and cgbeads[j] in ring and len(ring)<5:
-                                in_ring = True
-                                break
-                        # If not in bondlist and in the same ring, add the contraint
-                        if not in_bond_list and in_ring and [i, j, dist] not in constlist:
-                            constlist.append([i, j, dist])
+        # filtered_bondlist = []
+        # for bond in bondlist:
+        #     fc = read_params(bond[2], beadlist[bond[0]]+"-"+beadlist[bond[1]])
+        #     if float(fc) > cutoff:
+        #         constlist.append(bond)
+        #     else:
+        #         filtered_bondlist.append(bond)
 
-        if not trial:
-            ### AutoM3 ###
-            beadlist = []
-            for bead in beadtypes:
-                if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
-                else: beadlist.append(bead[0])
+        if len(bondlist) > 0:
+            text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
+            for b in bondlist:
+                # Make sure atoms in bond are not part of the same ring
+                fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
+                if fc >= cutoff:
+                    fc = cutoff
+                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
+                    b[0] + 1, b[1] + 1, b[2], fc,
+                )
+        else: text = "\n[bonds]\n"
 
-            # filtered_bondlist = []
-            # for bond in bondlist:
-            #     fc = read_params(bond[2], beadlist[bond[0]]+"-"+beadlist[bond[1]])
-            #     if float(fc) > cutoff:
-            #         constlist.append(bond)
-            #     else:
-            #         filtered_bondlist.append(bond)
+        if len(constlist) > 0:
+            text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
 
-            if len(bondlist) > 0:
-                text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
-                for b in bondlist:
-                    # Make sure atoms in bond are not part of the same ring
-                    fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
-                    if fc >= cutoff:
-                        fc = cutoff
-                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                        b[0] + 1, b[1] + 1, b[2], fc,
+            for c in constlist:
+                if c not in bondlist:
+                    if cpt_ringatoms > 18 and c[2] > 0.415:
+                        continue
+                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
+                        c[0] + 1, c[1] + 1, c[2]
                     )
-            else: text = "\n[bonds]\n"
 
-            if len(constlist) > 0:
-                text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
-
-                for c in constlist:
-                    if c not in bondlist:
-                        if cpt_ringatoms > 18 and c[2] > 0.415:
-                            continue
-                        text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
-                            c[0] + 1, c[1] + 1, c[2]
-                        )
-
-            # Make sure there's at least a bond to every atom
-            for i in range(len(cgbeads)):
-                bond_to_i = False
-                for b in bondlist + constlist:
-                    if i in [b[0], b[1]]:
-                        bond_to_i = True
-                if not bond_to_i:
-                    print("Error. No bond to atom %d" % (i + 1))
-                    exit(1)
+        # Make sure there's at least a bond to every atom
+        for i in range(len(cgbeads)):
+            bond_to_i = False
+            for b in bondlist + constlist:
+                if i in [b[0], b[1]]:
+                    bond_to_i = True
+            if not bond_to_i:
+                print("Error. No bond to atom %d" % (i + 1))
+                exit(1)
     return bondlist, constlist, text
 
 
@@ -703,17 +706,26 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
 
     text = ""
     angle_list = []
+    print(ringatoms)
+    print(cgbeads)
+    print(bondlist + constlist)
 
     if len(cgbeads) > 2:
         # Angles
-        for i in range(len(cgbeads)):
+        for k in range(len(cgbeads)):
             for j in range(len(cgbeads)): 
-                for k in range(len(cgbeads)):  
-                    all_in_ring = False
+                for i in range(len(cgbeads)):     
+
+                    # Check if all indices are different
+                    if i == j or j == k or i == k:
+                        break
+
+                    # Check if all of them are in one ring
                     for ring in ringatoms:
                         if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
-                            all_in_ring = True
+                            print(cgbeads[i], cgbeads[j], cgbeads[k], ring)
                             break
+
                     # Forbid all atoms linked by constraints
                     all_constraints = False
                     ij_bonded = False
@@ -732,11 +744,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                     if ij_const and jk_const:
                         all_constraints = True
                     if (
-                        not all_in_ring
-                        and (ij_bonded and jk_bonded) # AutoM3 change : was ( _ and _ )
-                        and i != j
-                        and j != k
-                        and i != k
+                        (ij_bonded and jk_bonded) # AutoM3 change : was ( _ and _ )
                         and not all_constraints
                     ):
                         # Measure angle between i, j, and k.
@@ -777,7 +785,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                                 new_angle = False
                         
                         ### AutoM3 ###
-                        if len(partitioning)>15:
+                        if len(partitioning) > 15:
                             for a1 in range(len(angle_list)):
                                 for a2 in range(len(angle_list)):
                                     if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
@@ -785,7 +793,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                         if new_angle :
                             funct = 1
                             if angle > type_2_cutoff:
-                                funct = 2
+                                funct = 10
                             angle_list.append([i, j, k, funct, angle, force_const])
         
         ### AutoM3 ###
