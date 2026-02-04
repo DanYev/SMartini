@@ -704,6 +704,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
             if not bond_to_i:
                 print("Error. No bond to atom %d" % (i + 1))
                 exit(1)
+
     return bondlist, constlist, text
 
 
@@ -1071,7 +1072,50 @@ def topout(header_write, atoms_write, bonds_write, angles_write):
     return text, bartender_input_info
 
 
-def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, bead_coords, ring_atoms, cg_beads): ### AutoM3 ###
+def write_position_restraints(
+    atom_indices,
+    force_constant: str = "POSRES_FC",
+    funct: int = 1,
+    ifdef: str = "POSRES",
+    include_end_if: bool = True,
+):
+    """Return a position restraints section for the provided atom indices.
+
+    Parameters
+    ----------
+    atom_indices : iterable of int
+        Atom indices (1-based) to restrain.
+    force_constant : str
+        Force constant label written for x/y/z (default: POSRES_FC).
+    funct : int
+        Gromacs function type (default: 1).
+    ifdef : str
+        Preprocessor symbol used for conditional inclusion.
+    include_end_if : bool
+        Whether to append a matching #endif line.
+    """
+    if not atom_indices:
+        return ""
+
+    lines = [
+        "#ifndef POSRES_FC",
+        "#define POSRES_FC 1000.0",
+        "#endif",
+        "[ position_restraints ]",
+        f"#ifdef {ifdef}",
+    ]
+    for atom_index in atom_indices:
+        atom_id = int(atom_index)
+        lines.append(
+            f"{atom_id:5d} {funct:d} {force_constant} {force_constant} {force_constant}"
+        )
+    if include_end_if:
+        lines.append("#endif")
+    return "\n".join(lines) + "\n"
+
+
+def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, bead_coords, ring_atoms, cg_beads, 
+    write_exclusions=True): ### AutoM3 ###
     """AutoM3 : Print itp file without virtual sites, upon users wish"""
     text = ""
 
@@ -1125,10 +1169,10 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
             exclusions_net = ""
             exclusions_net = exclusions_net + "\n[exclusions]\n"
             exclusions_net = exclusions_net + "  " + str(remote_beads[0])+ " " + str(remote_beads[1])
-            exclusions_net = exclusions_net+"\n"
+            exclusions_net = exclusions_net + "\n"
 
             for line in modified_lines_bonds:
-                if line!="" and len(line.split("   "))>6:
+                if line!="" and len(line.split("   ")) > 6:
                     if str(remote_beads[0]) == line.split("   ")[1] and str(remote_beads[1]) == line.split("   ")[2] :
                         if line in modified_lines_bonds : modified_lines_bonds.remove(line)
                     else:
@@ -1151,7 +1195,8 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
                         pass
                         # modified_lines_angles.remove(lineA)
         modified_angles_write = "\n".join(modified_lines_angles)
-    else : modified_angles_write = angles_write
+    else: 
+        modified_angles_write = angles_write
 
     #bartender info search
     bartender_input_info = {}
@@ -1160,17 +1205,33 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
         if ";" not in line and len(line.split())>4:
             bartender_input_info["BONDS"].append(line.split()[:2])
     
-    bartender_input_info["ANGLES"]=[]
+    bartender_input_info["ANGLES"] = []
     for line in list(modified_angles_write.split("\n")):
         if ";" not in line and len(line.split())>5:
             bartender_input_info["ANGLES"].append(line.split()[:3])
     
-    bartender_input_info["IMPROPERS"]=[]
+    bartender_input_info["IMPROPERS"] = []
     for line in list(dihedrals_write.split("\n")): 
         if ";" not in line and len(line.split())>6:
             bartender_input_info["IMPROPERS"].append(line.split()[:4])
     
-    text = modified_header_write + "\n" + atoms_write + "\n" + modified_bonds_write + "\n" + modified_angles_write + "\n" + dihedrals_write + exclusions_net
+    position_restraints = write_position_restraints(range(1, len(cg_beads) + 1))
+
+    text = (
+        modified_header_write
+        + "\n"
+        + atoms_write
+        + "\n"
+        + modified_bonds_write
+        + "\n"
+        + modified_angles_write
+        + "\n"
+        + dihedrals_write
+        + "\n"
+        + exclusions_net
+        + position_restraints
+    )
+    
     return text, bartender_input_info
 
 
@@ -1344,7 +1405,22 @@ def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_wr
         if ";" not in line and len(line.split()) > 6:
             bartender_input_info["IMPROPERS"].append(line.split()[:4])
 
-    text = modified_header_write + "\n" + modified_atoms_write + "\n" + modified_bonds_write + "\n" + modified_angles_write + "\n" + modified_dihedrals_write + "\n" + vs_write + exclusions_net
+    position_restraints = write_position_restraints(range(1, nb_beads + 1))
+    text = (
+        modified_header_write
+        + "\n"
+        + modified_atoms_write
+        + "\n"
+        + modified_bonds_write
+        + "\n"
+        + modified_angles_write
+        + "\n"
+        + modified_dihedrals_write
+        + "\n"
+        + vs_write
+        + exclusions_net
+        + position_restraints
+    )
     return text, vs_bead_names, bartender_input_info
 
 
