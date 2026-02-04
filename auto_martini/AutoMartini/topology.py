@@ -599,7 +599,7 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                 else: ### AutoM3 ### 
                     if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
                         constlist.append([i, j, dist])
-    
+
     # AutoM3 : check if there are beads with ring atoms, that are not connected
     for ir in range(len(cgbeads_ring)):
         for jr in range(ir + 1, len(cgbeads_ring)):
@@ -610,9 +610,8 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                     if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
                         ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
                         constlist.append([ir, jr, distr])
-    
-    # AutoM3 : removed chunk
 
+    # AutoM3 : removed chunk
     # Go through list of constraints. If we find an extra
     # possible constraint between beads that have constraints,
     # add it.
@@ -708,7 +707,8 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
     angle_list = []
     print(ringatoms)
     print(cgbeads)
-    print(bondlist + constlist)
+    print(bondlist)
+    print(constlist)
 
     # Angles
     if len(cgbeads) <= 2:
@@ -720,18 +720,18 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
 
                 # Check if all indices are different
                 if i == j or j == k or i == k:
-                    break
+                    continue
 
                 # Check if angle already exists
                 for a in angle_list:
                     it, jt, kt = a[0], a[1], a[2]
                     if i == kt and j == jt and k == it:
-                        break
+                        continue
 
                 # Check if all of them are in one ring
                 for ring in ringatoms:
                     if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
-                        break
+                        continue
 
                 # Check if all are bonded
                 ij_bonded = False
@@ -741,8 +741,9 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                         ij_bonded = True
                     if j in [b[0], b[1]] and k in [b[0], b[1]]:
                         jk_bonded = True
+                        print(j, k)
                 if not (ij_bonded and jk_bonded):
-                    break
+                    continue
 
                 # Measure angle between i, j, and k.
                 angle = (
@@ -779,12 +780,12 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
 
 
                 
-                ### AutoM3 ###
-                if len(partitioning) > 15:
-                    for a1 in range(len(angle_list)):
-                        for a2 in range(len(angle_list)):
-                            if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
-                                break
+                # ### AutoM3 ###
+                # if len(partitioning) > 15:
+                #     for a1 in range(len(angle_list)):
+                #         for a2 in range(len(angle_list)):
+                #             if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
+                #                 break
                 
                 funct = 1
                 if angle > type_2_cutoff:
