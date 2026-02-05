@@ -184,31 +184,33 @@ class Cg_molecule:
         )
         logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
 
+        # Remove mappings with bead numbers less than most optimal mapping.
+        filtered_cg_beads = []
+        for cg_beads in list_cg_beads:
+            if (
+                len(cg_beads) == len(list_cg_beads[0])
+                # and (len(list_heavy_atoms) - (5 * len(cg_beads))) > 3
+            ):
+                filtered_cg_beads.append(cg_beads)
+        logger.info("Filtered candidate bead mappings to %d after removing suboptimal bead counts", len(filtered_cg_beads))
+
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
-        max_attempts = len(list_cg_beads)
+        max_attempts = len(filtered_cg_beads) 
         logger.info("Max. number of attempts: %d", max_attempts)
         attempt = 0
 
         logger.info("Going through the candidate mappings")
         while attempt < max_attempts:
-            cg_beads = list_cg_beads[attempt]
+            cg_beads = filtered_cg_beads[attempt]
             bead_pos = _get_bead_pos(cg_beads, conf)
             success = True
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, max_attempts, len(cg_beads))
 
-            # Remove mappings with bead numbers less than most optimal mapping.
-            if (
-                len(cg_beads) < len(list_cg_beads[0])
-                and (len(list_heavy_atoms) - (5 * len(cg_beads))) > 3
-            ):
-                success = False
-            
             if not optimization.all_atoms_in_beads_connected(
                     cg_beads, self.heavy_atom_coords, list_heavy_atoms, list_bonds, molecule, self.atom_coords, force_map
                 ): # AutoM3 change : Added molecule and force_map arguments
-                success = False
                 attempt += 1
                 continue
             logger.info("Connection check successful")
@@ -229,7 +231,6 @@ class Cg_molecule:
                 self.atom_partitioning, self.cg_bead_coords = optimization.voronoi_atoms_old(
                     cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
                 )
-
             logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
             
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
@@ -248,12 +249,12 @@ class Cg_molecule:
             
             if force_map:
                 if fails > max_fails:
-                    success=False
+                    success = False
                 else:
-                    success=True
+                    success = True
             else:
-                if fails>0: 
-                    success=False
+                if fails > 0: 
+                    success = False
 
             logger.info("Atom partitioning created (%d atoms mapped)", len(self.atom_partitioning) if self.atom_partitioning else 0)
 
@@ -294,7 +295,6 @@ class Cg_molecule:
                     logp_file, # AutoM3 new argument
                     True,
             )
-     
 
             if not self.cg_bead_names:
                 success = False

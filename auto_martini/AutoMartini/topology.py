@@ -559,8 +559,6 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
     if len(cgbeads) <= 1:
         return bondlist, constlist, text
 
-    print(ringatoms)
-
     for i in range(len(cgbeads)):
         for j in range(i + 1, len(cgbeads)):
             dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
@@ -806,7 +804,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
                 
                 funct = 1
                 if angle > type_2_cutoff:
-                    funct = 10
+                    force_const = 250.0
                 angle_list.append([i, j, k, funct, angle, force_const])
 
     ### AutoM3 ###
@@ -819,7 +817,7 @@ def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bond
         text = text + "\n[angles]\n"
         text = text + ";  i  j  k    funct  angle  force.c.\n"
         for a in angle_list:
-            force = read_params(a[4], beadlist[a[0]]+"-"+beadlist[a[1]]+"-"+beadlist[a[2]])
+            force = read_params(a[4], beadlist[a[0]] + "-" + beadlist[a[1]] + "-" + beadlist[a[2]])
             if force is None : force=a[5]
             text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
                 a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
@@ -1484,7 +1482,7 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
     Returns water/octanol partitioning free energy according to ALOGPS
     AutoM3 : Returns water/octanol partitioning free energy defined empiricaly from customized database
     """
-    logger.info("Entering smi2alogps()")
+    logger.debug("Entering smi2alogps()")
 
     ## AutoM3 ###
     if not logp_file:

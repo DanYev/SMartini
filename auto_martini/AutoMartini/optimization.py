@@ -44,12 +44,12 @@ def read_bead_params():
     CG Bead vdw radius (in Angstroem)"""
     bead_params = dict()
     bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
-    bead_params["rvdw_aromatic"] = 4.1 / 2.0 #AutoM3 change: was 4.3 / 2.0    #sigma for ring
+    bead_params["rvdw_aromatic"] = 4.1 / 2.0 # AutoM3 change: was 4.3 / 2.0    #sigma for ring
     bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
-    bead_params["offset_bd_weight"] =20.0 #AutoM3 change: was 50.0    #penalty weight for nonring beads
-    bead_params["offset_bd_aromatic_weight"] = 5.0 #AutoM3 change: was 20.0    #penalty weight for ring beads
-    bead_params["lonely_atom_penalize"] = 0.28  #AutoM3 change: was 0.20
-    bead_params["bd_bd_overlap_coeff"] = 1.0 #AutoM3 change: was 9.0
+    bead_params["offset_bd_weight"] = 20.0 # AutoM3 change: was 50.0    #penalty weight for nonring beads
+    bead_params["offset_bd_aromatic_weight"] = 5.0 # AutoM3 change: was 20.0    #penalty weight for ring beads
+    bead_params["lonely_atom_penalize"] = 0.28  # AutoM3 change: was 0.20
+    bead_params["bd_bd_overlap_coeff"] = 1.0 # AutoM3 change: was 9.0
     bead_params["at_in_bd_coeff"] = 0.9
     return bead_params
 
@@ -365,9 +365,9 @@ def find_bead_pos(
             break
         current_lowest_energy = ene_best_trial
 
-    sorted_combs = np.array(sorted(list_trial_comb, key=itemgetter(1)), dtype="object")
-    return sorted_combs[:, 0]
-
+    sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
+    return_list = [x[0] for x in sorted_combs]
+    return return_list
 
 def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, list_heavyatoms, bondlist, mol, allatom_coords, force_map): #AutoM3 change: added mol, force_map
     """Make sure all atoms within one CG bead are connected to at least
