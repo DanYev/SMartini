@@ -288,6 +288,7 @@ cdef bint check_beads(
     const I32[::1] trial_comb,
     const I32[:, ::1] listbonds,
     const I32[::1] ring_id_of_atom,
+    const int nrings,
 ) nogil:
     """Validate a CG bead trial combination against chemical constraints (GIL-free).
 
@@ -322,7 +323,6 @@ cdef bint check_beads(
     cdef int n_trial = trial_comb.shape[0]
     cdef int rid_i, rid_j
     cdef int k, m
-    cdef int nrings = 0
     cdef int rid
     cdef int num_bonds_in_rings = 0
 
@@ -335,11 +335,11 @@ cdef bint check_beads(
     #         if trial_comb[k] == trial_comb[m]:
     #             return False
 
-    # Count rings to track max ring ID
-    for bi in range(n_trial):
-        rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
-        if rid >= nrings:
-            nrings = rid + 1
+    # # Count rings to track max ring ID
+    # for bi in range(n_trial):
+    #     rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
+    #     if rid >= nrings:
+    #         nrings = rid + 1
 
     # Check for beads linked by chemical bond (except in rings)
     for bi in range(n_trial):
@@ -370,11 +370,12 @@ def find_acceptable_trials_tmp(
     I32[:, ::1] seq_one_beads,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
+    const int nrings,
 ):
     cdef Py_ssize_t i
     acceptable_trials = []
     for i in range(seq_one_beads.shape[0]):
-        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom):
+        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom, nrings):
             acceptable_trials.append(seq_one_beads[i])
     if not acceptable_trials:
         return np.empty((0, 0), dtype=np.int32)
@@ -385,6 +386,7 @@ def find_acceptable_combinations(
     I32[:, ::1] trial_combinations,
     I32[:, ::1] listbonds,
     I32[::1] ring_id_of_atom,
+    const int nrings,
 ):
     """OpenMP-parallel filter for valid CG bead trial combinations.
 
@@ -432,7 +434,7 @@ def find_acceptable_combinations(
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n_trials, dtype=np.uint8)
 
     for i in prange(n_trials, schedule='static', nogil=True):
-        if check_beads(trial_combinations[i], listbonds, ring_id_of_atom):
+        if check_beads(trial_combinations[i], listbonds, ring_id_of_atom, nrings):
             mask[i] = 1
 
     # Count accepted (serial)

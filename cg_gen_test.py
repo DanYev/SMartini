@@ -18,20 +18,21 @@ if __name__ == "__main__":
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
 
-    smiles = "CCC"
-    smiles = "CC1CCC(C(C1)O)C(C)C" # Menthol
+    # smiles = "CCC"
+    # smiles = "CC1CCC(C(C1)O)C(C)C" # Menthol
+    smiles = "Cc1cc[nH]c1" # Pyrrole smth
     # smiles = "N=Cc1ccccc1"
     # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O"
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3"
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
 
-    sdf_file = Path("ligands") / "FTA.sdf"
-    n_beads = None
+    sdf_file = Path("ligands") / f"{molname}.sdf"
     mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
     # Save the atomistic RDKit molecule to SDF
+    n_beads = None
     sdf_path = outdir / f"{molname.lower()}_aa.sdf"
     w = Chem.SDWriter(str(sdf_path))
     w.write(mol_am)

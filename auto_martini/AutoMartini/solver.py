@@ -193,6 +193,7 @@ class Cg_molecule:
             ):
                 filtered_cg_beads.append(cg_beads)
         logger.info("Filtered candidate bead mappings to %d after removing suboptimal bead counts", len(filtered_cg_beads))
+        filtered_cg_beads = list_cg_beads
 
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
@@ -221,7 +222,6 @@ class Cg_molecule:
 
             ### AutoM3 change : different partition of atoms into coarse-grained beads, depending on the number of aromatic cycles ###
             _, num_arom = topology.is_aromatic(molecule)
-
             if not force_map and num_arom < 7: # AutoM3
                 self.atom_partitioning, self.cg_bead_coords = optimization.voronoi_atoms_new( 
                     cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
@@ -236,17 +236,13 @@ class Cg_molecule:
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
             #    Max 2 aromatic atoms per bead ; 
             #    Holding Functional groups together in bead ;
-
             max_fails = 1
             fails = 0
-
             if is_arom and (num_arom % 2) == 0: # only for pair number of aromatic atoms (actual code prevents sharing/mismatch)
                 if not optimization.max2arperbead(self.atom_partitioning, ring_atoms):
                     fails += 1
-
             if not optimization.functional_groups_ok(self.atom_partitioning, molecule, ring_atoms):
                 fails += 1
-            
             if force_map:
                 if fails > max_fails:
                     success = False
@@ -255,10 +251,9 @@ class Cg_molecule:
             else:
                 if fails > 0: 
                     success = False
-
             logger.info("Atom partitioning created (%d atoms mapped)", len(self.atom_partitioning) if self.atom_partitioning else 0)
 
-            # cgbeads should take atom rings number if ring atom in bead
+            # cgbeads should take atom rings number if ring atom in bead 
             cg_beads_rings = cg_beads.copy()
             for i, b in enumerate(cg_beads):
                 if b not in ring_atoms_flat:
@@ -267,10 +262,11 @@ class Cg_molecule:
                         if bd == i : atoms_in_b.append(at)
                     for a in atoms_in_b:
                         if a in ring_atoms_flat:
-                            cg_beads_rings[i]=a
+                            cg_beads_rings[i] = a
             logger.info("CG beads rings updated")
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
+            # for connectivity purposes
             mapping_dict = make_mapping_dictionary(self.atom_partitioning)
             for ring in ring_atoms:
                 for atom_idx in ring:
@@ -393,11 +389,11 @@ class Cg_molecule:
 
                 # check if fusion of cycles
                 common = False
-                if len(ring_atoms)>1:
+                if len(ring_atoms) > 1:
                     cpt = list(set.intersection(*map(set, ring_atoms)))
-                    if len(cpt)>1 : common=True
+                    if len(cpt) > 1 : common=True
                     for i in ring_atoms:
-                        if len(i)>6 : common=True
+                        if len(i) > 6 : common=True
                 else:
                     if len(ring_atoms_flat)>6 : common=True
 

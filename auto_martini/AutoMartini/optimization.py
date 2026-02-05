@@ -99,14 +99,14 @@ def _filter_chunk(args):
     * Must be top-level for multiprocessing pickling.
     * Returns a numpy array (can be large). This is the "Option 2" approach.
     """
-    chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id = args
+    chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings = args
     start_index = int(chunk_num) * int(chunk_size)
     chunk_array = opcy.generate_combinations(
         int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size)
     )
     if chunk_array.size == 0:
         return np.empty((0, int(num_beads)), dtype=np.int32)
-    return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
+    return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
 
 
 @timeit(level=logging.INFO)
@@ -150,6 +150,7 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
+    nrings = len(ring_atoms)
     
     # Process chunks 
     acceptable_trials_list = []
@@ -164,7 +165,7 @@ def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds,
         logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
         if chunk_array.size == 0:
             break
-        chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id)
+        chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
         if chunk_acceptable.size > 0:
             acceptable_trials_list.append(chunk_acceptable)
     
@@ -195,6 +196,7 @@ def find_acceptable_trials_mp(
     for rid, ring in enumerate(ring_atoms):
         ring = np.asarray(ring, dtype=dtype)
         ring_id[ring] = rid
+    nrings = len(ring_atoms)
 
     n_heavy_atoms = len(list_heavy_atoms)
     total = math.comb(int(n_heavy_atoms), int(num_beads))
@@ -208,7 +210,7 @@ def find_acceptable_trials_mp(
     os.environ.setdefault("OMP_NUM_THREADS", "1")
 
     work = [
-        (chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id)
+        (chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings)
         for chunk_num in range(int(n_chunks))
     ]
 
@@ -528,19 +530,24 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
 
 def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule): #AutoM3 change
     """Partition all atoms between CG beads"""
-    logger.debug("Entering voronoi_atoms()")
+    logger.debug("Entering voronoi_atoms_old()")
+
+    # Initial Partitioning based on closest bead to each heavy atom
     partitioning = {}
     for j in range(len(heavyatom_coords)):
-        if j not in partitioning.keys():
-            # Voronoi to check whether atom is closest to bead
-            bead_at = -1
-            dist_bead_at = 1000
-            for k in range(len(cgbead_coords)):
-                distk = np.linalg.norm(cgbead_coords[k] - heavyatom_coords[j])
-                if distk < dist_bead_at:
-                    dist_bead_at = distk
-                    bead_at = k
-            partitioning[j] = bead_at
+        # Voronoi to check whether atom is closest to bead
+        bead_at = -1
+        dist_bead_at = 1000
+        for k in range(len(cgbead_coords)):
+            distk = np.linalg.norm(cgbead_coords[k] - heavyatom_coords[j])
+            if distk < dist_bead_at:
+                dist_bead_at = distk
+                bead_at = k
+        partitioning[j] = bead_at
+
+    from .solver import make_mapping_dictionary
+    print(make_mapping_dictionary(partitioning))
+
     if len(cgbead_coords) > 1:
         # Book-keeping of closest atoms to every bead
         closest_atoms = {}
@@ -600,12 +607,12 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
             for b in bonds:
                 bond = b.split('-')
                 if str(at) in bond:
-                    at1=int(bond[0])
-                    at2=int(bond[-1])
-                    if at==at1 and at2 in partitioning.keys(): 
+                    at1 = int(bond[0])
+                    at2 = int(bond[-1])
+                    if at == at1 and at2 in partitioning.keys(): 
                         hbead = partitioning[at2]
                         hydrogen = at1
-                    if at==at2 and at1 in partitioning.keys():
+                    if at == at2 and at1 in partitioning.keys():
                         hbead = partitioning[at1]
                         hydrogen = at2
 
@@ -613,14 +620,14 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
                         aa_partitioning[hydrogen]=hbead
 
     #compute COG while taking into account hydrogens
-    bead_coord={}
+    bead_coord = {}
     for atom in range(len(allatom_coords)):
-        bead=aa_partitioning[atom]
+        bead = aa_partitioning[atom]
         if bead not in bead_coord.keys(): 
-            bead_coord[bead]=[]
+            bead_coord[bead] = []
         bead_coord[bead].append(allatom_coords[atom])
 
-    bead_cog=[]
+    bead_cog = []
     for bead, coords in sorted(bead_coord.items()):
         cog = np.mean(coords,axis=0)
         bead_cog.append(cog)
@@ -678,7 +685,7 @@ def max2arperbead(atom_partitioning, ringatoms): # AutoM3
     
     # Convert ringatoms to a set
     ringatoms_set = set(atom for sublist in ringatoms for atom in sublist)
-    for bead,atoms in bead_atoms.items():
+    for bead, atoms in bead_atoms.items():
         ring_atom_count = sum(1 for atom in atoms if atom in ringatoms_set)
         if ring_atom_count > 2:
             return False
