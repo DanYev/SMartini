@@ -39,7 +39,7 @@ if __name__ == "__main__":
     print(f"Wrote: {sdf_path}")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
-    itp_path = outdir / f"{molname.lower()}.itp"
+    itp_path = outdir / f"ligand_{molname}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
         min_beads=n_beads, max_beads=n_beads)
     # cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True)

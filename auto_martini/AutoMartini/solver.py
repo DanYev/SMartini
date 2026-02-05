@@ -104,6 +104,16 @@ def _get_bead_pos(trial_comb, conformer):
     return beadpos
 
 
+def make_mapping_dictionary(atom_partitioning):
+    """Create mapping dictionary from atom_partitioning"""
+    mapping_dict = {}
+    for atom_idx, bead_idx in atom_partitioning.items():
+        if bead_idx not in mapping_dict:
+            mapping_dict[bead_idx] = []
+        mapping_dict[bead_idx].append(atom_idx)
+    return mapping_dict
+
+
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
@@ -259,6 +269,17 @@ class Cg_molecule:
                             cg_beads_rings[i]=a
             logger.info("CG beads rings updated")
 
+            # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
+            mapping_dict = make_mapping_dictionary(self.atom_partitioning)
+            for ring in ring_atoms:
+                for atom_idx in ring:
+                    for bead_idx, atom_indices in mapping_dict.items():
+                        if atom_idx in atom_indices:
+                            # Add all atoms in this bead to ring_atoms_flat
+                            for at in atom_indices:
+                                if at not in ring:
+                                    ring.append(at)
+
             logger.info("Printing Atoms")
             self.cg_bead_names, bead_types, _, _ = topology.print_atoms(
                     molname,
@@ -382,14 +403,15 @@ class Cg_molecule:
 
                 ### AutoM3 outputs ###
 
-                if len(ring_atoms_flat) > 0 and not simple_model:
-                    if len(ring_atoms_flat) > 7 and common:
-                        vs_write, virtual_sites, rigid_dih  = topology.print_virtualsites(ring_atoms, self.cg_bead_coords, self.atom_partitioning, molecule)
+                # if len(ring_atoms_flat) > 0 and not simple_model:
+                #     if len(ring_atoms_flat) > 7 and common:
+                #         vs_write, virtual_sites, rigid_dih  = topology.print_virtualsites(ring_atoms, self.cg_bead_coords, self.atom_partitioning, molecule)
                         
-                        self.topout, vs_bead_names, bartender_input_info  = topology.topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites,vs_write,rigid_dih,simple_model)
+                #         self.topout, vs_bead_names, bartender_input_info  = topology.topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites,vs_write,rigid_dih,simple_model)
                     
-                    else:
-                        self.topout, bartender_input_info = topology.topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, self.cg_bead_coords, ring_atoms, cg_beads)
+                #     else:
+                #         self.topout, bartender_input_info = topology.topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, self.cg_bead_coords, ring_atoms, cg_beads)
+                self.topout, bartender_input_info = topology.topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, self.cg_bead_coords, ring_atoms, cg_beads)
                 
                 if bartender:
                     bartender_out = topology.bartender_input(molecule, molname, atoms_in_smi, bartender_input_info)
