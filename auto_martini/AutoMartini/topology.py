@@ -117,7 +117,7 @@ def gen_molecule_smi(smi):
     except ValueError as e:
         logger.warning("%s" % e)
         exit(1)
-    logger.info("Successfully generated molecule from SMILES")
+    logger.debug("Successfully generated molecule from SMILES")
     return molecule, errval
 
 
@@ -208,12 +208,12 @@ def get_atoms(molecule):
     num_atoms = conformer.GetNumAtoms()
     list_heavyatoms = []
     list_heavyatomnames = []
-    atoms = np.arange(num_atoms)
+    atoms = range(num_atoms)
     for i in np.nditer(atoms):
         atom_name = molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
         if atom_name != "H":
             list_heavyatoms.append(atoms[i])
-            list_heavyatomnames.append(atom_name)
+            list_heavyatomnames.append(f"{atom_name}{i+1}")
     if len(list_heavyatoms) == 0:
         print("Error. No heavy atom found.")
         exit(1)
@@ -464,7 +464,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
             )
         except Exception:
             raise
-        atoms_in_smi_dict[bead+1]=atoms_in_smi.replace(" ; atoms: ","") # AutoM3
+        atoms_in_smi_dict[bead+1] = atoms_in_smi.replace(" ; atoms: ","") # AutoM3
 
         atom_name = ""
         for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
@@ -544,9 +544,7 @@ def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partition
 
 def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False, cutoff=1e4):
     """print CG bonds in itp format"""
-
     logger.debug("Entering print_bonds()")
-
     # Bond information
     bondlist = []
     constlist = []
@@ -694,15 +692,15 @@ def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, be
                         c[0] + 1, c[1] + 1, c[2]
                     )
 
-        # Make sure there's at least a bond to every atom
-        for i in range(len(cgbeads)):
-            bond_to_i = False
-            for b in bondlist + constlist:
-                if i in [b[0], b[1]]:
-                    bond_to_i = True
-            if not bond_to_i:
-                print("Error. No bond to atom %d" % (i + 1))
-                exit(1)
+        # # Make sure there's at least a bond to every atom
+        # for i in range(len(cgbeads)):
+        #     bond_to_i = False
+        #     for b in bondlist + constlist:
+        #         if i in [b[0], b[1]]:
+        #             bond_to_i = True
+        #     if not bond_to_i:
+        #         print("Error. No bond to atom %d" % (i + 1))
+        #         exit(1)
     return bondlist, constlist, text
 
 

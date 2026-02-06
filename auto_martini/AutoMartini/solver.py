@@ -104,6 +104,115 @@ def _get_bead_pos(trial_comb, conformer):
     return beadpos
 
 
+def get_graph(smiles):
+    # --- Graph representation of the molecule ---
+    mol = Chem.MolFromSmiles(smiles)
+    # --- Node list (atoms) ---
+    nodes = []
+    for a in mol.GetAtoms():
+        heavy_neighbors = [n for n in a.GetNeighbors() if n.GetAtomicNum() > 1]
+        neighbor_ids = [n.GetIdx() for n in heavy_neighbors]
+        neighbor_bonds = []
+        for n in heavy_neighbors:
+            bond_id = (int(a.GetIdx()), int(n.GetIdx()))
+            b = mol.GetBondBetweenAtoms(*bond_id)
+            if b is None:
+                continue
+            neighbor_bonds.append(bond_id)
+        nodes.append({
+            "idx": a.GetIdx(),                    # 0-based
+            "atomic_num": a.GetAtomicNum(),       # 6 for C, 7 for N
+            "formal_charge": a.GetFormalCharge(),
+            "is_aromatic": a.GetIsAromatic(),
+            "degree": a.GetDegree(),              # total neighbors (includes H only if explicit)
+            "heavy_degree": len(heavy_neighbors),
+            "neighbors": neighbor_ids,             # heavy-atom neighbors only
+            "neighbor_bonds": neighbor_bonds,      # heavy-atom neighbor + bond metadata
+            "num_h": a.GetTotalNumHs(),            # implicit H count (unless you add Hs)
+        })
+
+    # --- Edge list (bonds) ---
+    # Undirected bond list with attributes
+    edges = []
+    for b in mol.GetBonds():
+        i = b.GetBeginAtomIdx()
+        j = b.GetEndAtomIdx()
+        edges.append({
+            "ij": (i, j),
+            "bond_type": str(b.GetBondType()),     # 'SINGLE', 'DOUBLE', 'AROMATIC', ...
+            "is_aromatic": b.GetIsAromatic(),
+            "is_conjugated": b.GetIsConjugated(),
+            "stereo": str(b.GetStereo()),          # often 'STEREONONE' for this case
+        })
+
+    # --- Terminal nodes ---
+    # Common definition in chemistry ML: heavy-atom degree == 1
+    terminal_atoms = [a.GetIdx() for a in mol.GetAtoms()
+                    if sum(1 for n in a.GetNeighbors() if n.GetAtomicNum() > 1) == 1]
+
+    return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
+
+
+def _if_atom_is_terminal(atom_idx, graph):
+    return atom_idx in graph["terminal_atoms"]
+
+
+def _filter_bead_neighbors(bead_neighbors):
+    changed = True
+    while changed:
+        changed = False
+        singles = [ns[0] for ns in bead_neighbors if len(ns) == 1]
+        for ns in bead_neighbors:
+            if len(ns) == 1:
+                continue
+            before = len(ns)
+            ns[:] = [a for a in ns if a not in singles]
+            changed |= (len(ns) != before)
+    return bead_neighbors
+
+
+def get_partitioning(trial_comb, graph): 
+    """Get partitioning of atoms into beads for given trial combination"""
+    atoms = graph["atoms"]
+    bonds = graph["bonds"]
+    terminal_atoms = graph["terminal_atoms"]
+    bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
+    print(trial_comb)
+    print(terminal_atoms)
+    print(bead_neighbors)
+    bead_bonds = [atoms[i]["neighbor_bonds"] for i in trial_comb]
+    filtered_bead_neighbors = _filter_bead_neighbors(bead_neighbors)
+    print(filtered_bead_neighbors)
+    mapping_dict = {idx: [int(atom)] for idx, atom in enumerate(trial_comb)}
+    for key, item in mapping_dict.items():
+        for neighbor in filtered_bead_neighbors[key]:
+            if neighbor not in trial_comb:
+                mapping_dict[key].append(neighbor)
+    partitioning = invert_mapping_dictionary(mapping_dict)
+    return partitioning
+
+
+def make_mapping_dictionary(atom_partitioning):
+    """Create mapping dictionary from atom_partitioning"""
+    mapping_dict = {}
+    for atom_idx, bead_idx in atom_partitioning.items():
+        if bead_idx not in mapping_dict:
+            mapping_dict[bead_idx] = []
+        mapping_dict[bead_idx].append(atom_idx)
+    return mapping_dict
+
+
+def invert_mapping_dictionary(mapping_dict):
+    """Inverse of make_mapping_dictionary(): bead_idx -> [atom_idx] to atom_idx -> bead_idx."""
+    atom_partitioning = {}
+    for bead_idx, atom_indices in mapping_dict.items():
+        for atom_idx in atom_indices:
+            if atom_idx in atom_partitioning:
+                raise ValueError(f"Atom {atom_idx} appears in multiple beads")
+            atom_partitioning[atom_idx] = bead_idx
+    return atom_partitioning
+
+
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
@@ -121,7 +230,10 @@ class Cg_molecule:
         self.topout = None
         self.bartender_out = None # AutoM3 new variable 
         self.molname = molname # AutoM3 change : for pretty GRO file (will be easier to look on a molecule in VMD with its proper name)
+        self.graph = None
         force_map = False # AutoM3 new variable
+
+        self.graph = get_graph(mol_smi)
 
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", molname, forcepred, simple_model)
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", topfname, bartender, bartenderfname, logp_file)
@@ -182,8 +294,8 @@ class Cg_molecule:
                 # and (len(list_heavy_atoms) - (5 * len(cg_beads))) > 3
             ):
                 filtered_cg_beads.append(cg_beads)
-        logger.info("Filtered candidate bead mappings to %d after removing suboptimal bead counts", len(filtered_cg_beads))
-        filtered_cg_beads = list_cg_beads
+        logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
+        # filtered_cg_beads = list_cg_beads
 
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
@@ -194,13 +306,15 @@ class Cg_molecule:
         logger.info("Going through the candidate mappings")
         while attempt < max_attempts:
             cg_beads = filtered_cg_beads[attempt]
+            partitioning = get_partitioning(cg_beads, self.graph)
             bead_pos = _get_bead_pos(cg_beads, conf)
             success = True
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, max_attempts, len(cg_beads))
 
-            if not optimization.all_atoms_in_beads_connected(
-                    cg_beads, self.heavy_atom_coords, list_heavy_atoms, list_bonds, molecule, self.atom_coords, force_map
+            if not all_atoms_in_beads_connected(
+                    cg_beads, self.heavy_atom_coords, list_heavy_atoms, list_bonds, molecule, 
+                    self.atom_coords, force_map, partitioning
                 ): # AutoM3 change : Added molecule and force_map arguments
                 attempt += 1
                 continue
@@ -213,18 +327,18 @@ class Cg_molecule:
             ### AutoM3 change : different partition of atoms into coarse-grained beads, depending on the number of aromatic cycles ###
             _, num_arom = topology.is_aromatic(molecule)
             if not force_map and num_arom < 7: # AutoM3
-                self.atom_partitioning, self.cg_bead_coords = optimization.voronoi_atoms_new( 
-                    cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
+                self.atom_partitioning, self.cg_bead_coords = voronoi_atoms_new( 
+                    cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule, partitioning
                 )
 
             else:
-                self.atom_partitioning, self.cg_bead_coords = optimization.voronoi_atoms_old(
-                    cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
+                self.atom_partitioning, self.cg_bead_coords = voronoi_atoms_old(
+                    cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule, partitioning
                 )
             logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
-            self.atom_partitioning = optimization.sanitize_rings(self.atom_partitioning, self.heavy_atom_coords, ring_atoms)
-            exit()
+            # self.atom_partitioning = optimization.sanitize_rings(self.atom_partitioning, self.heavy_atom_coords, ring_atoms)
+            # exit()
             
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
             #    Max 2 aromatic atoms per bead ; 
@@ -446,3 +560,282 @@ class Cg_molecule:
                 fp.write(cg_out)
         else:
             return cg_out
+
+
+def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule, in_partitioning): #AutoM3 change
+    """Partition all atoms between CG beads"""
+    logger.debug("Entering voronoi_atoms_old()")
+
+    # Initial Partitioning based on closest bead to each heavy atom
+    partitioning = {}
+    for j in range(len(heavyatom_coords)):
+        # Voronoi to check whether atom is closest to bead
+        bead_at = -1
+        dist_bead_at = 1000
+        for k in range(len(cgbead_coords)):
+            distk = np.linalg.norm(cgbead_coords[k] - heavyatom_coords[j])
+            if distk < dist_bead_at:
+                dist_bead_at = distk
+                bead_at = k
+        partitioning[j] = bead_at
+
+    if len(cgbead_coords) > 1:
+        # Book-keeping of closest atoms to every bead
+        closest_atoms = {}
+        for i in range(len(cgbead_coords)):
+            closest_atom = -1
+            closest_dist = 10000.0
+            for j in range(len(heavyatom_coords)):
+                dist_bead_at = np.linalg.norm(cgbead_coords[i] - heavyatom_coords[j])
+                if dist_bead_at < closest_dist:
+                    closest_dist = dist_bead_at
+                    closest_atom = j
+            if closest_atom == -1:
+                logger.warning("Error. Can't find closest atom to bead %s" % i)
+                exit(1)
+            closest_atoms[i] = closest_atom
+        print(closest_atoms)
+        # If one bead has only one heavy atom, include one more
+        for i in partitioning.values():
+            if sum(x == i for x in partitioning.values()) == 1:
+                # Find bead
+                lonely_bead = i
+                # Voronoi to find closest atom
+                closest_bead = -1
+                closest_bead_dist = 10000.0
+                for j in range(len(heavyatom_coords)):
+                    if partitioning[j] != lonely_bead:
+                        dist_bead_at = np.linalg.norm(
+                            cgbead_coords[lonely_bead] - heavyatom_coords[j]
+                        )
+                        # Only consider if it's closer, not a CG bead itself, and
+                        # the CG bead it belongs to has more than one other atom.
+                        if (
+                            dist_bead_at < closest_bead_dist
+                            and j != closest_atoms[partitioning[j]]
+                            and sum(x == partitioning[j] for x in partitioning.values()) > 2
+                        ):
+                            closest_bead = j
+                            closest_bead_dist = dist_bead_at
+                if closest_bead == -1:
+                    logger.warning("Error. Can't find an atom close to atom $s" % lonely_bead)
+                    exit(1)
+                partitioning[closest_bead] = lonely_bead
+
+    partitioning = in_partitioning
+    # find all bonds between atoms in molecule
+    bonds = []
+    for b in range(len(molecule.GetBonds())):
+        abond = molecule.GetBondWithIdx(b)
+        at1 = abond.GetBeginAtomIdx()
+        at2 = abond.GetEndAtomIdx()
+        if f"{at1}-{at2}" not in bonds and f"{at2}-{at1}" not in bonds:
+            bonds.append(f"{at1}-{at2}")
+
+    # create partitioning including hydrogens inside beads
+    aa_partitioning = partitioning.copy()
+    for at in range(len(allatom_coords)):
+        if at not in aa_partitioning.keys():
+            hbead = None
+            for b in bonds:
+                bond = b.split('-')
+                if str(at) in bond:
+                    at1 = int(bond[0])
+                    at2 = int(bond[-1])
+                    if at == at1 and at2 in partitioning.keys(): 
+                        hbead = partitioning[at2]
+                        hydrogen = at1
+                    if at == at2 and at1 in partitioning.keys():
+                        hbead = partitioning[at1]
+                        hydrogen = at2
+
+                    if hbead is not None: # found hydrogen atom connected to 
+                        aa_partitioning[hydrogen]=hbead
+
+    #compute COG while taking into account hydrogens
+    bead_coord = {}
+    for atom in range(len(allatom_coords)):
+        bead = aa_partitioning[atom]
+        if bead not in bead_coord.keys(): 
+            bead_coord[bead] = []
+        bead_coord[bead].append(allatom_coords[atom])
+
+    bead_cog = []
+    for bead, coords in sorted(bead_coord.items()):
+        cog = np.mean(coords,axis=0)
+        bead_cog.append(cog)
+
+    return partitioning, bead_cog
+
+
+def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule, in_partitioning): # AutoM3
+    """
+    Partition all atoms between CG beads, based on headliners coordinates and distances between other atoms coordinates. 
+    Headliners are atoms with cgbead_coords coordinates.
+    """
+    logger.debug("Entering voronoi_atoms()")
+    partitioning = {}
+
+    #Populate partitioning with atoms and atom headliners of beads
+    for j in range(len(heavyatom_coords)):
+        partitioning[j] = None
+        for b in range(len(cgbead_coords)):
+            if(heavyatom_coords[j]==cgbead_coords[b]).all():
+                partitioning[j] = b
+
+    # Find closest atoms to atom headliners of beads
+    if len(cgbead_coords) > 1:
+        closest_atoms = {}  # Book-keeping of closest atoms to every bead
+        for i in range(len(cgbead_coords)):
+            distances = {}
+            for j in range(len(heavyatom_coords)):
+                if (cgbead_coords[i] != heavyatom_coords[j]).all():
+                    dist_bead_at = np.linalg.norm(cgbead_coords[i] - heavyatom_coords[j])
+                    distances[j] = dist_bead_at  # Atom index as key, distance as value
+
+            # Sort distances by value and keep the closest atoms
+            sorted_distances = dict(sorted(distances.items(), key=lambda item: item[1]))
+            closest_atoms[i] = sorted_distances  # Dictionary of atoms and their distances for each bead
+
+        # Populate partitioning with closest atoms
+        for atom, bead in partitioning.items():
+
+            if bead is None:
+                closest_index = float('inf')  # Initialize with infinity
+                closest_bead = None
+
+                for current_bead, atoms_dict in closest_atoms.items():
+                    if atom in atoms_dict:
+                        index = list(atoms_dict.keys()).index(atom)  # Find the index of the atom in the sorted keys
+                        if index < closest_index:
+                            closest_index = index
+                            closest_bead = current_bead
+
+                if closest_bead is not None:
+                    partitioning[atom] = closest_bead
+
+        # If one bead has only one heavy atom, include one more
+        for i in partitioning.values():
+            if sum(x == i for x in partitioning.values()) == 1:
+                # Find bead
+                lonely_bead = i
+                # Voronoi to find closest atom
+                closest_bead = -1
+                closest_bead_dist = 10000.0
+                for j in range(len(heavyatom_coords)):
+                    if partitioning[j] != lonely_bead:
+                        dist_bead_at = np.linalg.norm(
+                            cgbead_coords[lonely_bead] - heavyatom_coords[j]
+                        )
+                        # Only consider if it's closer, not a CG bead itself, and
+                        # the CG bead it belongs to has more than one other atom. 
+                        if (
+                            dist_bead_at < closest_bead_dist
+                            and j != closest_atoms[partitioning[j]]
+                            and sum(x == partitioning[j] for x in partitioning.values()) > 2
+                        ):
+                            closest_bead = j
+                            closest_bead_dist = dist_bead_at
+                if closest_bead == -1:
+                    logger.warning("Error. Can't find an atom close to atom $s" % lonely_bead)
+                    exit(1)
+                partitioning[closest_bead] = lonely_bead
+    else:
+        for j in range(len(heavyatom_coords)):
+            partitioning[j] = 0 #len(cgbead_coords)
+
+    # find all bonds between atoms in molecule
+    bonds = []
+    for b in range(len(molecule.GetBonds())):
+        abond = molecule.GetBondWithIdx(b)
+        at1 = abond.GetBeginAtomIdx()
+        at2 = abond.GetEndAtomIdx()
+        if f"{at1}-{at2}" not in bonds and f"{at2}-{at1}" not in bonds:
+            bonds.append(f"{at1}-{at2}")
+
+    # create partitioning including hydrogens inside beads
+    aa_partitioning = partitioning.copy()
+    for at in range(len(allatom_coords)):
+        if at not in aa_partitioning.keys():
+            hbead = None
+            for b in bonds:
+                bond = b.split('-')
+                if str(at) in bond:
+                    at1=int(bond[0])
+                    at2=int(bond[-1])
+                    if at==at1 and at2 in partitioning.keys(): 
+                        hbead = partitioning[at2]
+                        hydrogen = at1
+                    if at==at2 and at1 in partitioning.keys():
+                        hbead = partitioning[at1]
+                        hydrogen = at2
+
+                    if hbead is not None: # found hydrogen atom connected to 
+                        aa_partitioning[hydrogen]=hbead
+
+    #compute COG while taking into account hydrogens
+    bead_coord={}
+    for atom in range(len(allatom_coords)):
+        bead=aa_partitioning[atom]
+        if bead not in bead_coord.keys(): 
+            bead_coord[bead]=[]
+        bead_coord[bead].append(allatom_coords[atom])
+
+    bead_cog=[]
+    for bead, coords in sorted(bead_coord.items()):
+        cog = np.mean(coords,axis=0)
+        bead_cog.append(cog)
+
+    return partitioning, bead_cog
+
+
+def sanitize_rings(atom_partitioning, atoms_xyz, ringatoms):
+    mapping_dict = make_mapping_dictionary(atom_partitioning)
+    print(mapping_dict)
+    print(atoms_xyz)
+    for bead, atoms in mapping_dict.items():
+        for ring in ringatoms:
+            if not set(atoms).issubset(ring):
+                continue
+            if len(atoms) <= 2:
+                continue
+            print("More than 2 atoms in bead %s are in ring %s" % (bead, ring))
+
+    return atom_partitioning
+
+
+def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, 
+    list_heavyatoms, bondlist, mol, allatom_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
+    """Make sure all atoms within one CG bead are connected to at least
+    one other atom in that bead"""
+    # Bead coordinates are given by heavy atoms themselves
+    cgbead_coords = []
+
+    for i in range(len(trial_comb)):
+        cgbead_coords.append(heavyatom_coords[list_heavyatoms.index(trial_comb[i])])
+    
+    _, num_arom = topology.is_aromatic(mol) #AutoM3 change
+    ### AutoM3 change of mapping approach to differenciate molecules with 0-1 and more cycles
+    if not force_map and num_arom < 7: #AutoM3 change
+        voronoi, _  = voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+    else:
+        voronoi, _  = voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+    logger.debug("voronoi %s" % voronoi)
+
+    for i in range(len(trial_comb)):
+        cg_bead = trial_comb[i]
+        num_atoms = list(voronoi.values()).count(voronoi[list_heavyatoms.index(cg_bead)])
+        # sub-part of bond list that only contains atoms within CG bead
+        sub_bond_list = []
+        for j in range(len(bondlist)):
+            if (
+                voronoi[list_heavyatoms.index(bondlist[j][0])] == voronoi[list_heavyatoms.index(cg_bead)]
+                and voronoi[list_heavyatoms.index(bondlist[j][1])] == voronoi[list_heavyatoms.index(cg_bead)]
+            ):
+                sub_bond_list.append(bondlist[j])
+        num_bonds = len(sub_bond_list)
+        if num_bonds < num_atoms - 1 or num_atoms == 1:
+            logger.debug("Error: Not all atoms in beads connected in %s" % trial_comb)
+            logger.debug("Error: %s < %s, %s" % (num_bonds, num_atoms - 1, sub_bond_list))
+            return False
+    return True
