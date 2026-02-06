@@ -109,6 +109,16 @@ def _filter_chunk(args):
     return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
 
 
+def make_mapping_dictionary(atom_partitioning):
+    """Create mapping dictionary from atom_partitioning"""
+    mapping_dict = {}
+    for atom_idx, bead_idx in atom_partitioning.items():
+        if bead_idx not in mapping_dict:
+            mapping_dict[bead_idx] = []
+        mapping_dict[bead_idx].append(atom_idx)
+    return mapping_dict
+
+    
 @timeit(level=logging.INFO)
 def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds, 
     dtype=np.int32, chunk_size=int(1e7)):
@@ -333,6 +343,7 @@ def find_bead_pos(
         min_beads = int(len(list_heavy_atoms) / 4.0)
     if not max_beads:
         max_beads = int(len(list_heavy_atoms) / 2.0)
+        # max_beads = len(list_heavy_atoms) // 2 + len(list_heavy_atoms) % 2
 
     # Collect all possible combinations of bead positions
     list_trial_comb = []
@@ -545,9 +556,6 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
                 bead_at = k
         partitioning[j] = bead_at
 
-    from .solver import make_mapping_dictionary
-    print(make_mapping_dictionary(partitioning))
-
     if len(cgbead_coords) > 1:
         # Book-keeping of closest atoms to every bead
         closest_atoms = {}
@@ -633,6 +641,21 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule)
         bead_cog.append(cog)
 
     return partitioning, bead_cog
+
+
+def sanitize_rings(atom_partitioning, atoms_xyz, ringatoms):
+    mapping_dict = make_mapping_dictionary(atom_partitioning)
+    print(mapping_dict)
+    print(atoms_xyz)
+    for bead, atoms in mapping_dict.items():
+        for ring in ringatoms:
+            if not set(atoms).issubset(ring):
+                continue
+            if len(atoms) <= 2:
+                continue
+            print("More than 2 atoms in bead %s are in ring %s" % (bead, ring))
+
+    return atom_partitioning
 
 
 def functional_groups_ok(atom_partitioning, molecule, ringatoms): # AutoM3

@@ -104,16 +104,6 @@ def _get_bead_pos(trial_comb, conformer):
     return beadpos
 
 
-def make_mapping_dictionary(atom_partitioning):
-    """Create mapping dictionary from atom_partitioning"""
-    mapping_dict = {}
-    for atom_idx, bead_idx in atom_partitioning.items():
-        if bead_idx not in mapping_dict:
-            mapping_dict[bead_idx] = []
-        mapping_dict[bead_idx].append(atom_idx)
-    return mapping_dict
-
-
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
@@ -232,6 +222,9 @@ class Cg_molecule:
                     cg_bead_coords, self.heavy_atom_coords, self.atom_coords, molecule
                 )
             logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
+
+            self.atom_partitioning = optimization.sanitize_rings(self.atom_partitioning, self.heavy_atom_coords, ring_atoms)
+            exit()
             
             # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
             #    Max 2 aromatic atoms per bead ; 
@@ -267,7 +260,7 @@ class Cg_molecule:
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
-            mapping_dict = make_mapping_dictionary(self.atom_partitioning)
+            mapping_dict = optimization.make_mapping_dictionary(self.atom_partitioning)
             for ring in ring_atoms:
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():

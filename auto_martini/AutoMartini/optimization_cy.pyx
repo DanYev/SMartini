@@ -329,18 +329,6 @@ cdef bint check_beads(
     if n_trial <= 1:
         return True
 
-    # # Check for duplicates (inline, O(n²) but n is small)
-    # for k in range(n_trial):
-    #     for m in range(k + 1, n_trial):
-    #         if trial_comb[k] == trial_comb[m]:
-    #             return False
-
-    # # Count rings to track max ring ID
-    # for bi in range(n_trial):
-    #     rid = <int>ring_id_of_atom[<int>trial_comb[bi]]
-    #     if rid >= nrings:
-    #         nrings = rid + 1
-
     # Check for beads linked by chemical bond (except in rings)
     for bi in range(n_trial):
         ai = <int>trial_comb[bi]
@@ -348,15 +336,15 @@ cdef bint check_beads(
             aj = <int>trial_comb[bj]
             if _is_bond(ai, aj, listbonds):
                 return False
-    #             rid_i = <int>ring_id_of_atom[ai]
-    #             rid_j = <int>ring_id_of_atom[aj]
-    #             if rid_i != -1 and rid_i == rid_j:
-    #                 num_bonds_in_rings += 1
-    #             else:
-    #                 return False
+                # rid_i = <int>ring_id_of_atom[ai]
+                # rid_j = <int>ring_id_of_atom[aj]
+                # if rid_i != -1 and rid_i == rid_j:
+                #     num_bonds_in_rings += 1
+                # else:
+                #     return False
 
-    # # Reject if any ring had bonds between beads
-    # if num_bonds_in_rings > 0:
+    # # Reject if any ring has more than 1 bond
+    # if num_bonds_in_rings > 1:
     #     return False
 
     # Check for two terminal beads linked to the same atom
