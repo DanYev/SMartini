@@ -199,6 +199,7 @@ def find_acceptable_trials_mp(
     num_beads,
     ring_atoms,
     list_bonds,
+    atoms_and_neighbors,
     dtype=np.int32,
     chunk_size=int(1e7),
     nprocs=None,
@@ -235,15 +236,32 @@ def find_acceptable_trials_mp(
         for chunk_num in range(int(n_chunks))
     ]
 
-    acceptable_trials_list = []
+    acc_trials_list = []
     with mp.Pool(processes=nprocs) as pool:
         for chunk_acceptable in pool.imap_unordered(_filter_chunk, work, chunksize=1):
             if chunk_acceptable.size:
-                acceptable_trials_list.append(chunk_acceptable)
+                acc_trials_list.append(chunk_acceptable)
 
-    if not acceptable_trials_list:
+    filtered_list = filter_out_bad_combinations(acc_trials_list, atoms_and_neighbors, 
+        natoms=len(atoms_and_neighbors), dtype=dtype)
+
+    if not filtered_list:
         return np.empty((0, int(num_beads)), dtype=dtype)
-    return np.vstack(acceptable_trials_list)
+
+    return np.vstack(filtered_list)
+
+
+def filter_out_bad_combinations(acc_trials_list, atoms_and_neighbors, natoms, dtype=np.int32):
+    """Filter out bad combinations from acceptable_trials."""
+    filtered_list = []
+    for chunk in acc_trials_list:
+        for trial in chunk:
+            sum = 0
+            for atom_idx in trial:
+                sum += len(atoms_and_neighbors[atom_idx])
+            if sum >= natoms:
+                filtered_list.append(trial)
+    return filtered_list
 
 
 def _ring_id_of_atom_from_rings(ring_atoms, dtype=np.int32):
@@ -326,7 +344,7 @@ def collect_energies_and_combs(
 
 @timeit(level=logging.INFO)
 def find_bead_pos(
-    molecule, conformer, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
+    molecule, conformer, graph, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
     min_beads=None, max_beads=None, dtype=np.int32, 
 ):
     """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
@@ -346,8 +364,10 @@ def find_bead_pos(
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
 
+
     list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms, dtype=dtype)
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms, dtype=dtype)
+    atoms_and_neighbors = [a["neighbors"] + [a["idx"]] for a in graph["atoms"]]
 
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
     if not min_beads:
@@ -371,8 +391,13 @@ def find_bead_pos(
             list_heavy_atoms, num_beads,
             ring_atoms,
             list_bonds,
+            atoms_and_neighbors,
             dtype=dtype,
         )
+        n_accceptable = len(acceptable_trials)
+        if n_accceptable == 0:
+            logger.info("No acceptable combinations found for %d beads. Stopping search.", num_beads)
+            continue
         logger.info("Number of Acceptable Combinations: %d", len(acceptable_trials))
 
         logger.info("Collecting Combinations And Their Energies...")

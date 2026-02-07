@@ -145,7 +145,8 @@ def gen_molecule_sdf(sdf):
     except ValueError as e:
         exit(1)
     logger.info("Successfully generated molecule from SDF")
-    return molecule
+    raw_molecule = suppl[0]
+    return molecule, raw_molecule
 
 
 def print_header(molname, mol_smi):

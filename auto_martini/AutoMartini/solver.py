@@ -104,9 +104,12 @@ def _get_bead_pos(trial_comb, conformer):
     return beadpos
 
 
-def get_graph(smiles):
+def get_graph(mol=None, smiles=None):
     # --- Graph representation of the molecule ---
-    mol = Chem.MolFromSmiles(smiles)
+    if not mol:
+        if not smiles:
+            raise ValueError("Either mol or smiles must be provided")
+        mol = Chem.MolFromSmiles(smiles)
     # --- Node list (atoms) ---
     nodes = []
     for a in mol.GetAtoms():
@@ -153,21 +156,21 @@ def get_graph(smiles):
     return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
 
 
-def _if_atom_is_terminal(atom_idx, graph):
-    return atom_idx in graph["terminal_atoms"]
-
-
 def _filter_bead_neighbors(bead_neighbors):
+    # if a bead is a termimal bead, it can be connected to only one other bead, 
+    # so remove it from all other neighbor lists
     changed = True
     while changed:
         changed = False
-        singles = [ns[0] for ns in bead_neighbors if len(ns) == 1]
-        for ns in bead_neighbors:
-            if len(ns) == 1:
-                continue
-            before = len(ns)
-            ns[:] = [a for a in ns if a not in singles]
-            changed |= (len(ns) != before)
+        for n_neighbors in range(1, 4):
+            print("n_neighbors", n_neighbors)
+            n_ples = [ns for ns in bead_neighbors if len(ns) == n_neighbors]
+            for n_ple in n_ples:
+                for ns in bead_neighbors:
+                    before = len(ns)
+                    ns[:] = [a for a in ns if a not in n_ples]
+                    changed |= (len(ns) != before)
+    
     return bead_neighbors
 
 
@@ -175,14 +178,33 @@ def get_partitioning(trial_comb, graph):
     """Get partitioning of atoms into beads for given trial combination"""
     atoms = graph["atoms"]
     bonds = graph["bonds"]
-    terminal_atoms = graph["terminal_atoms"]
     bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
-    print(trial_comb)
-    print(terminal_atoms)
-    print(bead_neighbors)
     bead_bonds = [atoms[i]["neighbor_bonds"] for i in trial_comb]
+    print(trial_comb)
+    print(bead_neighbors)
     filtered_bead_neighbors = _filter_bead_neighbors(bead_neighbors)
     print(filtered_bead_neighbors)
+    exit()
+
+    # Sanity check you described:
+    # total atoms in neighbor lists (counting repeats) + len(trial_comb) should match total atoms.
+    neighbor_atoms = [int(a) for neigh in filtered_bead_neighbors for a in neigh]
+    mapped_atoms = [int(a) for a in trial_comb] + neighbor_atoms
+
+    total_atoms = len(atoms)
+    if len(mapped_atoms) != total_atoms:
+        covered = set(mapped_atoms)
+        missing = sorted({a["idx"] for a in atoms} - covered)
+        raise ValueError(
+            f"Bad mapping size (mapped={len(mapped_atoms)}, total={total_atoms}); missing={missing}"
+        )
+
+    # If repeats exist, you can still accidentally hit the right total length while missing others.
+    # This guarantees there are no duplicates and nothing missing.
+    if len(set(mapped_atoms)) != total_atoms:
+        raise ValueError("Bad mapping: duplicate atom assignment in neighbors/trial")
+
+
     mapping_dict = {idx: [int(atom)] for idx, atom in enumerate(trial_comb)}
     for key, item in mapping_dict.items():
         for neighbor in filtered_bead_neighbors[key]:
@@ -218,7 +240,7 @@ class Cg_molecule:
 
     def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
         bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
-        min_beads=None, max_beads=None,):
+        min_beads=None, max_beads=None, raw_molecule=None):
         # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
 
         self.heavy_atom_coords = None
@@ -233,7 +255,12 @@ class Cg_molecule:
         self.graph = None
         force_map = False # AutoM3 new variable
 
-        self.graph = get_graph(mol_smi)
+        if raw_molecule:
+            self.graph = get_graph(mol=raw_molecule) 
+        else:
+            self.graph = get_graph(smiles=mol_smi) 
+        graph = self.graph
+
 
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", molname, forcepred, simple_model)
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", topfname, bartender, bartenderfname, logp_file)
@@ -253,6 +280,7 @@ class Cg_molecule:
         # Get list of heavy atoms and their coordinates
         list_heavy_atoms, self.list_heavyatom_names = topology.get_atoms(molecule)
         conf, self.heavy_atom_coords, self.atom_coords = topology.get_heavy_atom_coords(molecule)
+        self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
         logger.info("Detected %d heavy atoms", len(list_heavy_atoms))
 
         # Identify ring-type atoms
@@ -275,6 +303,7 @@ class Cg_molecule:
         list_cg_beads = optimization.find_bead_pos(
             molecule,
             conf,
+            graph,
             list_heavy_atoms,
             self.heavy_atom_coords,
             self.atom_coords,
@@ -295,7 +324,7 @@ class Cg_molecule:
             ):
                 filtered_cg_beads.append(cg_beads)
         logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
-        # filtered_cg_beads = list_cg_beads
+        filtered_cg_beads = list_cg_beads
 
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
@@ -305,8 +334,21 @@ class Cg_molecule:
 
         logger.info("Going through the candidate mappings")
         while attempt < max_attempts:
+
+            if attempt % 1000 == 0:  # Log every 1000 attempts
+                logger.info("Attempt %d/%d", attempt, max_attempts)
+
             cg_beads = filtered_cg_beads[attempt]
-            partitioning = get_partitioning(cg_beads, self.graph)
+
+            if len(cg_beads) != 5:
+                attempt += 1
+                continue
+
+            try:
+                partitioning = get_partitioning(cg_beads, self.graph)
+            except Exception:
+                attempt += 1
+                continue
             bead_pos = _get_bead_pos(cg_beads, conf)
             success = True
 

@@ -14,8 +14,8 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "ANP"
-    n_beads = 12
+    molname = "aspirin"
+    n_beads = None
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
 
     sdf_file = Path("ligands") / f"{molname}.sdf"
-    mol_am = am.topology.gen_molecule_sdf(str(sdf_file))
+    mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
     # Save the atomistic RDKit molecule to SDF
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"ligand_{molname}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads)
+        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_molecule)
     # cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True)
     logging.info(f"Wrote: {itp_path}")
 
