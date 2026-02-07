@@ -127,7 +127,7 @@ def invert_mapping_dictionary(mapping_dict):
             if atom_idx in atom_partitioning:
                 raise ValueError(f"Atom {atom_idx} appears in multiple beads")
             atom_partitioning[atom_idx] = bead_idx
-    return atom_partitioning
+    return dict(sorted(atom_partitioning.items()))
 
     
 @timeit(level=logging.INFO)

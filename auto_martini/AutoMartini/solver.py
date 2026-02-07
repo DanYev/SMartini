@@ -156,21 +156,68 @@ def get_graph(mol=None, smiles=None):
     return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
 
 
-def _filter_bead_neighbors(bead_neighbors):
-    # if a bead is a termimal bead, it can be connected to only one other bead, 
-    # so remove it from all other neighbor lists
+def _mapping_is_valid(bead_neighbors, total_atoms):
+    n_neighbors = sum([len(ns) for ns in bead_neighbors])
+    n_atoms = n_neighbors + len(bead_neighbors)
+    return n_atoms == total_atoms
+
+
+def _filter_singles(bead_neighbors):
+    # if a bead can be connected to only one other bead
+    # remove it from all other neighbor lists
     changed = True
     while changed:
         changed = False
-        for n_neighbors in range(1, 4):
-            print("n_neighbors", n_neighbors)
-            n_ples = [ns for ns in bead_neighbors if len(ns) == n_neighbors]
-            for n_ple in n_ples:
-                for ns in bead_neighbors:
-                    before = len(ns)
-                    ns[:] = [a for a in ns if a not in n_ples]
-                    changed |= (len(ns) != before)
-    
+        singles = [ns[0] for ns in bead_neighbors if len(ns) == 1]
+        for ns in bead_neighbors:
+            if len(ns) == 1:
+                continue
+            before = len(ns)
+            ns[:] = [a for a in ns if a not in singles]
+            changed |= (len(ns) != before)
+    return bead_neighbors
+
+
+def _filter_doubles(bead_neighbors, total_atoms, are_aromatic, iteration=0):
+    # if a bead can be connected to only two other beads, choose one
+    # starting with aromatic beads, then non-aromatic
+    changed = True
+    while changed:
+        changed = False
+        for i, ns in enumerate(bead_neighbors):
+            if _mapping_is_valid(bead_neighbors, total_atoms):
+                return bead_neighbors
+            if are_aromatic[i]:
+                if len(ns) == 2:
+                    removed = ns.pop(iteration)
+                    bead_neighbors = _filter_singles(bead_neighbors)
+                    changed = True
+    changed = True
+    while changed:
+        changed = False
+        for i, ns in enumerate(bead_neighbors):
+            if _mapping_is_valid(bead_neighbors, total_atoms):
+                return bead_neighbors
+            if len(ns) == 2:
+                removed = ns.pop(iteration)
+                bead_neighbors = _filter_singles(bead_neighbors)
+                changed = True
+    return bead_neighbors
+
+
+def _find_bead_neighbors(trial_comb, atoms, iteration=0):
+    are_aromatic = [atoms[i]["is_aromatic"] for i in trial_comb]
+    bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
+    total_atoms = len(atoms)
+
+    bead_neighbors = _filter_singles(bead_neighbors)
+    if _mapping_is_valid(bead_neighbors, total_atoms):
+        return bead_neighbors
+
+    bead_neighbors = _filter_doubles(bead_neighbors, total_atoms, are_aromatic, iteration)
+    if _mapping_is_valid(bead_neighbors, total_atoms):
+        return bead_neighbors
+
     return bead_neighbors
 
 
@@ -178,17 +225,14 @@ def get_partitioning(trial_comb, graph):
     """Get partitioning of atoms into beads for given trial combination"""
     atoms = graph["atoms"]
     bonds = graph["bonds"]
-    bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
     bead_bonds = [atoms[i]["neighbor_bonds"] for i in trial_comb]
-    print(trial_comb)
-    print(bead_neighbors)
-    filtered_bead_neighbors = _filter_bead_neighbors(bead_neighbors)
-    print(filtered_bead_neighbors)
-    exit()
+    # print(trial_comb)
+    bead_neighbors = _find_bead_neighbors(trial_comb, atoms)
+    # print(bead_neighbors)
 
-    # Sanity check you described:
+    # Sanity check:
     # total atoms in neighbor lists (counting repeats) + len(trial_comb) should match total atoms.
-    neighbor_atoms = [int(a) for neigh in filtered_bead_neighbors for a in neigh]
+    neighbor_atoms = [int(a) for neigh in bead_neighbors for a in neigh]
     mapped_atoms = [int(a) for a in trial_comb] + neighbor_atoms
 
     total_atoms = len(atoms)
@@ -204,10 +248,9 @@ def get_partitioning(trial_comb, graph):
     if len(set(mapped_atoms)) != total_atoms:
         raise ValueError("Bad mapping: duplicate atom assignment in neighbors/trial")
 
-
     mapping_dict = {idx: [int(atom)] for idx, atom in enumerate(trial_comb)}
     for key, item in mapping_dict.items():
-        for neighbor in filtered_bead_neighbors[key]:
+        for neighbor in bead_neighbors[key]:
             if neighbor not in trial_comb:
                 mapping_dict[key].append(neighbor)
     partitioning = invert_mapping_dictionary(mapping_dict)
@@ -232,7 +275,8 @@ def invert_mapping_dictionary(mapping_dict):
             if atom_idx in atom_partitioning:
                 raise ValueError(f"Atom {atom_idx} appears in multiple beads")
             atom_partitioning[atom_idx] = bead_idx
-    return atom_partitioning
+    # Ensure deterministic ascending key iteration order (Python dict preserves insertion order).
+    return dict(sorted(atom_partitioning.items()))
 
 
 class Cg_molecule:
@@ -340,9 +384,11 @@ class Cg_molecule:
 
             cg_beads = filtered_cg_beads[attempt]
 
-            if len(cg_beads) != 5:
-                attempt += 1
-                continue
+            # if len(cg_beads) != 5:
+            #     attempt += 1
+            #     continue
+            # partitioning = get_partitioning(cg_beads, self.graph)
+            # exit()
 
             try:
                 partitioning = get_partitioning(cg_beads, self.graph)
@@ -814,6 +860,8 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
 
                     if hbead is not None: # found hydrogen atom connected to 
                         aa_partitioning[hydrogen]=hbead
+
+    partitioning = in_partitioning.copy()
 
     #compute COG while taking into account hydrogens
     bead_coord={}
