@@ -47,10 +47,11 @@ class Cg_molecule:
     def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
         bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
         min_beads=None, max_beads=None, raw_molecule=None):
-        # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
+        
         # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
 
         # Store all arguments as instance attributes
+        # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
         self.molecule = molecule
         self.smiles = mol_smi
         self.molname = molname
@@ -65,23 +66,33 @@ class Cg_molecule:
         self.raw_molecule = raw_molecule
         
         # Initialize state attributes
-        self.heavy_atom_coords = None
+        self.list_ha = None
+        self.list_ha_names = None
+        self.conf = None
+        self.ha_coords = None
         self.atom_coords = None
-        self.list_heavyatom_names = None
+        self.ring_atoms = None
+        self.ring_atoms_flat = None
+        self.is_arom = None
+        self.num_arom = None
+        self.hbond_a = None
+        self.hbond_d = None
+        self.list_bonds = None
         self.partitioning = None
         self.cg_bead_names = []
         self.cg_bead_coords = []
         self.topout = None
         self.bartender_out = None
-        self.graph = None
+        self.ga_graph = None
+        self.aa_graph = None
         self.topology = None  # Will be populated after successful mapping
         self.force_map = False
 
-        # INITIALIZE THE AA MOLECULE
-        self.graph = self.get_ha_graph()
-
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", self.molname, self.forcepred, self.simple_model)
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
+
+        # INITIALIZE THE AA MOLECULE
+        self.ha_graph = self.get_ha_graph()  # Heavy atom graph for partitioning
 
         ## AutoM3 : MINIMIZATION with RDkit ###
         self.molecule = Chem.Mol(self.molecule)
@@ -90,28 +101,30 @@ class Cg_molecule:
         AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
         AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
 
+        # Extract features and build all-atom graph structure
         self.feats = self.extract_features(self.molecule)
-
-        # Get list of heavy atoms and their coordinates
-        self.list_ha, self.list_heavyatom_names = topology.get_atoms(self.molecule)
-        self.conf, self.heavy_atom_coords, self.atom_coords = topology.get_ha_coords(self.molecule)
+        self.aa_graph = self.build_aa_graph(self.molecule, self.feats)
+        
+        # Populate attributes from aa_graph
+        self.list_ha = self.aa_graph["list_ha"]
+        self.list_ha_names = self.aa_graph["list_ha_names"]
+        self.conf = self.aa_graph["conf"]
+        self.ha_coords = self.aa_graph["ha_coords"]
+        self.atom_coords = self.aa_graph["atom_coords"]
+        self.ring_atoms = self.aa_graph["ring_atoms"]
+        self.ring_atoms_flat = self.aa_graph["ring_atoms_flat"]
+        self.is_arom = self.aa_graph["is_aromatic"]
+        self.num_arom = self.aa_graph["num_aromatic"]
+        self.hbond_a = self.aa_graph["hbond_a"]
+        self.hbond_d = self.aa_graph["hbond_d"]
+        self.list_bonds = self.aa_graph["bonds"]
+        
         self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
         logger.info("Detected %d heavy atoms", len(self.list_ha))
-
-        # Identify ring-type atoms
-        self.ring_atoms = topology.get_ring_atoms(self.molecule)
-        self.is_arom, self.num_arom = topology.is_aromatic(self.molecule) # AutoM3
-        logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", len(list(chain.from_iterable(self.ring_atoms))), self.is_arom, self.num_arom)
-
-        # Get Hbond information
-        self.hbond_a = topology.get_hbond_a(self.feats)
-        self.hbond_d = topology.get_hbond_d(self.feats)
-
-        # List of bonds between heavy atoms
-        self.list_bonds = self.get_ha_bonds(self.molecule, self.list_ha)
-
-        # Flatten list of ring atoms
-        self.ring_atoms_flat = list(chain.from_iterable(self.ring_atoms))
+        logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", 
+                    len(self.ring_atoms_flat), 
+                    self.is_arom, 
+                    self.num_arom)
 
         # Actual mapping process
         self.process()
@@ -122,9 +135,9 @@ class Cg_molecule:
         list_cg_beads = optimization.find_bead_pos(
             self.molecule,
             self.conf,
-            self.graph,
+            self.ha_graph,
             self.list_ha,
-            self.heavy_atom_coords,
+            self.ha_coords,
             self.atom_coords,
             self.ring_atoms,
             self.ring_atoms_flat,
@@ -165,8 +178,9 @@ class Cg_molecule:
             # partitioning = get_partitioning(cg_beads, self.graph)
             # exit()
 
+            logger.info("Trying to partition the atoms between beads")
             try:
-                partitioning = self.get_partitioning(cg_beads, self.graph)
+                partitioning = self.get_partitioning(cg_beads, self.ha_graph)
             except Exception:
                 continue
 
@@ -235,6 +249,97 @@ class Cg_molecule:
         logger.debug("Entering extract_features()")
         features = Cg_molecule._factory.GetFeaturesForMol(molecule)
         return features
+
+    @staticmethod
+    def build_aa_graph(molecule, features):
+        """Build all-atom graph data structure with heavy atoms, coords, rings, H-bonds, etc."""
+        logger.debug("Entering build_aa_graph()")
+        
+        # Get list of heavy atoms and their names
+        conformer = molecule.GetConformer()
+        num_atoms = conformer.GetNumAtoms()
+        list_ha = []
+        list_ha_names = []
+        atoms = range(num_atoms)
+        for i in np.nditer(atoms):
+            atom_name = molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
+            if atom_name != "H":
+                list_ha.append(atoms[i])
+                list_ha_names.append(f"{atom_name}{i+1}")
+        if len(list_ha) == 0:
+            print("Error. No heavy atom found.")
+            exit(1)
+        
+        # Get coordinates - heavy atoms and all atoms
+        ha_coords = []
+        atom_coords = []
+        for i in range(num_atoms):
+            coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
+            if molecule.GetAtomWithIdx(i).GetSymbol() != "H":
+                ha_coords.append(coord)
+                atom_coords.append(coord)
+            else:
+                atom_coords.append(coord)
+        
+        # Get ring atoms (systems of joined rings)
+        rings = molecule.GetRingInfo().AtomRings()
+        ring_systems = []
+        for ring in rings:
+            ring_atoms = set(ring)
+            new_systems = []
+            for system in ring_systems:
+                shared = len(ring_atoms.intersection(system))
+                if shared:
+                    ring_atoms = ring_atoms.union(system)
+                else:
+                    new_systems.append(system)
+            new_systems.append(ring_atoms)
+            ring_systems = new_systems
+        ring_atoms = [list(ring) for ring in ring_systems]
+        ring_atoms_flat = list(chain.from_iterable(ring_atoms))
+        
+        # Check if molecule is aromatic
+        aromatic_atoms = [atom.GetIsAromatic() for atom in molecule.GetAtoms()]
+        num_aromatic = sum(aromatic_atoms)
+        is_aromatic = num_aromatic > 0
+        
+        # Get H-bond acceptors
+        hbond_a = []
+        for feat in features:
+            if feat.GetFamily() == "Acceptor":
+                for i in feat.GetAtomIds():
+                    if i not in hbond_a:
+                        hbond_a.append(i)
+        
+        # Get H-bond donors
+        hbond_d = []
+        for feat in features:
+            if feat.GetFamily() == "Donor":
+                for i in feat.GetAtomIds():
+                    if i not in hbond_d:
+                        hbond_d.append(i)
+        
+        # Get bonds between heavy atoms
+        bonds = []
+        for i in range(len(list_ha)):
+            for j in range(i + 1, len(list_ha)):
+                if molecule.GetBondBetweenAtoms(int(list_ha[i]), int(list_ha[j])) is not None:
+                    bonds.append([list_ha[i], list_ha[j]])
+        
+        return {
+            "list_ha": list_ha,
+            "list_ha_names": list_ha_names,
+            "conf": conformer,
+            "ha_coords": ha_coords,
+            "atom_coords": atom_coords,
+            "ring_atoms": ring_atoms,
+            "ring_atoms_flat": ring_atoms_flat,
+            "is_aromatic": is_aromatic,
+            "num_aromatic": num_aromatic,
+            "hbond_a": hbond_a,
+            "hbond_d": hbond_d,
+            "bonds": bonds,
+        }
 
     @staticmethod
     def get_coords(conformer, sites, avg_pos, ringatoms_flat):
@@ -310,10 +415,13 @@ class Cg_molecule:
     def get_ha_graph(self):
         """Get graph representation of molecule based on heavy atoms only"""
         # --- Graph representation of the molecule ---
-        if not self.raw_molecule:
-            if not self.smiles:
-                raise ValueError("Either mol or smiles must be provided")
+        if self.raw_molecule:
+            mol = self.raw_molecule
+        elif self.smiles:
             mol = Chem.MolFromSmiles(self.smiles)
+        else:
+            raise ValueError("Either mol or smiles must be provided")
+        
         # --- Node list (atoms) ---
         nodes = []
         for a in mol.GetAtoms():
@@ -630,7 +738,7 @@ class Cg_molecule:
 
     def output_aa(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
-        aa_out = output.output_gro(self.heavy_atom_coords, self.list_heavyatom_names, self.molname)
+        aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
         if aa_output:
             with open(aa_output, "w") as fp:
                 fp.write(aa_out)
@@ -651,18 +759,18 @@ class Cg_molecule:
 # OLD STUFF
 #################
 
-def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule, in_partitioning): #AutoM3 change
+def voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, molecule, in_partitioning): #AutoM3 change
     """Partition all atoms between CG beads"""
     logger.debug("Entering voronoi_atoms_old()")
 
     # Initial Partitioning based on closest bead to each heavy atom
     partitioning = {}
-    for j in range(len(heavyatom_coords)):
+    for j in range(len(ha_coords)):
         # Voronoi to check whether atom is closest to bead
         bead_at = -1
         dist_bead_at = 1000
         for k in range(len(cgbead_coords)):
-            distk = np.linalg.norm(cgbead_coords[k] - heavyatom_coords[j])
+            distk = np.linalg.norm(cgbead_coords[k] - ha_coords[j])
             if distk < dist_bead_at:
                 dist_bead_at = distk
                 bead_at = k
@@ -674,8 +782,8 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
         for i in range(len(cgbead_coords)):
             closest_atom = -1
             closest_dist = 10000.0
-            for j in range(len(heavyatom_coords)):
-                dist_bead_at = np.linalg.norm(cgbead_coords[i] - heavyatom_coords[j])
+            for j in range(len(ha_coords)):
+                dist_bead_at = np.linalg.norm(cgbead_coords[i] - ha_coords[j])
                 if dist_bead_at < closest_dist:
                     closest_dist = dist_bead_at
                     closest_atom = j
@@ -692,10 +800,10 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
                 # Voronoi to find closest atom
                 closest_bead = -1
                 closest_bead_dist = 10000.0
-                for j in range(len(heavyatom_coords)):
+                for j in range(len(ha_coords)):
                     if partitioning[j] != lonely_bead:
                         dist_bead_at = np.linalg.norm(
-                            cgbead_coords[lonely_bead] - heavyatom_coords[j]
+                            cgbead_coords[lonely_bead] - ha_coords[j]
                         )
                         # Only consider if it's closer, not a CG bead itself, and
                         # the CG bead it belongs to has more than one other atom.
@@ -757,7 +865,7 @@ def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
     return partitioning, bead_cog
 
 
-def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule, in_partitioning): # AutoM3
+def voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, molecule, in_partitioning): # AutoM3
     """
     Partition all atoms between CG beads, based on headliners coordinates and distances between other atoms coordinates. 
     Headliners are atoms with cgbead_coords coordinates.
@@ -766,10 +874,10 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
     partitioning = {}
 
     #Populate partitioning with atoms and atom headliners of beads
-    for j in range(len(heavyatom_coords)):
+    for j in range(len(ha_coords)):
         partitioning[j] = None
         for b in range(len(cgbead_coords)):
-            if(heavyatom_coords[j]==cgbead_coords[b]).all():
+            if(ha_coords[j]==cgbead_coords[b]).all():
                 partitioning[j] = b
 
     # Find closest atoms to atom headliners of beads
@@ -777,9 +885,9 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
         closest_atoms = {}  # Book-keeping of closest atoms to every bead
         for i in range(len(cgbead_coords)):
             distances = {}
-            for j in range(len(heavyatom_coords)):
-                if (cgbead_coords[i] != heavyatom_coords[j]).all():
-                    dist_bead_at = np.linalg.norm(cgbead_coords[i] - heavyatom_coords[j])
+            for j in range(len(ha_coords)):
+                if (cgbead_coords[i] != ha_coords[j]).all():
+                    dist_bead_at = np.linalg.norm(cgbead_coords[i] - ha_coords[j])
                     distances[j] = dist_bead_at  # Atom index as key, distance as value
 
             # Sort distances by value and keep the closest atoms
@@ -811,10 +919,10 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
                 # Voronoi to find closest atom
                 closest_bead = -1
                 closest_bead_dist = 10000.0
-                for j in range(len(heavyatom_coords)):
+                for j in range(len(ha_coords)):
                     if partitioning[j] != lonely_bead:
                         dist_bead_at = np.linalg.norm(
-                            cgbead_coords[lonely_bead] - heavyatom_coords[j]
+                            cgbead_coords[lonely_bead] - ha_coords[j]
                         )
                         # Only consider if it's closer, not a CG bead itself, and
                         # the CG bead it belongs to has more than one other atom. 
@@ -830,7 +938,7 @@ def voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, molecule,
                     exit(1)
                 partitioning[closest_bead] = lonely_bead
     else:
-        for j in range(len(heavyatom_coords)):
+        for j in range(len(ha_coords)):
             partitioning[j] = 0 #len(cgbead_coords)
 
     # find all bonds between atoms in molecule
@@ -895,7 +1003,7 @@ def sanitize_rings(partitioning, atoms_xyz, ringatoms):
     return partitioning
 
 
-def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, 
+def all_atoms_in_beads_connected(trial_comb, ha_coords, 
     list_ha, bondlist, mol, allatom_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
     """Make sure all atoms within one CG bead are connected to at least
     one other atom in that bead"""
@@ -903,14 +1011,14 @@ def all_atoms_in_beads_connected(trial_comb, heavyatom_coords,
     cgbead_coords = []
 
     for i in range(len(trial_comb)):
-        cgbead_coords.append(heavyatom_coords[list_ha.index(trial_comb[i])])
+        cgbead_coords.append(ha_coords[list_ha.index(trial_comb[i])])
     
     _, num_arom = topology.is_aromatic(mol) #AutoM3 change
     ### AutoM3 change of mapping approach to differenciate molecules with 0-1 and more cycles
     if not force_map and num_arom < 7: #AutoM3 change
-        voronoi, _  = voronoi_atoms_new(cgbead_coords, heavyatom_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+        voronoi, _  = voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
     else:
-        voronoi, _  = voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+        voronoi, _  = voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
     logger.debug("voronoi %s" % voronoi)
 
     for i in range(len(trial_comb)):
