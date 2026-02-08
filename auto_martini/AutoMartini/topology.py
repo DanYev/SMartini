@@ -372,110 +372,99 @@ def get_standard_mass(bead_type): # AutoM3
 
 
 
-def print_virtualsites(ringatoms, cg_bead_coords, partitionning, mol): ### AutoM3 ###
+def build_virtual_sites_data(ringatoms, cg_bead_coords, partitioning, molecule):
     """
-    Introduced in AutoM3.
-    Prints CG virtual sites in itp format.
+    Build virtual sites data structure (decoupled from formatting).
+    Returns: (virtual_sites_dict, rigid_dihedrals_list)
     """
-    logger.debug("Entering print_virtualsites()")
+    logger.debug("Entering build_virtual_sites_data()")
 
-    text = ""
-
-    #Get number of bonds for each atom
-    atom_bond_counts = {atom.GetIdx(): 0 for atom in mol.GetAtoms()}
+    # Get number of bonds for each atom
+    atom_bond_counts = {atom.GetIdx(): 0 for atom in molecule.GetAtoms()}
     
-    for bond in mol.GetBonds():
+    for bond in molecule.GetBonds():
         begin_atom_idx = bond.GetBeginAtomIdx()
         end_atom_idx = bond.GetEndAtomIdx()
         
-        if (mol.GetAtomWithIdx(begin_atom_idx).GetSymbol() != "H" and mol.GetAtomWithIdx(end_atom_idx).GetSymbol() != "H") and (partitionning[begin_atom_idx]!=partitionning[end_atom_idx]): # Check if not hydrogen and not in the same bead
+        if (molecule.GetAtomWithIdx(begin_atom_idx).GetSymbol() != "H" and 
+            molecule.GetAtomWithIdx(end_atom_idx).GetSymbol() != "H") and \
+           (partitioning[begin_atom_idx] != partitioning[end_atom_idx]):
             if begin_atom_idx not in atom_bond_counts:
                 atom_bond_counts[begin_atom_idx] = 1
-            else : atom_bond_counts[begin_atom_idx] += 1
+            else:
+                atom_bond_counts[begin_atom_idx] += 1
             
             if end_atom_idx not in atom_bond_counts:
                 atom_bond_counts[end_atom_idx] = 1
-            else: atom_bond_counts[end_atom_idx] += 1
+            else:
+                atom_bond_counts[end_atom_idx] += 1
     
     bead_bond_counts = {}
-    for a, b in partitionning.items():
+    for a, b in partitioning.items():
         if b not in bead_bond_counts: 
             bead_bond_counts[b] = 0
         for at, cpt in atom_bond_counts.items():
             if at == a: 
                 bead_bond_counts[b] += cpt
 
-    ring_atoms=[]
-    virtual_sites={}
-    for ra in ringatoms: ring_atoms+=ra
+    ring_atoms = []
+    virtual_sites = {}
+    for ra in ringatoms:
+        ring_atoms += ra
 
-    #Find beads constructing rings
-    bead_in_ring_coords={}
-    vs_bead_coords=[]
-
-    for atom,bead in partitionning.items():
+    # Find beads constructing rings
+    bead_in_ring_coords = {}
+    for atom, bead in partitioning.items():
         if atom in ring_atoms and bead not in bead_in_ring_coords:
-            bead_in_ring_coords[bead]=cg_bead_coords[bead]
+            bead_in_ring_coords[bead] = cg_bead_coords[bead]
     
-    #Count distances between each pair of beads
+    # Count distances between each pair of beads
     distances = {}
     for bead, coord in bead_in_ring_coords.items():
-        distances[bead]={}
+        distances[bead] = {}
         for other_bead, other_coord in bead_in_ring_coords.items():
             if bead != other_bead:
                 distance = np.linalg.norm(coord - other_coord) 
-                distances[bead][other_bead]=distance
+                distances[bead][other_bead] = distance
     
-    def find_more_vs(num_vs,bead_bond_counts_sorted,cg_bead_coords,distances):
-        vs_bead_coords=[]
-        virtual_sites={}
-        vs_list=[]
+    def find_more_vs(num_vs, bead_bond_counts_sorted, cg_bead_coords, distances):
+        virtual_sites = {}
+        vs_list = []
         for i in range(num_vs):
-            vs_bead=int(list(bead_bond_counts_sorted.keys())[i])
+            vs_bead = int(list(bead_bond_counts_sorted.keys())[i])
             vs_list.append(vs_bead)
-
-            #if vs_bead not in virtual_sites: virtual_sites[vs_bead]=[]
-
-            for j in range(len(cg_bead_coords)):
-                if j==vs_bead: vs_bead_coords.append(cg_bead_coords[i])
         
         for vs in vs_list:
-            constructing_beads_dist=dict(sorted(distances[vs].items(), key=lambda item: item[1]))
-            constructing_beads=[bead for bead in constructing_beads_dist.keys()]
+            constructing_beads_dist = dict(sorted(distances[vs].items(), key=lambda item: item[1]))
+            constructing_beads = [bead for bead in constructing_beads_dist.keys()]
             for bead in constructing_beads:
-                if bead in vs_list: constructing_beads.remove(bead)
+                if bead in vs_list:
+                    constructing_beads.remove(bead)
             
             if vs not in virtual_sites.keys():
-                virtual_sites[vs]=constructing_beads[:4]
+                virtual_sites[vs] = constructing_beads[:4]
         return virtual_sites
 
-    
-    #Find number of fused cycles = number of needed virtual sites    
+    # Find number of fused cycles = number of needed virtual sites    
     bead_bond_counts_sorted = dict(sorted(bead_bond_counts.items(), key=lambda item: item[1], reverse=True))
-    cpt_ringatoms=len(sum(ringatoms,[]))
+    cpt_ringatoms = len(sum(ringatoms, []))
 
     for r_nb in range(len(ringatoms)):
-        if cpt_ringatoms>6 and cpt_ringatoms<19 : 
-            virtual_sites=find_more_vs(1,bead_bond_counts_sorted,cg_bead_coords,distances)
+        if cpt_ringatoms > 6 and cpt_ringatoms < 19: 
+            virtual_sites = find_more_vs(1, bead_bond_counts_sorted, cg_bead_coords, distances)
 
-        if cpt_ringatoms>18: # more than 4 fused cycles
-            virtual_sites=find_more_vs(3,bead_bond_counts_sorted,cg_bead_coords,distances)
+        if cpt_ringatoms > 18:  # more than 4 fused cycles
+            virtual_sites = find_more_vs(3, bead_bond_counts_sorted, cg_bead_coords, distances)
 
-    text = text + "\n[virtual_sitesn]\n"
-    text = text + "; site funct  constructing atom indices"
-    rigid_dihedral = []
+    # Calculate rigid dihedrals for 4-atom virtual sites
+    rigid_dihedrals = []
     for vs, cb in virtual_sites.items():
-        if len(cb)==4:
-            text = (text + "\n   {:d}       1     {:d} {:d} {:d} {:d}".format(
-                                    vs+1, cb[0] + 1, cb[1] + 1, cb[2] + 1, cb[3] + 1
-                                )
-                            )
-            
+        if len(cb) == 4:
             # Find dihedral from constructing beads
-            i=cb[0]
-            j=cb[1]
-            k=cb[2]
-            l=cb[3]
+            i = cb[0]
+            j = cb[1]
+            k = cb[2]
+            l = cb[3]
             r1 = cg_bead_coords[j] - cg_bead_coords[i]
             r2 = cg_bead_coords[k] - cg_bead_coords[j]
             r3 = cg_bead_coords[l] - cg_bead_coords[k]
@@ -485,22 +474,39 @@ def print_virtualsites(ringatoms, cg_bead_coords, partitionning, mol): ### AutoM
             cosphi = np.dot(p1, p2)
             sinphi = np.dot(r2, np.cross(p1, p2))
             angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-            force=100
-            new_dih="  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}".format(cb[0]+1,cb[1]+1,cb[2]+1,cb[3]+1, round(angle,2), force)
-            rigid_dihedral.append(new_dih)
-
-        if len(cb)==3:
-            text = (text + "\n   {:d}       1     {:d} {:d} {:d}".format(
-                                    vs+1, cb[0] + 1, cb[1] + 1, cb[2] + 1
-                                )
-                            )
-        if len(cb)==2:
-            text = (text + "\n   {:d}       1     {:d} {:d}".format(
-                                    vs+1, cb[0] + 1, cb[1] + 1
-                                )
-                            )
+            force = 100
+            rigid_dihedrals.append({
+                'atoms': [cb[0], cb[1], cb[2], cb[3]],
+                'angle': round(angle, 2),
+                'force': force
+            })
         
-    return text, virtual_sites, rigid_dihedral
+    return virtual_sites, rigid_dihedrals
+
+
+def format_virtual_sites(virtual_sites):
+    """Format virtual sites data for .itp output."""
+    if not virtual_sites:
+        return ""
+    
+    text = "\n[virtual_sitesn]\n"
+    text += "; site funct  constructing atom indices"
+    
+    for vs, cb in virtual_sites.items():
+        if len(cb) == 4:
+            text += "\n   {:d}       1     {:d} {:d} {:d} {:d}".format(
+                vs+1, cb[0]+1, cb[1]+1, cb[2]+1, cb[3]+1
+            )
+        elif len(cb) == 3:
+            text += "\n   {:d}       1     {:d} {:d} {:d}".format(
+                vs+1, cb[0]+1, cb[1]+1, cb[2]+1
+            )
+        elif len(cb) == 2:
+            text += "\n   {:d}       1     {:d} {:d}".format(
+                vs+1, cb[0]+1, cb[1]+1
+            )
+    
+    return text
 
 
 def topout(header_write, atoms_write, bonds_write, angles_write):
