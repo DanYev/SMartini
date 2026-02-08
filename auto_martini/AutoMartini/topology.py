@@ -1122,7 +1122,7 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
 # NEW: Topology Building Functions (decoupled data from formatting)
 # ==============================================================================
 
-def build_topology(molname, mol_smi, forcepred, cgbeads, cgbeads_ring, molecule, hbonda, hbondd, 
+def build_topology(cgbeads, molname, mol_smi, forcepred, cgbeads_ring, molecule, hbonda, hbondd, 
                     partitioning, cgbead_coords, ringatoms, ringatoms_flat, logp_file, beadtypes=None, trial=False, simple_model=False):
     """
     Build complete Topology object with all CG data.
@@ -1155,7 +1155,7 @@ def build_topology(molname, mol_smi, forcepred, cgbeads, cgbeads_ring, molecule,
     
     # Build atoms
     atomnames, computed_beadtypes, atoms_data, atoms_in_smi_dict = build_atoms_data(
-        molname, forcepred, cgbeads, molecule, hbonda, hbondd,
+        cgbeads, molname, forcepred,  molecule, hbonda, hbondd,
         partitioning, ringatoms, ringatoms_flat, logp_file, trial
     )
     topo.atomnames = atomnames
@@ -1186,7 +1186,7 @@ def build_topology(molname, mol_smi, forcepred, cgbeads, cgbeads_ring, molecule,
     return topo
 
 
-def build_atoms_data(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partitioning, 
+def build_atoms_data(cgbeads, molname, forcepred, molecule, hbonda, hbondd, partitioning, 
                       ringatoms, ringatoms_flat, logp_file, trial=False):
     """Build atoms data structure (decoupled from formatting)."""
     logger.debug("Entering build_atoms_data()")
