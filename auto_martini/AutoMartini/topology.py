@@ -118,10 +118,8 @@ class Topology:
 
                 bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
                 atom_name = ""
-                name_index = 0
-                while atom_name in self.atomnames or name_index == 0:
-                    name_index += 1
-                    atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
+                name_index = bead + 1
+                atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
                 self.atomnames.append(atom_name)
                 
                 mass = get_standard_mass(bead_type)
@@ -486,8 +484,10 @@ class Topology:
         def find_more_vs(num_vs, bead_bond_counts_sorted, cg_bead_coords, distances):
             virtual_sites = {}
             vs_list = []
-            for i in range(num_vs):
-                vs_bead = int(list(bead_bond_counts_sorted.keys())[i])
+            # Only select beads that are in rings (i.e., in distances dict)
+            ring_beads = [bead for bead in bead_bond_counts_sorted.keys() if bead in distances]
+            for i in range(min(num_vs, len(ring_beads))):
+                vs_bead = int(ring_beads[i])
                 vs_list.append(vs_bead)
             
             for vs in vs_list:
@@ -1343,7 +1343,7 @@ def run_bartender(header_write, atoms_write, bonds_write, angles_write, dihedral
         tuple: (topout_text, bartender_out or None)
     """
     # Build topology output
-    _, bartender_input_info = topout_noVS(
+    topout_text, bartender_input_info = topout_noVS(
         header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
         bead_coords, ring_atoms, cg_beads, write_exclusions
     )
@@ -1353,7 +1353,7 @@ def run_bartender(header_write, atoms_write, bonds_write, angles_write, dihedral
     if bartender:
         bartender_out = bartender_input(molecule, molname, atoms_in_smi_dict, bartender_input_info)
     
-    return bartender_out
+    return topout_text, bartender_out
 
 
 def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###

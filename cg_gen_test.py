@@ -24,9 +24,9 @@ if __name__ == "__main__":
     # smiles = "Cc1cc[nH]c1" # Toluene
     # smiles = "C1=NC2=NC=NC(=C2N1)N" # Adenine
     # smiles = "N=Cc1ccccc1" # Benzylimine
-    smiles = "CC(=O)OC1=CC=CC=C1C(=O)O" # Aspirin
+    # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O" # Aspirin
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"  
-    # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
+    smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
     mol_am, _ = am.topology.gen_molecule_smi(smiles)
     raw_molecule = None
 

@@ -740,7 +740,8 @@ class Cg_molecule:
         virtual_sites_write = self.topology.format_virtual_sites()
 
         # Build topology output and bartender input
-        self.bartender_out = run_bartender(
+        # run_bartender generates complete topology including exclusions and position_restraints
+        self.topout, self.bartender_out = run_bartender(
             header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
             self.cg_bead_coords, self.ring_atoms, cg_beads,
             self.molecule, self.molname, self.topology.atoms_in_smi_dict,
