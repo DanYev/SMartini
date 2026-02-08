@@ -127,6 +127,7 @@ def get_graph(mol=None, smiles=None):
             "atomic_num": a.GetAtomicNum(),       # 6 for C, 7 for N
             "formal_charge": a.GetFormalCharge(),
             "is_aromatic": a.GetIsAromatic(),
+            "is_in_ring": a.IsInRing(),
             "degree": a.GetDegree(),              # total neighbors (includes H only if explicit)
             "heavy_degree": len(heavy_neighbors),
             "neighbors": neighbor_ids,             # heavy-atom neighbors only
@@ -156,69 +157,77 @@ def get_graph(mol=None, smiles=None):
     return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
 
 
-def _mapping_is_valid(bead_neighbors, total_atoms):
-    n_neighbors = sum([len(ns) for ns in bead_neighbors])
-    n_atoms = n_neighbors + len(bead_neighbors)
-    return n_atoms == total_atoms
+def _single_atom_in_mapping(mapping):
+    for ns in mapping:
+        if len(ns) == 1:
+            return True
+    return False
 
 
-def _filter_singles(bead_neighbors):
-    # if a bead can be connected to only one other bead
-    # remove it from all other neighbor lists
-    changed = True
-    while changed:
-        changed = False
-        singles = [ns[0] for ns in bead_neighbors if len(ns) == 1]
-        for ns in bead_neighbors:
-            if len(ns) == 1:
-                continue
-            before = len(ns)
-            ns[:] = [a for a in ns if a not in singles]
-            changed |= (len(ns) != before)
-    return bead_neighbors
+def _atom_count(atom, bead_neighbors):
+    count = 0
+    for ns in bead_neighbors:
+        if atom in ns:
+            count += 1
+    return count 
 
 
-def _filter_doubles(bead_neighbors, total_atoms, are_aromatic, iteration=0):
-    # if a bead can be connected to only two other beads, choose one
-    # starting with aromatic beads, then non-aromatic
-    changed = True
-    while changed:
-        changed = False
-        for i, ns in enumerate(bead_neighbors):
-            if _mapping_is_valid(bead_neighbors, total_atoms):
-                return bead_neighbors
-            if are_aromatic[i]:
-                if len(ns) == 2:
-                    removed = ns.pop(iteration)
-                    bead_neighbors = _filter_singles(bead_neighbors)
-                    changed = True
-    changed = True
-    while changed:
-        changed = False
-        for i, ns in enumerate(bead_neighbors):
-            if _mapping_is_valid(bead_neighbors, total_atoms):
-                return bead_neighbors
-            if len(ns) == 2:
-                removed = ns.pop(iteration)
-                bead_neighbors = _filter_singles(bead_neighbors)
-                changed = True
-    return bead_neighbors
+def _ring_beads_are_good(mapping, is_in_ring):
+    for ns, ring in zip(mapping, is_in_ring):
+        if ring and len(ns) > 2:
+            return False
+    return True
 
 
-def _find_bead_neighbors(trial_comb, atoms, iteration=0):
-    are_aromatic = [atoms[i]["is_aromatic"] for i in trial_comb]
+def distribute_neighbors(trial_comb, atoms):
+    """Find acceptable mappings of atoms to beads for given trial combination"""
     bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
-    total_atoms = len(atoms)
+    is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
+    n_atoms = len(atoms)
+    atom_ids = set(range(n_atoms))
+    nei_ids = atom_ids - set(trial_comb)
+    mapping = [[int(i)] for i in trial_comb]
+    mappings = [mapping]
+    print(trial_comb)
+    print(bead_neighbors)
+    print(nei_ids)
 
-    bead_neighbors = _filter_singles(bead_neighbors)
-    if _mapping_is_valid(bead_neighbors, total_atoms):
-        return bead_neighbors
+    # Distribute neighbors of trial combination atoms to beads, 
+    # and keep track of all possible mappings
+    for nei_idx in nei_ids:
+        updated_mappings = []
+        for mapping in mappings:
+            for idx, bead in enumerate(mapping):
+                if not nei_idx in bead_neighbors[idx]:
+                    continue
+                tmp_mapping = [x.copy() for x in mapping]
+                tmp_mapping[idx].append(nei_idx)
+                updated_mappings.append(tmp_mapping)
+        mappings = updated_mappings
 
-    bead_neighbors = _filter_doubles(bead_neighbors, total_atoms, are_aromatic, iteration)
-    if _mapping_is_valid(bead_neighbors, total_atoms):
-        return bead_neighbors
+    # Filter out mappings with single atoms in beads
+    tmp_list = []
+    for mapping in mappings:
+        if _single_atom_in_mapping(mapping):
+            continue
+        tmp_list.append(mapping)
+    mappings = tmp_list
+    
+    # At this point we probably have multiple mappings with different 
+    # numbers of atoms in beads with most of them being equally valid
+    # Try keeping ring beads small and close together
+    tmp_list = []
+    for mapping in mappings:
+        if not _ring_beads_are_good(mapping, is_in_ring):
+            continue
+        tmp_list.append(mapping)
+    mappings = tmp_list
 
-    return bead_neighbors
+    for mapping in mappings:   
+        print(mapping)    
+
+    exit()
+    return mappings
 
 
 def get_partitioning(trial_comb, graph): 
@@ -226,27 +235,9 @@ def get_partitioning(trial_comb, graph):
     atoms = graph["atoms"]
     bonds = graph["bonds"]
     bead_bonds = [atoms[i]["neighbor_bonds"] for i in trial_comb]
-    # print(trial_comb)
-    bead_neighbors = _find_bead_neighbors(trial_comb, atoms)
-    # print(bead_neighbors)
-
-    # Sanity check:
-    # total atoms in neighbor lists (counting repeats) + len(trial_comb) should match total atoms.
-    neighbor_atoms = [int(a) for neigh in bead_neighbors for a in neigh]
-    mapped_atoms = [int(a) for a in trial_comb] + neighbor_atoms
-
-    total_atoms = len(atoms)
-    if len(mapped_atoms) != total_atoms:
-        covered = set(mapped_atoms)
-        missing = sorted({a["idx"] for a in atoms} - covered)
-        raise ValueError(
-            f"Bad mapping size (mapped={len(mapped_atoms)}, total={total_atoms}); missing={missing}"
-        )
-
-    # If repeats exist, you can still accidentally hit the right total length while missing others.
-    # This guarantees there are no duplicates and nothing missing.
-    if len(set(mapped_atoms)) != total_atoms:
-        raise ValueError("Bad mapping: duplicate atom assignment in neighbors/trial")
+    bead_neighbors = distribute_neighbors(trial_comb, atoms)
+    print(bead_neighbors)
+    exit()
 
     mapping_dict = {idx: [int(atom)] for idx, atom in enumerate(trial_comb)}
     for key, item in mapping_dict.items():
@@ -254,6 +245,7 @@ def get_partitioning(trial_comb, graph):
             if neighbor not in trial_comb:
                 mapping_dict[key].append(neighbor)
     partitioning = invert_mapping_dictionary(mapping_dict)
+
     return partitioning
 
 
@@ -384,11 +376,11 @@ class Cg_molecule:
 
             cg_beads = filtered_cg_beads[attempt]
 
-            # if len(cg_beads) != 5:
-            #     attempt += 1
-            #     continue
-            # partitioning = get_partitioning(cg_beads, self.graph)
-            # exit()
+            if len(cg_beads) != 5:
+                attempt += 1
+                continue
+            partitioning = get_partitioning(cg_beads, self.graph)
+            exit()
 
             try:
                 partitioning = get_partitioning(cg_beads, self.graph)
