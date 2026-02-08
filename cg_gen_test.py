@@ -14,7 +14,7 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "ANP"
+    molname = "TEST"
     n_beads = None
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
@@ -26,13 +26,13 @@ if __name__ == "__main__":
     # smiles = "N=Cc1ccccc1" # Benzylimine
     # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O" # Aspirin
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"  
-    # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
-    # mol_am, _ = am.topology.gen_molecule_smi(smiles)
-    # raw_molecule = None
+    smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
+    mol_am, _ = am.topology.gen_molecule_smi(smiles)
+    raw_molecule = None
 
-    sdf_file = Path("ligands") / f"{molname}.sdf"
-    mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
-    smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
+    # sdf_file = Path("ligands") / f"{molname}.sdf"
+    # mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
+    # smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
     # Save the atomistic RDKit molecule to SDF
     sdf_path = outdir / f"{molname.lower()}_aa.sdf"
