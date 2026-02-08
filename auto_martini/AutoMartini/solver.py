@@ -172,17 +172,28 @@ def _atom_count(atom, bead_neighbors):
     return count 
 
 
-def _ring_beads_are_good(mapping, is_in_ring):
-    for ns, ring in zip(mapping, is_in_ring):
+def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+    for ns, ring in zip(mapping, bead_is_in_ring):
         if ring and len(ns) > 2:
             return False
+    return True
+
+
+def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+    for ns, ring in zip(mapping, bead_is_in_ring):
+        if not ring:
+            continue
+        for atom in ns:
+            if not atom_is_in_ring[atom]:
+                return False
     return True
 
 
 def distribute_neighbors(trial_comb, atoms):
     """Find acceptable mappings of atoms to beads for given trial combination"""
     bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
-    is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
+    bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
+    atom_is_in_ring = [a["is_in_ring"] for a in atoms]
     n_atoms = len(atoms)
     atom_ids = set(range(n_atoms))
     nei_ids = atom_ids - set(trial_comb)
@@ -212,22 +223,45 @@ def distribute_neighbors(trial_comb, atoms):
             continue
         tmp_list.append(mapping)
     mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
     
     # At this point we probably have multiple mappings with different 
     # numbers of atoms in beads with most of them being equally valid
     # Try keeping ring beads small and close together
     tmp_list = []
     for mapping in mappings:
-        if not _ring_beads_are_good(mapping, is_in_ring):
+        if not _ring_beads_are_tiny(mapping, bead_is_in_ring):
             continue
         tmp_list.append(mapping)
-    mappings = tmp_list
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
 
-    for mapping in mappings:   
-        print(mapping)    
+    # If still ambiguous, try keeping ring beads together (not sharing with non-ring atoms)
+    tmp_list = []
+    for mapping in mappings:
+        if not _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+            continue
+        tmp_list.append(mapping)
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
 
-    exit()
-    return mappings
+    # For rings with the odd number of atoms one bead may need to contain 3 atoms, 
+    # select the bead with the highest number of connections
+    # for mapping in mappings:   
+    #     print(mapping)    
+    # exit()
+
+    # If we have only 2 mapping select one of them
+    #TODO OR SYMMETRIZE THEM IN THE FUTURE
+    if len(mappings) == 2:
+        return mappings[0]
+
+    return mappings[0]
 
 
 def get_partitioning(trial_comb, graph): 
@@ -235,17 +269,9 @@ def get_partitioning(trial_comb, graph):
     atoms = graph["atoms"]
     bonds = graph["bonds"]
     bead_bonds = [atoms[i]["neighbor_bonds"] for i in trial_comb]
-    bead_neighbors = distribute_neighbors(trial_comb, atoms)
-    print(bead_neighbors)
-    exit()
-
-    mapping_dict = {idx: [int(atom)] for idx, atom in enumerate(trial_comb)}
-    for key, item in mapping_dict.items():
-        for neighbor in bead_neighbors[key]:
-            if neighbor not in trial_comb:
-                mapping_dict[key].append(neighbor)
+    mapping = distribute_neighbors(trial_comb, atoms)
+    mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
     partitioning = invert_mapping_dictionary(mapping_dict)
-
     return partitioning
 
 
@@ -376,11 +402,11 @@ class Cg_molecule:
 
             cg_beads = filtered_cg_beads[attempt]
 
-            if len(cg_beads) != 5:
-                attempt += 1
-                continue
-            partitioning = get_partitioning(cg_beads, self.graph)
-            exit()
+            # if len(cg_beads) != 11:
+            #     attempt += 1
+            #     continue
+            # partitioning = get_partitioning(cg_beads, self.graph)
+            # exit()
 
             try:
                 partitioning = get_partitioning(cg_beads, self.graph)
