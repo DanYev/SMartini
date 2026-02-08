@@ -27,8 +27,9 @@ If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """ 
 
-from . import output, topology
+from . import output
 from . import optimization as optimization
+from .topology import Topology, read_delta_f_types, smi2alogps, run_bartender
 from .common import *
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,8 @@ class Cg_molecule:
         self.bartender_out = None
         self.ga_graph = None
         self.aa_graph = None
-        self.topology = None  # Will be populated after successful mapping
+        # Initialize topology early so it can be updated throughout
+        self.topology = Topology(molname=self.molname, mol_smi=self.smiles, nrexcl=2)
         self.force_map = False
 
         logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", self.molname, self.forcepred, self.simple_model)
@@ -218,27 +220,31 @@ class Cg_molecule:
                                     ring.append(at)
 
             logger.info("Building Atoms")
-            self.cg_bead_names, bead_types, _, _ = topology.build_atoms_data(
-                    cg_beads,
-                    self.molname,
-                    self.forcepred,
-                    self.molecule,
-                    self.hbond_a,
-                    self.hbond_d,
-                    self.partitioning,
-                    self.ring_atoms,
-                    self.ring_atoms_flat,
-                    self.logp_file, # AutoM3 new argument
-                    True,
+            # Use temporary Topology instance for trial build
+            temp_topo = Topology(molname=self.molname, mol_smi=self.smiles)
+            temp_topo.build_atoms(
+                cgbeads=cg_beads,
+                forcepred=self.forcepred,
+                molecule=self.molecule,
+                hbonda=self.hbond_a,
+                hbondd=self.hbond_d,
+                partitioning=self.partitioning,
+                ringatoms=self.ring_atoms,
+                ringatoms_flat=self.ring_atoms_flat,
+                logp_file=self.logp_file,
+                trial=True
             )
+            self.cg_bead_names = temp_topo.atomnames
+            bead_types = temp_topo.beadtypes
 
             # Check additivity between fragments and entire molecule
             if not self.check_additivity(bead_types):
                 continue
             
             logger.info("Success mapping found on attempt %d", attempt)
-            self.topology = self._build_topology(cg_beads, cg_beads_rings, bead_types)
-            self._finalize_topology(cg_beads, cg_beads_rings, bead_types, attempt)
+            num_ar = self._build_topology(cg_beads, cg_beads_rings, bead_types)
+            self._update_topology(cg_beads, cg_beads_rings, bead_types, attempt, num_ar)
+            self._write_topology()
             break
 
 
@@ -375,13 +381,13 @@ class Cg_molecule:
         for bead in beadtypes:
             if bead[0] == "S" or bead[0] == "T": # AutoM3 change : added bead "T"
                 rings = True
-            delta_f_types = topology.read_delta_f_types()
+            delta_f_types = read_delta_f_types()
             sum_frag += delta_f_types[bead] #sum of free energies of beads in ring(s)
         # Wildman-Crippen log_p
         wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(self.molecule)[0]
         # Get SMILES string of entire molecule
 
-        whole_mol_dg,_ = topology.smi2alogps(self.forcepred, self.smiles, wc_log_p, "MOL", None, None, True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
+        whole_mol_dg,_ = smi2alogps(self.forcepred, self.smiles, wc_log_p, "MOL", None, None, True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
         if whole_mol_dg != 0:
             m_ad = math.fabs((whole_mol_dg - sum_frag) / whole_mol_dg)
             logger.info(
@@ -630,30 +636,68 @@ class Cg_molecule:
 
 
     def _build_topology(self, cg_beads, cg_beads_rings, bead_types):
-        # Build complete topology using new Topology class
-        topo = topology.build_topology(
+        """Build topology data using Topology instance methods."""
+        
+        # Build atoms data
+        self.topology.build_atoms(
             cgbeads=cg_beads,
-            molname=self.molname,
-            mol_smi=self.smiles,
             forcepred=self.forcepred,
-            cgbeads_ring=cg_beads_rings,
             molecule=self.molecule,
             hbonda=self.hbond_a,
             hbondd=self.hbond_d,
             partitioning=self.partitioning,
-            cgbead_coords=self.cg_bead_coords,
             ringatoms=self.ring_atoms,
             ringatoms_flat=self.ring_atoms_flat,
             logp_file=self.logp_file,
-            beadtypes=bead_types,
-            trial=False,
-            simple_model=self.simple_model
+            trial=False
         )
-        return topo
+        
+        # Override beadtypes if provided
+        if bead_types is not None:
+            self.topology.beadtypes = bead_types
+        
+        # Build bonds and constraints
+        self.topology.build_bonds(
+            cgbeads=cg_beads,
+            cgbeads_ring=cg_beads_rings,
+            molecule=self.molecule,
+            partitioning=self.partitioning,
+            cgbead_coords=self.cg_bead_coords,
+            ringatoms=self.ring_atoms
+        )
+        
+        # Build angles
+        self.topology.build_angles(
+            cgbeads=cg_beads,
+            molecule=self.molecule,
+            partitioning=self.partitioning,
+            cgbead_coords=self.cg_bead_coords,
+            ringatoms=self.ring_atoms
+        )
+        
+        # Build dihedrals (unless simple model)
+        num_ar = 0
+        if not self.simple_model:
+            num_ar = self.topology.build_dihedrals(
+                cgbeads=cg_beads,
+                ringatoms=self.ring_atoms,
+                cgbead_coords=self.cg_bead_coords
+            )
+        
+        # Build virtual sites if needed
+        if self.ring_atoms and len(sum(self.ring_atoms, [])) > 6:
+            self.topology.build_virtual_sites(
+                ringatoms=self.ring_atoms,
+                cg_bead_coords=self.cg_bead_coords,
+                partitioning=self.partitioning,
+                molecule=self.molecule
+            )
+        
+        return num_ar
 
 
-    def _finalize_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
-        """Finalize topology after successful mapping - builds complete Topology object."""
+    def _update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt, num_ar=0):
+        """Update topology with formatted output strings after successful mapping."""
         
         # Store convenience references
         self.cg_bead_names = self.topology.atomnames
@@ -677,47 +721,36 @@ class Cg_molecule:
             ):
                 errval = 7
 
-        # Generate formatted outputs
-        header_write = topology.format_topology_header(self.topology)
-        atoms_write = topology.format_topology_atoms(self.topology.atoms, trial=False)
-        bonds_write = topology.format_topology_bonds(
-            self.topology.bonds, self.topology.constraints, 
-            self.topology.beadtypes, self.ring_atoms, trial=False
-        )
-        angles_write = topology.format_topology_angles(self.topology.angles, self.topology.beadtypes)
+        # Generate formatted outputs using topology methods
+        header_write = self.topology.format_header()
+        atoms_write = self.topology.format_atoms(trial=False)
+        bonds_write = self.topology.format_bonds(ringatoms=self.ring_atoms, trial=False)
+        angles_write = self.topology.format_angles()
         
         if not self.simple_model and self.topology.dihedrals:
-            dihedrals_write = topology.format_topology_dihedrals(
-                self.topology.dihedrals, 0, cg_beads, self.ring_atoms, 
-                self.cg_bead_coords, self.topology.beadtypes
+            dihedrals_write = self.topology.format_dihedrals(
+                num_ar=num_ar,
+                cgbeads=cg_beads,
+                ringatoms=self.ring_atoms,
+                cgbead_coords=self.cg_bead_coords
             )
         else:
             dihedrals_write = ""
+        
+        virtual_sites_write = self.topology.format_virtual_sites()
 
-        self.topout, bartender_input_info = topology.topout(header_write, atoms_write, bonds_write, angles_write)
-
-        # Check if fusion of cycles
-        common = False
-        if len(self.ring_atoms) > 1:
-            cpt = list(set.intersection(*map(set, self.ring_atoms)))
-            if len(cpt) > 1:
-                common = True
-            for i in self.ring_atoms:
-                if len(i) > 6:
-                    common = True
-        else:
-            if len(self.ring_atoms_flat) > 6:
-                common = True
-
-        self.topout, bartender_input_info = topology.topout_noVS(
-            header_write, atoms_write, bonds_write, angles_write, dihedrals_write, 
-            self.cg_bead_coords, self.ring_atoms, cg_beads
+        # Build topology output and bartender input
+        self.bartender_out = run_bartender(
+            header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
+            self.cg_bead_coords, self.ring_atoms, cg_beads,
+            self.molecule, self.molname, self.topology.atoms_in_smi_dict,
+            bartender=self.bartender
         )
         
-        if self.bartender:
-            self.bartender_out = topology.bartender_input(
-                self.molecule, self.molname, self.topology.atoms_in_smi_dict, bartender_input_info
-            )
+    def _write_topology(self):
+        """Write topology and bartender files to disk."""
+        
+        if self.bartender and self.bartenderfname:
             with open(self.bartenderfname, "w") as btf:
                 btf.write(self.bartender_out)
             logger.info("Wrote bartender input: %s", self.bartenderfname)
@@ -726,10 +759,6 @@ class Cg_molecule:
             with open(self.topfname, "w") as fp:
                 fp.write(self.topout)
             logger.info("Wrote topology: %s", self.topfname)
-        if not self.force_map: 
-            print("Converged to solution in {} iteration(s)".format(attempt + 1))
-        if self.force_map: 
-            print("Converged to solution in {} iteration(s)".format(attempt + 1 + self.max_attempts))
 
     def output_aa(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
