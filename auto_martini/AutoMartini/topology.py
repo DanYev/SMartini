@@ -26,7 +26,7 @@ received a copy of the GNU General Public License along with PyGran.
 If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """ 
-
+from dataclasses import dataclass, field
 from sys import exit
 
 from AutoMartini._version import __version__
@@ -38,6 +38,42 @@ logger = logging.getLogger(__name__)
 # For feature extraction
 fdefName = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
 factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
+
+
+@dataclass
+class Topology:
+    """Container for coarse-grained molecular topology data.
+    
+    This class holds all topology information in structured form,
+    separating data from formatting logic.
+    """
+    # Header information
+    molname: str = ""
+    mol_smi: str = ""
+    
+    # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logporigin
+    atoms: list = field(default_factory=list)
+    atomnames: list = field(default_factory=list)
+    beadtypes: list = field(default_factory=list)
+    atoms_in_smi_dict: dict = field(default_factory=dict)
+    
+    # Bonds data: list of [i, j, dist]
+    bonds: list = field(default_factory=list)
+    
+    # Constraints data: list of [i, j, dist]
+    constraints: list = field(default_factory=list)
+    
+    # Angles data: list of [i, j, k, angle, force_const, angle_type]
+    angles: list = field(default_factory=list)
+    
+    # Dihedrals data: list of [i, j, k, l, angle, force_const]
+    dihedrals: list = field(default_factory=list)
+    
+    # Virtual sites (if any)
+    virtual_sites: list = field(default_factory=list)
+    
+    # Metadata
+    nrexcl: int = 2
 
 
 def read_delta_f_types():
@@ -148,23 +184,6 @@ def gen_molecule_sdf(sdf):
     raw_molecule = suppl[0]
     return molecule, raw_molecule
 
-
-def print_header(molname, mol_smi):
-    """Print topology header"""
-    text = "; GENERATED WITH Auto_Martini M3FF for {}\n".format(molname)
-    
-    info = (
-        "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
-        + "; updated to Martini 3 force field by Magdalena Szczuka\n"
-        + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
-        + "; SMILES code : " + mol_smi + "\n\n"
-        + "\n[moleculetype]\n"
-        + "; molname       nrexcl\n"
-        + "  {:5s}         2\n\n".format(molname)
-        + "[atoms]\n"
-        + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num"
-    ) # AutoM3 : added mass and additionnal comments
-    return text + info
 
 
 def letter_occurrences(string):
@@ -446,491 +465,8 @@ def get_standard_mass(bead_type): # AutoM3
         else: return 72
 
 
-def print_atoms(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partitioning, ringatoms, ringatoms_flat, logp_file, trial=False):
-    """
-    Print CG Atoms in itp format
-    AutoM3 added argument : logp_file
-    """
-    logger.debug("Entering print_atoms()")
-    atomnames = []
-    beadtypes = []
-    text = ""
-    atoms_in_smi_dict={}
-
-    for bead in range(len(cgbeads)):
-        # Determine SMI of substructure
-        try:
-            smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi  = substruct2smi(
-                molecule, partitioning, bead
-            )
-        except Exception:
-            raise
-        atoms_in_smi_dict[bead+1] = atoms_in_smi.replace(" ; atoms: ","") # AutoM3
-
-        atom_name = ""
-        for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
-            try:
-                float(character)
-            except ValueError:
-                if count == 1:
-                    atom_name += "{:s}".format(character)
-                else:
-                    atom_name += "{:s}{:s}".format(character, str(count))
-        # Get charge for smi_frag
-        mol_frag, errval = gen_molecule_smi(smi_frag)
-        charge_frag = get_charge(mol_frag)
-
-        if errval == 0:
-            # frag_heavyatom_coord = get_heavy_atom_coords(mol_frag)
-            # frag_HA_coord_towrite = frag_heavyatom_coord[1]
-            # frag_HA_coord_towrite[:0] = [smi_frag]
-            # frag_heavyatom_coord_list.append(frag_HA_coord_towrite)
-            charge_frag = get_charge(mol_frag)
-
-            # Extract ALOGPS free energy 
-            # AutoM3 added variable logporigin to recognize which logp was found with ALOGPS and comment it in itp output file
-            try:
-                if charge_frag == 0:
-                    alogps, logporigin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1,converted_smi, real_smi,logp_file, trial)
-                else:
-                    alogps = 0.0
-                    logporigin = "; Charged fragment"
-            except (NameError, TypeError, ValueError):
-                return atomnames, beadtypes, errval
-
-            hbond_a_flag = 0
-            for at in hbonda:
-                if partitioning[at] == bead:
-                    hbond_a_flag = 1
-                    break
-            hbond_d_flag = 0
-            for at in hbondd:
-                if partitioning[at] == bead:
-                    hbond_d_flag = 1
-                    break
-
-            in_ring = cgbeads[bead] in ringatoms_flat
-
-            bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag) # AutoM3 change : added smi_frag argument
-            atom_name = ""
-            name_index = 0
-            while atom_name in atomnames or name_index == 0:
-                name_index += 1
-                atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
-            atomnames.append(atom_name)
-            
-            mass = get_standard_mass(bead_type)
-
-            if not trial:
-                if len(molname)>4:molname=molname[:4]
-                text = (
-                    text
-                    + "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
-                        bead + 1,
-                        bead_type,
-                        molname,
-                        atom_name,
-                        bead + 1,
-                        charge,
-                        mass, # AutoM3
-                        smi_frag, # AutoM3
-                        atoms_in_smi, # AutoM3
-                        logporigin # AutoM3
-                    )
-                )
-            beadtypes.append(bead_type)
-
-    return atomnames, beadtypes, text, atoms_in_smi_dict    # AutoM3 new variable : atoms_in_smi_dict
 
 
-def print_bonds(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, beadtypes, ringatoms, trial=False, cutoff=1e4):
-    """print CG bonds in itp format"""
-    logger.debug("Entering print_bonds()")
-    # Bond information
-    bondlist = []
-    constlist = []
-    text = ""
-    cpt_ringatoms = 0 #AutoM3 change    
-
-    if ringatoms != []: 
-        cpt_ringatoms = len(sum(ringatoms, [])) #AutoM3 change
-
-    if len(cgbeads) <= 1:
-        return bondlist, constlist, text
-
-    for i in range(len(cgbeads)):
-        for j in range(i + 1, len(cgbeads)):
-            dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-            if dist > 0.54:  #AutoM3 change : was  0.5
-                break
-
-            if dist < 0.134: # AutoM3 change : was 0.2
-                raise NameError("Bond too short") 
-
-            # Are atoms part of the same ring
-            added_to_constraints = False
-            for ring in ringatoms:
-                if cgbeads[i] in ring and cgbeads[j] in ring: 
-                    constlist.append([i, j, dist])  
-                    added_to_constraints = True
-                    break
-            if added_to_constraints:
-                continue
-
-            # Look for a bond between an atom of i and an atom of j
-            found_connection = False
-            atoms_in_bead_i = []
-            for ii in partitioning.keys():
-                if partitioning[ii] == i:
-                    atoms_in_bead_i.append(ii)
-            
-            atoms_in_bead_j = []
-            for jj in partitioning.keys():
-                if partitioning[jj] == j:
-                    atoms_in_bead_j.append(jj)
-            for ib in range(len(molecule.GetBonds())):
-                abond = molecule.GetBondWithIdx(ib)
-                if (
-                    abond.GetBeginAtomIdx() in atoms_in_bead_i
-                    and abond.GetEndAtomIdx() in atoms_in_bead_j
-                ) or (
-                    abond.GetBeginAtomIdx() in atoms_in_bead_j
-                    and abond.GetEndAtomIdx() in atoms_in_bead_i
-                ):
-                    found_connection = True
-            
-            if found_connection:
-                bondlist.append([i, j, dist])
-
-            else: ### AutoM3 ### 
-                if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
-                    constlist.append([i, j, dist])
-
-    # AutoM3 : check if there are beads with ring atoms, that are not connected
-    for ir in range(len(cgbeads_ring)):
-        for jr in range(ir + 1, len(cgbeads_ring)):
-            distr = np.linalg.norm(cgbead_coords[ir] - cgbead_coords[jr]) * 0.1
-            if distr < 0.65:  #AutoM3 change : was  0.5
-                # Are atoms part of the same ring
-                for ring in ringatoms:
-                    if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
-                        ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
-                        constlist.append([ir, jr, distr])
-
-    # AutoM3 : removed chunk
-    # Go through list of constraints. If we find an extra
-    # possible constraint between beads that have constraints,
-    # add it.
-    beads_with_const = []
-    for c in constlist:
-        if c[0] not in beads_with_const:
-            beads_with_const.append(c[0])
-        if c[1] not in beads_with_const:
-            beads_with_const.append(c[1])
-
-    beads_with_const = sorted(beads_with_const)
-    for i in range(len(beads_with_const)):
-        for j in range(1 + i, len(beads_with_const)):
-            const_exists = False
-            for c in constlist:
-                if (c[0] == i and c[1] == j) or (c[0] == j and c[1] == i):
-                    const_exists = True
-                    break
-            if not const_exists:
-                dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                if any(dist  != bl[2] for bl in bondlist): # AutoM3 change : was   if dist < 0.35:
-                    # Check that it's not in the bond list
-                    in_bond_list = False
-                    for b in bondlist:
-                        if (b[0] == i and b[1] == j) or (b[0] == j and b[0] == i):
-                            in_bond_list = True
-                            break
-                    # Are atoms part of the same ring
-                    in_ring = False
-                    for ring in ringatoms:
-                        if cgbeads[i] in ring and cgbeads[j] in ring and len(ring)<5:
-                            in_ring = True
-                            break
-                    # If not in bondlist and in the same ring, add the contraint
-                    if not in_bond_list and in_ring and [i, j, dist] not in constlist:
-                        constlist.append([i, j, dist])
-
-    if not trial:
-        ### AutoM3 ###
-        beadlist = []
-        for bead in beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
-            else: beadlist.append(bead[0])
-
-        # filtered_bondlist = []
-        # for bond in bondlist:
-        #     fc = read_params(bond[2], beadlist[bond[0]]+"-"+beadlist[bond[1]])
-        #     if float(fc) > cutoff:
-        #         constlist.append(bond)
-        #     else:
-        #         filtered_bondlist.append(bond)
-
-        if len(bondlist) > 0:
-            text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
-            for b in bondlist:
-                # Make sure atoms in bond are not part of the same ring
-                fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
-                if fc >= cutoff:
-                    fc = cutoff
-                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                    b[0] + 1, b[1] + 1, b[2], fc,
-                )
-        else: text = "\n[bonds]\n"
-
-        if len(constlist) > 0:
-            text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
-
-            for c in constlist:
-                if c not in bondlist:
-                    if cpt_ringatoms > 18 and c[2] > 0.415:
-                        continue
-                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
-                        c[0] + 1, c[1] + 1, c[2]
-                    )
-
-        # # Make sure there's at least a bond to every atom
-        # for i in range(len(cgbeads)):
-        #     bond_to_i = False
-        #     for b in bondlist + constlist:
-        #         if i in [b[0], b[1]]:
-        #             bond_to_i = True
-        #     if not bond_to_i:
-        #         print("Error. No bond to atom %d" % (i + 1))
-        #         exit(1)
-    return bondlist, constlist, text
-
-
-def print_angles(cgbeads, molecule, partitioning, cgbead_coords, beadtypes, bondlist, constlist, ringatoms, type_2_cutoff=160.0): 
-    """print CG angles in itp format and returns the angles list"""
-    logger.debug("Entering print_angles()")
-
-    text = ""
-    angle_list = []
-
-    # Angles
-    if len(cgbeads) <= 2:
-        return text, angle_list
-
-    for i in range(len(cgbeads)):
-        for j in range(len(cgbeads)): 
-            for k in range(len(cgbeads)):     
-
-                # Check if all indices are different
-                if i == j or j == k or i == k:
-                    continue
-
-                # Check if angle already exists
-                stop_iteration = False
-                for a in angle_list:
-                    it, jt, kt = a[0], a[1], a[2]
-                    if i == kt and j == jt and k == it:
-                        stop_iteration = True
-                        break
-                if stop_iteration:
-                    continue
-
-                # Check if all of them are in one ring
-                for ring in ringatoms:
-                    if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
-                        stop_iteration = True
-                        break
-                if stop_iteration:
-                    continue
-
-                # Check if all are bonded
-                ij_bonded = False
-                jk_bonded = False
-                ik_bonded = False
-                for b in bondlist + constlist:
-                    connectivity = [b[0], b[1]]
-                    if i in connectivity and j in connectivity:
-                        ij_bonded = True
-                    if j in connectivity and k in connectivity:
-                        jk_bonded = True
-                    if i in connectivity and k in connectivity:
-                        ik_bonded = True
-                # If all three are bonded, skip. If only ij and jk are bonded, keep.
-                if ij_bonded and jk_bonded and ik_bonded:
-                    continue
-                # Skip if they do not form a chain (i-j-k or k-j-i)
-                if not (ij_bonded and jk_bonded):
-                    continue
-
-                # Measure angle between i, j, and k.
-                angle = (
-                    180.0
-                    / math.pi
-                    * math.acos(
-                        np.dot(
-                            cgbead_coords[i] - cgbead_coords[j],
-                            cgbead_coords[k] - cgbead_coords[j],
-                        )
-                        / (
-                            np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
-                            * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
-                        )
-                    )
-                )
-                # Look for any double bond between atoms belonging to these CG beads.
-                atoms_in_fragment = []
-                for aa in partitioning.keys():
-                    if partitioning[aa] == j:
-                        atoms_in_fragment.append(aa)
-                force_const = 100.0 # AutoM3 change : was 25.0
-                for ib in range(len(molecule.GetBonds())):
-                    abond = molecule.GetBondWithIdx(ib)
-                    if (
-                        abond.GetBeginAtomIdx() in atoms_in_fragment
-                        and abond.GetEndAtomIdx() in atoms_in_fragment
-                    ):
-                        bondtype = molecule.GetBondBetweenAtoms(
-                            abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
-                        ).GetBondType()
-                        if bondtype == rdchem.BondType.DOUBLE:
-                            force_const = 45.0
-
-                ### AutoM3 ###
-                if len(partitioning) > 15:
-                    for a1 in range(len(angle_list)):
-                        for a2 in range(len(angle_list)):
-                            if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
-                                break
-                
-                funct = 1
-                if angle > type_2_cutoff:
-                    force_const = 250.0
-                angle_list.append([i, j, k, funct, angle, force_const])
-
-    ### AutoM3 ###
-    beadlist = []
-    for bead in beadtypes:
-        if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
-        else: beadlist.append(bead[0])
-
-    if len(angle_list) > 0:
-        text = text + "\n[angles]\n"
-        text = text + ";  i  j  k    funct  angle  force.c.\n"
-        for a in angle_list:
-            force = read_params(a[4], beadlist[a[0]] + "-" + beadlist[a[1]] + "-" + beadlist[a[2]])
-            if force is None : force=a[5]
-            text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
-                a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
-            )
-    return text, angle_list
-
-
-def print_dihedrals(cgbeads, constlist, ringatoms, cgbead_coords, beadtypes):
-    """Print CG dihedrals in itp format"""
-    logger.debug("Entering print_dihedrals()")
-
-    new_dihed_list = [] # AutoM3
-    text = ""
-    num_ar=0
-
-    if len(cgbeads) > 3: 
-        # Dihedrals
-        dihed_list = []
-        # Three ring atoms and one non ring
-        for i in range(len(cgbeads)):
-            for j in range(len(cgbeads)):
-                for k in range(len(cgbeads)):
-                    for l in range(len(cgbeads)):
-                        if i != j and i != k and i != l and j != k and j != l and k != l:
-
-                            three_in_ring = False
-                            for ring in ringatoms:
-                                num_ar+=len(ring)
-                                if [
-                                    [cgbeads[i] in ring],
-                                    [cgbeads[j] in ring],
-                                    [cgbeads[k] in ring],
-                                    [cgbeads[l] in ring],
-                                ].count([True]) >= 3:
-                                    three_in_ring = True
-                                    break
-                            for b in constlist:
-                                if i in [b[0], b[1]] and j in [b[0], b[1]]:
-                                    pass
-                                if j in [b[0], b[1]] and k in [b[0], b[1]]:
-                                    pass
-                                if k in [b[0], b[1]] and l in [b[0], b[1]]:
-                                    pass
-                            # Distance criterion--beads can't be far apart
-                            disthres = 0.5 #AutoM3 change : was 0.35
-                            close_enough = False
-                            if (
-                                np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[j] - cgbead_coords[k]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[k] - cgbead_coords[l]) * 0.1
-                                < disthres
-                            ):
-                                close_enough = True
-
-                            already_dih = False
-                            for dih in dihed_list:
-                                if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
-                                    already_dih = True
-                                    break
-
-                            if three_in_ring and close_enough and not already_dih:
-                                r1 = cgbead_coords[j] - cgbead_coords[i]
-                                r2 = cgbead_coords[k] - cgbead_coords[j]
-                                r3 = cgbead_coords[l] - cgbead_coords[k]
-                                p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-                                p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-                                r2 /= np.linalg.norm(r2)
-                                cosphi = np.dot(p1, p2)
-                                sinphi = np.dot(r2, np.cross(p1, p2))
-                                angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-                                r1_1 = cgbead_coords[i] - cgbead_coords[j]
-                                r2_2 = cgbead_coords[j] - cgbead_coords[k]
-                                angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
-                                angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
-                                forc_const = 10.0
-                                if angle_ijk < 145.0 and angle_jkl < 145.0 : # look Restricted bending potential in gromacs manual
-                                    dihed_list.append([i, j, k, l, angle, forc_const])
-
-        ### AutoM3 ###
-        bead_in_ring_coords = {}
-        for nb, bead_nb in enumerate(cgbeads):
-            for ring in ringatoms:
-                if bead_nb in ring: bead_in_ring_coords[nb] = cgbead_coords[nb]
-        beadlist = []
-        for bead in beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'): beadlist.append('R')
-            else: beadlist.append(bead[0])
-        
-        new_dihed_list = dihed_list
-        if len(dihed_list) > 0:
-            text = text + "\n[dihedrals]\n"
-            text = text + ";  i  j  k  l  funct  angle  force.c.\n"
-
-            for dl in dihed_list:
-                for di in dihed_list[1:]:
-                    if dl!=di:
-                        # Check if beads are repeating
-                        if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]) :
-                            new_dihed_list.remove(di)
-                    
-            for d in new_dihed_list:
-                ### AutoM3 ###
-                force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
-                if num_ar > 0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None: force = force / 2 #for dihedral between cycle-bead and non-cycled bead: dicrease of force
-                if force is None: force = d[5]
-                text = (
-                    text
-                    + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
-                    )
-                )
-    return text
 
 
 def print_virtualsites(ringatoms, cg_bead_coords, partitionning, mol): ### AutoM3 ###
@@ -1677,3 +1213,641 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
             bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
 
     return bead_type
+
+
+# ==============================================================================
+# NEW: Topology Building Functions (decoupled data from formatting)
+# ==============================================================================
+
+def build_topology(molname, mol_smi, forcepred, cgbeads, cgbeads_ring, molecule, hbonda, hbondd, 
+                    partitioning, cgbead_coords, ringatoms, ringatoms_flat, logp_file, beadtypes=None, trial=False, simple_model=False):
+    """
+    Build complete Topology object with all CG data.
+    
+    This function centralizes topology construction and returns a Topology object
+    containing all topology data in structured form (atoms, bonds, angles, dihedrals, etc.).
+    
+    Args:
+        molname: Molecule name
+        mol_smi: SMILES string
+        forcepred: Force field prediction model
+        cgbeads: List of CG beads
+        cgbeads_ring: List of ring CG beads
+        molecule: RDKit molecule object
+        hbonda: H-bond acceptors
+        hbondd: H-bond donors
+        partitioning: Atom to bead mapping
+        cgbead_coords: CG bead coordinates
+        ringatoms: List of ring atoms
+        ringatoms_flat: Flattened ring atoms
+        logp_file: LogP file handle
+        beadtypes: Pre-computed bead types (optional, will compute if None)
+        trial: Whether this is a trial run
+        simple_model: Whether to skip dihedrals
+    
+    Returns:
+        Topology: object containing all topology data
+    """
+    topo = Topology(molname=molname, mol_smi=mol_smi)
+    
+    # Build atoms
+    atomnames, computed_beadtypes, atoms_data, atoms_in_smi_dict = build_atoms_data(
+        molname, forcepred, cgbeads, molecule, hbonda, hbondd,
+        partitioning, ringatoms, ringatoms_flat, logp_file, trial
+    )
+    topo.atomnames = atomnames
+    topo.beadtypes = beadtypes if beadtypes is not None else computed_beadtypes
+    topo.atoms = atoms_data
+    topo.atoms_in_smi_dict = atoms_in_smi_dict
+    
+    # Build bonds and constraints
+    bonds, constraints = build_bonds_data(
+        cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, ringatoms
+    )
+    topo.bonds = bonds
+    topo.constraints = constraints
+    
+    # Build angles
+    angles = build_angles_data(
+        cgbeads, molecule, partitioning, cgbead_coords, bonds, constraints, ringatoms
+    )
+    topo.angles = angles
+    
+    # Build dihedrals (unless simple model)
+    if not simple_model:
+        dihedrals, num_ar = build_dihedrals_data(
+            cgbeads, constraints, ringatoms, cgbead_coords
+        )
+        topo.dihedrals = dihedrals
+    
+    return topo
+
+
+def build_atoms_data(molname, forcepred, cgbeads, molecule, hbonda, hbondd, partitioning, 
+                      ringatoms, ringatoms_flat, logp_file, trial=False):
+    """Build atoms data structure (decoupled from formatting)."""
+    logger.debug("Entering build_atoms_data()")
+    atomnames = []
+    beadtypes = []
+    atoms_data = []
+    atoms_in_smi_dict = {}
+
+    for bead in range(len(cgbeads)):
+        try:
+            smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(
+                molecule, partitioning, bead
+            )
+        except Exception:
+            raise
+        atoms_in_smi_dict[bead + 1] = atoms_in_smi.replace(" ; atoms: ", "")
+
+        atom_name = ""
+        for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
+            try:
+                float(character)
+            except ValueError:
+                if count == 1:
+                    atom_name += "{:s}".format(character)
+                else:
+                    atom_name += "{:s}{:s}".format(character, str(count))
+        
+        mol_frag, errval = gen_molecule_smi(smi_frag)
+        charge_frag = get_charge(mol_frag)
+
+        if errval == 0:
+            try:
+                if charge_frag == 0:
+                    alogps, logporigin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
+                else:
+                    alogps = 0.0
+                    logporigin = "; Charged fragment"
+            except (NameError, TypeError, ValueError):
+                return atomnames, beadtypes, atoms_data, atoms_in_smi_dict
+
+            hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
+            hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
+            in_ring = cgbeads[bead] in ringatoms_flat
+
+            bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
+            atom_name = ""
+            name_index = 0
+            while atom_name in atomnames or name_index == 0:
+                name_index += 1
+                atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
+            atomnames.append(atom_name)
+            
+            mass = get_standard_mass(bead_type)
+
+            atom_dict = {
+                'id': bead + 1,
+                'type': bead_type,
+                'resnr': 1,
+                'residue': molname[:4] if len(molname) > 4 else molname,
+                'atom': atom_name,
+                'cgnr': bead + 1,
+                'charge': charge,
+                'mass': mass,
+                'smiles': smi_frag,
+                'atoms_in_smi': atoms_in_smi,
+                'logporigin': logporigin
+            }
+            atoms_data.append(atom_dict)
+            beadtypes.append(bead_type)
+
+    return atomnames, beadtypes, atoms_data, atoms_in_smi_dict
+
+
+def build_bonds_data(cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, ringatoms, cutoff=1e4):
+    """Build bonds and constraints data (decoupled from formatting)."""
+    logger.debug("Entering build_bonds_data()")
+    bondlist = []
+    constlist = []
+    cpt_ringatoms = 0
+    
+    if ringatoms != []:
+        cpt_ringatoms = len(sum(ringatoms, []))
+
+    if len(cgbeads) <= 1:
+        return bondlist, constlist
+
+    # Main bond/constraint detection logic (same as original print_bonds)
+    for i in range(len(cgbeads)):
+        for j in range(i + 1, len(cgbeads)):
+            dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+            if dist > 0.54:
+                break
+            if dist < 0.134:
+                raise NameError("Bond too short")
+
+            added_to_constraints = False
+            for ring in ringatoms:
+                if cgbeads[i] in ring and cgbeads[j] in ring:
+                    constlist.append([i, j, dist])
+                    added_to_constraints = True
+                    break
+            if added_to_constraints:
+                continue
+
+            # Look for a bond between an atom of i and an atom of j
+            found_connection = False
+            atoms_in_bead_i = []
+            for ii in partitioning.keys():
+                if partitioning[ii] == i:
+                    atoms_in_bead_i.append(ii)
+            
+            atoms_in_bead_j = []
+            for jj in partitioning.keys():
+                if partitioning[jj] == j:
+                    atoms_in_bead_j.append(jj)
+                    
+            for ib in range(len(molecule.GetBonds())):
+                abond = molecule.GetBondWithIdx(ib)
+                if (
+                    abond.GetBeginAtomIdx() in atoms_in_bead_i
+                    and abond.GetEndAtomIdx() in atoms_in_bead_j
+                ) or (
+                    abond.GetBeginAtomIdx() in atoms_in_bead_j
+                    and abond.GetEndAtomIdx() in atoms_in_bead_i
+                ):
+                    found_connection = True
+            
+            if found_connection:
+                bondlist.append([i, j, dist])
+            else:
+                if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in constlist:
+                    constlist.append([i, j, dist])
+
+    # Ring beads check
+    for ir in range(len(cgbeads_ring)):
+        for jr in range(ir + 1, len(cgbeads_ring)):
+            distr = np.linalg.norm(cgbead_coords[ir] - cgbead_coords[jr]) * 0.1
+            if distr < 0.65:
+                for ring in ringatoms:
+                    if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
+                        ) and ([ir, jr, distr] not in constlist and [ir, jr, distr] not in  bondlist ):
+                        constlist.append([ir, jr, distr])
+
+    # Go through list of constraints. If we find an extra
+    # possible constraint between beads that have constraints, add it.
+    beads_with_const = []
+    for c in constlist:
+        if c[0] not in beads_with_const:
+            beads_with_const.append(c[0])
+        if c[1] not in beads_with_const:
+            beads_with_const.append(c[1])
+
+    beads_with_const = sorted(beads_with_const)
+    for i in range(len(beads_with_const)):
+        for j in range(1 + i, len(beads_with_const)):
+            const_exists = False
+            for c in constlist:
+                if (c[0] == i and c[1] == j) or (c[0] == j and c[1] == i):
+                    const_exists = True
+                    break
+            if not const_exists:
+                dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+                if any(dist  != bl[2] for bl in bondlist):
+                    # Check that it's not in the bond list
+                    in_bond_list = False
+                    for b in bondlist:
+                        if (b[0] == i and b[1] == j) or (b[0] == j and b[0] == i):
+                            in_bond_list = True
+                            break
+                    # Are atoms part of the same ring
+                    in_ring = False
+                    for ring in ringatoms:
+                        if cgbeads[i] in ring and cgbeads[j] in ring and len(ring)<5:
+                            in_ring = True
+                            break
+                    # If not in bondlist and in the same ring, add the constraint
+                    if not in_bond_list and in_ring and [i, j, dist] not in constlist:
+                        constlist.append([i, j, dist])
+
+    return bondlist, constlist
+
+
+def format_topology_header(topo):
+    """Format Topology header section."""
+    text = "; GENERATED WITH Auto_Martini M3FF for {}\n".format(topo.molname)
+    info = (
+        "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
+        + "; updated to Martini 3 force field by Magdalena Szczuka\n"
+        + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
+        + "; SMILES code : " + topo.mol_smi + "\n\n"
+        + "\n[moleculetype]\n"
+        + "; molname       nrexcl\n"
+        + "  {:5s}         {:d}\n\n".format(topo.molname, topo.nrexcl)
+        + "[atoms]\n"
+        + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num"
+    )
+    return text + info
+
+
+def format_topology_atoms(atoms_data, trial=False):
+    """Format atoms list into ITP text."""
+    if trial:
+        return ""
+    
+    text = ""
+    for atom in atoms_data:
+        text += (
+            "   {:<5d}   {:5s}   {:d}   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
+                atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
+                atom['cgnr'], atom['charge'], atom['mass'], atom['smiles'],
+                atom['atoms_in_smi'], atom['logporigin']
+            )
+        )
+    return text
+
+
+def format_topology_bonds(bonds, constraints, beadtypes, ringatoms, trial=False, cutoff=1e4):
+    """Format bonds and constraints into ITP text."""
+    if trial:
+        return ""
+    
+    text = ""
+    cpt_ringatoms = 0
+    if ringatoms != []:
+        cpt_ringatoms = len(sum(ringatoms, []))
+    
+    # Create beadlist for read_params
+    beadlist = []
+    for bead in beadtypes:
+        if not bead.startswith('T') and not bead.startswith('S'):
+            beadlist.append('R')
+        else:
+            beadlist.append(bead[0])
+    
+    if len(bonds) > 0:
+        text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
+        for b in bonds:
+            # Make sure atoms in bond are not part of the same ring
+            fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
+            if fc >= cutoff:
+                fc = cutoff
+            text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
+                b[0] + 1, b[1] + 1, b[2], fc,
+            )
+    else:
+        text = "\n[bonds]\n"
+    
+    if len(constraints) > 0:
+        text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
+        for c in constraints:
+            if c not in bonds:
+                if cpt_ringatoms > 18 and c[2] > 0.415:
+                    continue
+                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
+                    c[0] + 1, c[1] + 1, c[2]
+                )
+    
+    return text
+
+
+def build_angles_data(cgbeads, molecule, partitioning, cgbead_coords, bondlist, constlist, ringatoms, type_2_cutoff=160.0):
+    """Build angles data structure (decoupled from formatting)."""
+    logger.debug("Entering build_angles_data()")
+    
+    angle_list = []
+
+    # Angles
+    if len(cgbeads) <= 2:
+        return angle_list
+
+    for i in range(len(cgbeads)):
+        for j in range(len(cgbeads)): 
+            for k in range(len(cgbeads)):     
+
+                # Check if all indices are different
+                if i == j or j == k or i == k:
+                    continue
+
+                # Check if angle already exists
+                stop_iteration = False
+                for a in angle_list:
+                    it, jt, kt = a[0], a[1], a[2]
+                    if i == kt and j == jt and k == it:
+                        stop_iteration = True
+                        break
+                if stop_iteration:
+                    continue
+
+                # Check if all of them are in one ring
+                for ring in ringatoms:
+                    if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
+                        stop_iteration = True
+                        break
+                if stop_iteration:
+                    continue
+
+                # Check if all are bonded
+                ij_bonded = False
+                jk_bonded = False
+                ik_bonded = False
+                for b in bondlist + constlist:
+                    connectivity = [b[0], b[1]]
+                    if i in connectivity and j in connectivity:
+                        ij_bonded = True
+                    if j in connectivity and k in connectivity:
+                        jk_bonded = True
+                    if i in connectivity and k in connectivity:
+                        ik_bonded = True
+                # If all three are bonded, skip. If only ij and jk are bonded, keep.
+                if ij_bonded and jk_bonded and ik_bonded:
+                    continue
+                # Skip if they do not form a chain (i-j-k or k-j-i)
+                if not (ij_bonded and jk_bonded):
+                    continue
+
+                # Measure angle between i, j, and k.
+                angle = (
+                    180.0
+                    / math.pi
+                    * math.acos(
+                        np.dot(
+                            cgbead_coords[i] - cgbead_coords[j],
+                            cgbead_coords[k] - cgbead_coords[j],
+                        )
+                        / (
+                            np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
+                            * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
+                        )
+                    )
+                )
+                # Look for any double bond between atoms belonging to these CG beads.
+                atoms_in_fragment = []
+                for aa in partitioning.keys():
+                    if partitioning[aa] == j:
+                        atoms_in_fragment.append(aa)
+                force_const = 100.0
+                for ib in range(len(molecule.GetBonds())):
+                    abond = molecule.GetBondWithIdx(ib)
+                    if (
+                        abond.GetBeginAtomIdx() in atoms_in_fragment
+                        and abond.GetEndAtomIdx() in atoms_in_fragment
+                    ):
+                        bondtype = molecule.GetBondBetweenAtoms(
+                            abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
+                        ).GetBondType()
+                        if bondtype == rdchem.BondType.DOUBLE:
+                            force_const = 45.0
+
+                ### AutoM3 ###
+                if len(partitioning) > 15:
+                    for a1 in range(len(angle_list)):
+                        for a2 in range(len(angle_list)):
+                            if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
+                                break
+                
+                funct = 1
+                if angle > type_2_cutoff:
+                    force_const = 250.0
+                angle_list.append([i, j, k, funct, angle, force_const])
+
+    return angle_list
+
+
+def build_dihedrals_data(cgbeads, constlist, ringatoms, cgbead_coords):
+    """Build dihedrals data structure (decoupled from formatting)."""
+    logger.debug("Entering build_dihedrals_data()")
+
+    new_dihed_list = []
+    num_ar = 0
+
+    if len(cgbeads) > 3: 
+        # Dihedrals
+        dihed_list = []
+        # Three ring atoms and one non ring
+        for i in range(len(cgbeads)):
+            for j in range(len(cgbeads)):
+                for k in range(len(cgbeads)):
+                    for l in range(len(cgbeads)):
+                        if i != j and i != k and i != l and j != k and j != l and k != l:
+
+                            three_in_ring = False
+                            for ring in ringatoms:
+                                num_ar += len(ring)
+                                if [
+                                    [cgbeads[i] in ring],
+                                    [cgbeads[j] in ring],
+                                    [cgbeads[k] in ring],
+                                    [cgbeads[l] in ring],
+                                ].count([True]) >= 3:
+                                    three_in_ring = True
+                                    break
+                            for b in constlist:
+                                if i in [b[0], b[1]] and j in [b[0], b[1]]:
+                                    pass
+                                if j in [b[0], b[1]] and k in [b[0], b[1]]:
+                                    pass
+                                if k in [b[0], b[1]] and l in [b[0], b[1]]:
+                                    pass
+                            # Distance criterion--beads can't be far apart
+                            disthres = 0.5
+                            close_enough = False
+                            if (
+                                np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+                                < disthres
+                                and np.linalg.norm(cgbead_coords[j] - cgbead_coords[k]) * 0.1
+                                < disthres
+                                and np.linalg.norm(cgbead_coords[k] - cgbead_coords[l]) * 0.1
+                                < disthres
+                            ):
+                                close_enough = True
+
+                            already_dih = False
+                            for dih in dihed_list:
+                                if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
+                                    already_dih = True
+                                    break
+
+                            if three_in_ring and close_enough and not already_dih:
+                                r1 = cgbead_coords[j] - cgbead_coords[i]
+                                r2 = cgbead_coords[k] - cgbead_coords[j]
+                                r3 = cgbead_coords[l] - cgbead_coords[k]
+                                p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                                p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
+                                r2 /= np.linalg.norm(r2)
+                                cosphi = np.dot(p1, p2)
+                                sinphi = np.dot(r2, np.cross(p1, p2))
+                                angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
+                                r1_1 = cgbead_coords[i] - cgbead_coords[j]
+                                r2_2 = cgbead_coords[j] - cgbead_coords[k]
+                                angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
+                                angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
+                                forc_const = 10.0
+                                if angle_ijk < 145.0 and angle_jkl < 145.0:
+                                    dihed_list.append([i, j, k, l, angle, forc_const])
+
+        new_dihed_list = dihed_list
+        if len(dihed_list) > 0:
+            for dl in dihed_list:
+                for di in dihed_list[1:]:
+                    if dl != di:
+                        # Check if beads are repeating
+                        if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]):
+                            new_dihed_list.remove(di)
+
+    return new_dihed_list, num_ar
+
+
+def format_topology_angles(angle_list, beadtypes):
+    """Format angles into ITP text."""
+    text = ""
+    
+    ### AutoM3 ###
+    beadlist = []
+    for bead in beadtypes:
+        if not bead.startswith('T') and not bead.startswith('S'):
+            beadlist.append('R')
+        else:
+            beadlist.append(bead[0])
+
+    if len(angle_list) > 0:
+        text = text + "\n[angles]\n"
+        text = text + ";  i  j  k    funct  angle  force.c.\n"
+        for a in angle_list:
+            force = read_params(a[4], beadlist[a[0]] + "-" + beadlist[a[1]] + "-" + beadlist[a[2]])
+            if force is None:
+                force = a[5]
+            text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
+                a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
+            )
+    return text
+
+
+def format_topology_dihedrals(dihed_list, num_ar, cgbeads, ringatoms, cgbead_coords, beadtypes):
+    """Format dihedrals into ITP text."""
+    text = ""
+    
+    ### AutoM3 ###
+    bead_in_ring_coords = {}
+    for nb, bead_nb in enumerate(cgbeads):
+        for ring in ringatoms:
+            if bead_nb in ring:
+                bead_in_ring_coords[nb] = cgbead_coords[nb]
+    
+    beadlist = []
+    for bead in beadtypes:
+        if not bead.startswith('T') and not bead.startswith('S'):
+            beadlist.append('R')
+        else:
+            beadlist.append(bead[0])
+    
+    if len(dihed_list) > 0:
+        text = text + "\n[dihedrals]\n"
+        text = text + ";  i  j  k  l  funct  angle  force.c.\n"
+        
+        for d in dihed_list:
+            ### AutoM3 ###
+            force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
+            if num_ar > 0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None:
+                force = force / 2  # for dihedral between cycle-bead and non-cycled bead: decrease of force
+            if force is None:
+                force = d[5]
+            text = (
+                text
+                + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
+                    d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
+                )
+            )
+    return text
+
+
+def format_topology_to_itp(topo, trial=False):
+    """
+    Format complete Topology object to ITP file text.
+    
+    Args:
+        topo: Topology object
+        trial: Whether this is a trial run
+        
+    Returns:
+        str: Complete ITP file content
+    """
+    text = ""
+    
+    # Header
+    text += "; GENERATED WITH Auto_Martini M3FF for {}\n".format(topo.molname)
+    text += (
+        "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
+        + "; updated to Martini 3 force field by Magdalena Szczuka\n"
+        + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
+        + "; SMILES code : " + topo.mol_smi + "\n\n"
+        + "\n[moleculetype]\n"
+        + "; molname       nrexcl\n"
+        + "  {:5s}         {:d}\n\n".format(topo.molname, topo.nrexcl)
+        + "[atoms]\n"
+        + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num\n"
+    )
+    
+    # Atoms
+    text += format_topology_atoms(topo.atoms, trial)
+    
+    # Bonds and constraints
+    text += format_topology_bonds(topo.bonds, topo.constraints, topo.beadtypes, [], trial)
+    
+    # Angles
+    text += format_topology_angles(topo.angles, topo.beadtypes)
+    
+    # Dihedrals
+    if topo.dihedrals:
+        # Need cgbeads and ringatoms for formatting dihedrals
+        # For now, skip num_ar calculation - will need to refactor if needed
+        text += "\n[dihedrals]\n;  i  j  k  l  funct  angle  force.c.\n"
+        beadlist = []
+        for bead in topo.beadtypes:
+            if not bead.startswith('T') and not bead.startswith('S'):
+                beadlist.append('R')
+            else:
+                beadlist.append(bead[0])
+        
+        for d in topo.dihedrals:
+            force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
+            if force is None:
+                force = d[5]
+            text += "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
+                d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
+            )
+    
+    return text

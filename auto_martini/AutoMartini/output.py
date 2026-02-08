@@ -85,7 +85,7 @@ def output_map(sites, site_names, molname):
 def _parse_itp_atoms_mapping(itp_text: str):
     """Parse AutoMartini-generated `[atoms]` block and extract bead->atom mapping.
 
-    Expected input format (as produced by `topology.print_header()` + `topology.print_atoms()`)
+    Expected input format (as produced by `topology.format_topology_header()` + `topology.format_topology_atoms()`)
     includes per-atom comment fragments like:
 
         ; atoms: P0, O5, O14, ...

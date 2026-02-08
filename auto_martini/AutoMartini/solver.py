@@ -329,57 +329,45 @@ class Cg_molecule:
 
         return bead_cog
 
-    def _finalize_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
-        """Finalize topology after successful mapping."""
-        header_write = topology.print_header(self.molname, self.smiles)
-        self.cg_bead_names, bead_types, atoms_write, atoms_in_smi = topology.print_atoms(
-            self.molname,
-            self.forcepred,
-            cg_beads,
-            self.molecule,
-            self.hbond_a,
-            self.hbond_d,
-            self.partitioning,
-            self.ring_atoms,
-            self.ring_atoms_flat,
-            self.logp_file,
-            trial=False,
-        )
 
+    def _build_topology(self, cg_beads, cg_beads_rings, bead_types):
+        # Build complete topology using new Topology class
+        topo = topology.build_topology(
+            molname=self.molname,
+            mol_smi=self.smiles,
+            forcepred=self.forcepred,
+            cgbeads=cg_beads,
+            cgbeads_ring=cg_beads_rings,
+            molecule=self.molecule,
+            hbonda=self.hbond_a,
+            hbondd=self.hbond_d,
+            partitioning=self.partitioning,
+            cgbead_coords=self.cg_bead_coords,
+            ringatoms=self.ring_atoms,
+            ringatoms_flat=self.ring_atoms_flat,
+            logp_file=self.logp_file,
+            beadtypes=bead_types,
+            trial=False,
+            simple_model=self.simple_model
+        )
+        return topo
+
+
+    def _finalize_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
+        """Finalize topology after successful mapping - builds complete Topology object."""
+        
+        # Store convenience references
+        self.cg_bead_names = self.topology.atomnames
+        
         logger.info("Final CG model: %d beads", len(self.cg_bead_names))
 
-        bond_list, const_list, bonds_write = topology.print_bonds(
-            cg_beads,
-            cg_beads_rings,
-            self.molecule,
-            self.partitioning,
-            self.cg_bead_coords,
-            bead_types,
-            self.ring_atoms,
-            False,
-        )
-
-        if not self.simple_model:
-            dihedrals_write = topology.print_dihedrals(
-                cg_beads,
-                const_list,
-                self.ring_atoms,
-                self.cg_bead_coords,
-                bead_types
-            )
-
-        angles_write, angle_list = topology.print_angles(
-            cg_beads,
-            self.molecule,
-            self.partitioning,
-            self.cg_bead_coords,
-            bead_types,
-            bond_list,
-            const_list,
-            self.ring_atoms,
-        )
-
-        if not angles_write and len(bond_list) > 1:
+        # Validation checks
+        bond_list = self.topology.bonds
+        const_list = self.topology.constraints
+        angle_list = self.topology.angles
+        
+        errval = 0
+        if len(bond_list) > 1 and len(angle_list) == 0:
             errval = 2
         if bond_list and angle_list:
             if (len(bond_list) + len(const_list)) < 2 and len(angle_list) > 0:
@@ -390,22 +378,47 @@ class Cg_molecule:
             ):
                 errval = 7
 
+        # Generate formatted outputs
+        header_write = topology.format_topology_header(self.topology)
+        atoms_write = topology.format_topology_atoms(self.topology.atoms, trial=False)
+        bonds_write = topology.format_topology_bonds(
+            self.topology.bonds, self.topology.constraints, 
+            self.topology.beadtypes, self.ring_atoms, trial=False
+        )
+        angles_write = topology.format_topology_angles(self.topology.angles, self.topology.beadtypes)
+        
+        if not self.simple_model and self.topology.dihedrals:
+            dihedrals_write = topology.format_topology_dihedrals(
+                self.topology.dihedrals, 0, cg_beads, self.ring_atoms, 
+                self.cg_bead_coords, self.topology.beadtypes
+            )
+        else:
+            dihedrals_write = ""
+
         self.topout, bartender_input_info = topology.topout(header_write, atoms_write, bonds_write, angles_write)
 
-        # check if fusion of cycles
+        # Check if fusion of cycles
         common = False
         if len(self.ring_atoms) > 1:
             cpt = list(set.intersection(*map(set, self.ring_atoms)))
-            if len(cpt) > 1 : common=True
+            if len(cpt) > 1:
+                common = True
             for i in self.ring_atoms:
-                if len(i) > 6 : common=True
+                if len(i) > 6:
+                    common = True
         else:
-            if len(self.ring_atoms_flat)>6 : common=True
+            if len(self.ring_atoms_flat) > 6:
+                common = True
 
-        self.topout, bartender_input_info = topology.topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, self.cg_bead_coords, self.ring_atoms, cg_beads)
+        self.topout, bartender_input_info = topology.topout_noVS(
+            header_write, atoms_write, bonds_write, angles_write, dihedrals_write, 
+            self.cg_bead_coords, self.ring_atoms, cg_beads
+        )
         
         if self.bartender:
-            self.bartender_out = topology.bartender_input(self.molecule, self.molname, atoms_in_smi, bartender_input_info)
+            self.bartender_out = topology.bartender_input(
+                self.molecule, self.molname, self.topology.atoms_in_smi_dict, bartender_input_info
+            )
             with open(self.bartenderfname, "w") as btf:
                 btf.write(self.bartender_out)
             logger.info("Wrote bartender input: %s", self.bartenderfname)
@@ -448,6 +461,7 @@ class Cg_molecule:
         self.topout = None
         self.bartender_out = None
         self.graph = None
+        self.topology = None  # Will be populated after successful mapping
         self.force_map = False
 
         if self.raw_molecule:
@@ -526,7 +540,7 @@ class Cg_molecule:
         attempt = 0
 
         logger.info("Going through the candidate mappings")
-        while attempt < self.max_attempts:
+        for attempt in range(self.max_attempts):
 
             if attempt % 1000 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
@@ -542,8 +556,8 @@ class Cg_molecule:
             try:
                 partitioning = self.get_partitioning(cg_beads, self.graph)
             except Exception:
-                attempt += 1
                 continue
+            
             bead_pos = self._get_bead_pos(cg_beads, self.conf)
             success = True
             self.partitioning = partitioning
@@ -588,7 +602,7 @@ class Cg_molecule:
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
-            mapping_dict = optimization.make_mapping_dictionary(self.partitioning)
+            mapping_dict = make_mapping_dictionary(self.partitioning)
             for ring in self.ring_atoms:
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():
@@ -598,8 +612,8 @@ class Cg_molecule:
                                 if at not in ring:
                                     ring.append(at)
 
-            logger.info("Printing Atoms")
-            self.cg_bead_names, bead_types, _, _ = topology.print_atoms(
+            logger.info("Building Atoms")
+            self.cg_bead_names, bead_types, _, _ = topology.build_atoms_data(
                     self.molname,
                     self.forcepred,
                     cg_beads,
@@ -615,48 +629,22 @@ class Cg_molecule:
 
             if not self.cg_bead_names:
                 success = False
+                continue
             # Check additivity between fragments and entire molecule
             if not self.check_additivity(self.forcepred, bead_types, self.molecule, self.smiles):
-                success = False
+                continue
             
-            # Bond list
-            try:
-                bond_list, const_list , _= topology.print_bonds(
-                    cg_beads,
-                    cg_beads_rings,
-                    self.molecule,
-                    self.partitioning,
-                    self.cg_bead_coords,
-                    bead_types, # AutoM3 change
-                    self.ring_atoms,
-                    trial=True,
-                )
-            except Exception:
-                raise
+            logger.info("Success mapping found on attempt %d", attempt + 1)
+            self.topology = self._build_topology(cg_beads, cg_beads_rings, bead_types)
+            self._finalize_topology(cg_beads, cg_beads_rings, bead_types, attempt)
+            break
 
-            # I added errval below from the master branch ... not sure where to use this anywhere, possibly leave for debugging
-            if not self.ring_atoms and (len(bond_list) + len(const_list)) >= len(self.cg_bead_names):
-                errval = 3
-                success = False
-            if (len(bond_list) + len(const_list)) < len(self.cg_bead_names) - 1:
-                errval = 5
-                success = False
-            if len(cg_beads) != len(self.cg_bead_names):
-                success = False
-                errval = 8
-            
-            if success:
-                logger.info("Success mapping found on attempt %d", attempt + 1)
-                self._finalize_topology(cg_beads, cg_beads_rings, bead_types, attempt)
-                break
-            else:
-                attempt += 1
-        
-                # AutoM3 change : force mapping by old code if new code doesn't give result
-                if attempt == self.max_attempts and not self.force_map:
-                    self.force_map = True
-                    attempt = 0 
-                    logger.info("Retrying with force_map=True")
+                # # AutoM3 change : force mapping by old code if new code doesn't give result
+                # attempt += 1
+                # if attempt == self.max_attempts and not self.force_map:
+                #     self.force_map = True
+                #     attempt = 0 
+                #     logger.info("Retrying with force_map=True")
 
         if attempt == self.max_attempts and self.force_map:
             raise RuntimeError(
@@ -681,6 +669,10 @@ class Cg_molecule:
         else:
             return cg_out
 
+
+################
+# OLD STUFF
+#################
 
 def voronoi_atoms_old(cgbead_coords, heavyatom_coords, allatom_coords, molecule, in_partitioning): #AutoM3 change
     """Partition all atoms between CG beads"""
