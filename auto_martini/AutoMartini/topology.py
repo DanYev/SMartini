@@ -47,7 +47,7 @@ class Topology:
     molname: str = ""
     mol_smi: str = ""
     
-    # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logporigin
+    # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logp_origin
     atoms: list = field(default_factory=list)
     atomnames: list = field(default_factory=list)
     beadtypes: list = field(default_factory=list)
@@ -105,10 +105,10 @@ class Topology:
             if errval == 0:
                 try:
                     if charge_frag == 0:
-                        alogps, logporigin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
+                        alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
                     else:
                         alogps = 0.0
-                        logporigin = "; Charged fragment"
+                        logp_origin = "; Charged fragment"
                 except (NameError, TypeError, ValueError):
                     return
 
@@ -135,7 +135,7 @@ class Topology:
                     'mass': mass,
                     'smiles': smi_frag,
                     'atoms_in_smi': atoms_in_smi,
-                    'logporigin': logporigin
+                    'logp_origin': logp_origin
                 }
                 self.atoms.append(atom_dict)
                 self.beadtypes.append(bead_type)
@@ -564,7 +564,7 @@ class Topology:
                 "   {:<5d}   {:5s}   {:d}   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                     atom['cgnr'], atom['charge'], atom['mass'], atom['smiles'],
-                    atom['atoms_in_smi'], atom['logporigin']
+                    atom['atoms_in_smi'], atom['logp_origin']
                 )
             )
         return text
@@ -1597,7 +1597,7 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
 
     ## AutoM3 ###
     if not logp_file:
-        logp_file = os.path.join(os.path.dirname(__file__), 'logP_smi.dat')
+        logp_file = os.path.join(os.path.dirname(__file__), 'logP_smi_extended.dat')
     found_smi = False
     if bead != "MOL":
         logP_data = {}
@@ -1612,9 +1612,9 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
                         (key, val) = line.rstrip().split()
                         logP_data[key] = float(val)
             except Exception as e:
-                print(f"An error occurred while reading the logP file")
+                logger.error(f"An error occurred while reading the logP file: {e}")
         else:
-            print(f"Invalid file name: {logp_file}")
+            logger.error(f"Invalid file name: {logp_file}")
         
         log_p = 0.0
         for smiles, logp in logP_data.items():
@@ -1893,10 +1893,10 @@ def build_atoms_data(cgbeads, molname, forcepred, molecule, hbonda, hbondd, part
         if errval == 0:
             try:
                 if charge_frag == 0:
-                    alogps, logporigin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
+                    alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
                 else:
                     alogps = 0.0
-                    logporigin = "; Charged fragment"
+                    logp_origin = "; Charged fragment"
             except (NameError, TypeError, ValueError):
                 return atomnames, beadtypes, atoms_data, atoms_in_smi_dict
 
@@ -1925,7 +1925,7 @@ def build_atoms_data(cgbeads, molname, forcepred, molecule, hbonda, hbondd, part
                 'mass': mass,
                 'smiles': smi_frag,
                 'atoms_in_smi': atoms_in_smi,
-                'logporigin': logporigin
+                'logp_origin': logp_origin
             }
             atoms_data.append(atom_dict)
             beadtypes.append(bead_type)
@@ -2070,7 +2070,7 @@ def format_topology_atoms(atoms_data, trial=False):
             "   {:<5d}   {:5s}   {:d}   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
                 atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                 atom['cgnr'], atom['charge'], atom['mass'], atom['smiles'],
-                atom['atoms_in_smi'], atom['logporigin']
+                atom['atoms_in_smi'], atom['logp_origin']
             )
         )
     return text

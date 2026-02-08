@@ -45,8 +45,8 @@ class Cg_molecule:
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
 
-    def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
-        bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
+    def __init__(self, molecule, mol_smi, molname, logp_file_name="logP_smi_extended.dat", 
+        simple_model=None, topfname=None, bartenderfname=None, bartender=None, forcepred=True,
         min_beads=None, max_beads=None, raw_molecule=None):
         
         # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
@@ -60,7 +60,7 @@ class Cg_molecule:
         self.topfname = topfname
         self.bartenderfname = bartenderfname
         self.bartender = bartender
-        self.logp_file = logp_file
+        self.logp_file = os.path.join(os.path.dirname(__file__), logp_file_name)
         self.forcepred = forcepred
         self.min_beads = min_beads
         self.max_beads = max_beads
@@ -71,7 +71,7 @@ class Cg_molecule:
         self.list_ha_names = None
         self.conf = None
         self.ha_coords = None
-        self.atom_coords = None
+        self.aa_coords = None
         self.ring_atoms = None
         self.ring_atoms_flat = None
         self.is_arom = None
@@ -112,7 +112,7 @@ class Cg_molecule:
         self.list_ha_names = self.aa_graph["list_ha_names"]
         self.conf = self.aa_graph["conf"]
         self.ha_coords = self.aa_graph["ha_coords"]
-        self.atom_coords = self.aa_graph["atom_coords"]
+        self.aa_coords = self.aa_graph["aa_coords"]
         self.ring_atoms = self.aa_graph["ring_atoms"]
         self.ring_atoms_flat = self.aa_graph["ring_atoms_flat"]
         self.is_arom = self.aa_graph["is_aromatic"]
@@ -140,7 +140,7 @@ class Cg_molecule:
             self.ha_graph,
             self.list_ha,
             self.ha_coords,
-            self.atom_coords,
+            self.aa_coords,
             self.ring_atoms,
             self.ring_atoms_flat,
             self.force_map,  # AutoM3 new argument
@@ -182,18 +182,17 @@ class Cg_molecule:
 
             logger.info("Trying to partition the atoms between beads")
             try:
-                partitioning = self.get_partitioning(cg_beads)
+                self.partitioning = self.get_partitioning(cg_beads)
             except Exception:
                 continue
+            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
-            bead_pos = self._get_bead_pos(cg_beads, self.conf)
-            self.partitioning = partitioning
+            # bead_pos = self._get_bead_pos(cg_beads, self.conf)
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
             self.cg_bead_coords = self.get_bead_coords()
-            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
             # cgbeads should take atom rings number if ring atom in bead 
             cg_beads_rings = cg_beads.copy()
@@ -276,14 +275,14 @@ class Cg_molecule:
         
         # Get coordinates - heavy atoms and all atoms
         ha_coords = []
-        atom_coords = []
+        aa_coords = []
         for i in range(num_atoms):
             coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
             if self.molecule.GetAtomWithIdx(i).GetSymbol() != "H":
                 ha_coords.append(coord)
-                atom_coords.append(coord)
+                aa_coords.append(coord)
             else:
-                atom_coords.append(coord)
+                aa_coords.append(coord)
         
         # Get ring atoms (systems of joined rings)
         rings = self.molecule.GetRingInfo().AtomRings()
@@ -335,7 +334,7 @@ class Cg_molecule:
             "list_ha_names": list_ha_names,
             "conf": conformer,
             "ha_coords": ha_coords,
-            "atom_coords": atom_coords,
+            "aa_coords": aa_coords,
             "ring_atoms": ring_atoms,
             "ring_atoms_flat": ring_atoms_flat,
             "is_aromatic": is_aromatic,
@@ -601,7 +600,7 @@ class Cg_molecule:
 
         # create partitioning including hydrogens inside beads
         aa_partitioning = self.partitioning.copy()
-        for at in range(len(self.atom_coords)):
+        for at in range(len(self.aa_coords)):
             if at not in aa_partitioning.keys():
                 hbead = None
                 for b in bonds:
@@ -621,11 +620,11 @@ class Cg_molecule:
 
         # compute COG while taking into account hydrogens
         bead_coord = {}
-        for atom in range(len(self.atom_coords)):
+        for atom in range(len(self.aa_coords)):
             bead = aa_partitioning[atom]
             if bead not in bead_coord.keys():
                 bead_coord[bead] = []
-            bead_coord[bead].append(self.atom_coords[atom])
+            bead_coord[bead].append(self.aa_coords[atom])
 
         bead_cog = []
         for bead, coords in sorted(bead_coord.items()):
@@ -784,7 +783,7 @@ class Cg_molecule:
 # OLD STUFF
 #################
 
-def voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, molecule, in_partitioning): #AutoM3 change
+def voronoi_atoms_old(cgbead_coords, ha_coords, aa_coords, molecule, in_partitioning): #AutoM3 change
     """Partition all atoms between CG beads"""
     logger.debug("Entering voronoi_atoms_old()")
 
@@ -856,7 +855,7 @@ def voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, molecule, in_par
 
     # create partitioning including hydrogens inside beads
     aa_partitioning = partitioning.copy()
-    for at in range(len(allatom_coords)):
+    for at in range(len(aa_coords)):
         if at not in aa_partitioning.keys():
             hbead = None
             for b in bonds:
@@ -876,11 +875,11 @@ def voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, molecule, in_par
 
     #compute COG while taking into account hydrogens
     bead_coord = {}
-    for atom in range(len(allatom_coords)):
+    for atom in range(len(aa_coords)):
         bead = aa_partitioning[atom]
         if bead not in bead_coord.keys(): 
             bead_coord[bead] = []
-        bead_coord[bead].append(allatom_coords[atom])
+        bead_coord[bead].append(aa_coords[atom])
 
     bead_cog = []
     for bead, coords in sorted(bead_coord.items()):
@@ -890,7 +889,7 @@ def voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, molecule, in_par
     return partitioning, bead_cog
 
 
-def voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, molecule, in_partitioning): # AutoM3
+def voronoi_atoms_new(cgbead_coords, ha_coords, aa_coords, molecule, in_partitioning): # AutoM3
     """
     Partition all atoms between CG beads, based on headliners coordinates and distances between other atoms coordinates. 
     Headliners are atoms with cgbead_coords coordinates.
@@ -977,7 +976,7 @@ def voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, molecule, in_par
 
     # create partitioning including hydrogens inside beads
     aa_partitioning = partitioning.copy()
-    for at in range(len(allatom_coords)):
+    for at in range(len(aa_coords)):
         if at not in aa_partitioning.keys():
             hbead = None
             for b in bonds:
@@ -999,11 +998,11 @@ def voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, molecule, in_par
 
     #compute COG while taking into account hydrogens
     bead_coord={}
-    for atom in range(len(allatom_coords)):
+    for atom in range(len(aa_coords)):
         bead=aa_partitioning[atom]
         if bead not in bead_coord.keys(): 
             bead_coord[bead]=[]
-        bead_coord[bead].append(allatom_coords[atom])
+        bead_coord[bead].append(aa_coords[atom])
 
     bead_cog=[]
     for bead, coords in sorted(bead_coord.items()):
@@ -1029,7 +1028,7 @@ def sanitize_rings(partitioning, atoms_xyz, ringatoms):
 
 
 def all_atoms_in_beads_connected(trial_comb, ha_coords, 
-    list_ha, bondlist, mol, allatom_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
+    list_ha, bondlist, mol, aa_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
     """Make sure all atoms within one CG bead are connected to at least
     one other atom in that bead"""
     # Bead coordinates are given by heavy atoms themselves
@@ -1041,9 +1040,9 @@ def all_atoms_in_beads_connected(trial_comb, ha_coords,
     _, num_arom = topology.is_aromatic(mol) #AutoM3 change
     ### AutoM3 change of mapping approach to differenciate molecules with 0-1 and more cycles
     if not force_map and num_arom < 7: #AutoM3 change
-        voronoi, _  = voronoi_atoms_new(cgbead_coords, ha_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+        voronoi, _  = voronoi_atoms_new(cgbead_coords, ha_coords, aa_coords, mol, in_partitioning) #AutoM3 change
     else:
-        voronoi, _  = voronoi_atoms_old(cgbead_coords, ha_coords, allatom_coords, mol, in_partitioning) #AutoM3 change
+        voronoi, _  = voronoi_atoms_old(cgbead_coords, ha_coords, aa_coords, mol, in_partitioning) #AutoM3 change
     logger.debug("voronoi %s" % voronoi)
 
     for i in range(len(trial_comb)):
@@ -1109,9 +1108,9 @@ def invert_mapping_dictionary(mapping_dict):
     return Cg_molecule.invert_mapping_dictionary(mapping_dict)
 
 
-def get_bead_coords(partitioning, allatom_coords, molecule):
+def get_bead_coords(partitioning, aa_coords, molecule):
     # Alias for backward compatibility - creates temporary instance
     temp = Cg_molecule(molecule=molecule, mol_smi="", molname="temp", raw_molecule=molecule)
     temp.partitioning = partitioning
-    temp.atom_coords = allatom_coords
+    temp.aa_coords = aa_coords
     return temp.get_bead_coords()
