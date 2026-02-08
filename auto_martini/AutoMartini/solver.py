@@ -149,35 +149,31 @@ class Cg_molecule:
         )
         logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
 
-        # Remove mappings with bead numbers less than most optimal mapping.
-        self.filtered_cg_beads = []
-        for cg_beads in list_cg_beads:
-            if (
-                len(cg_beads) == len(list_cg_beads[0])
-                # and (len(self.list_ha) - (5 * len(cg_beads))) > 3
-            ):
-                self.filtered_cg_beads.append(cg_beads)
-        logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
-        self.filtered_cg_beads = list_cg_beads
+        # # Remove mappings with bead numbers less than most optimal mapping.
+        # self.cg_beads_list = []
+        # for cg_beads in list_cg_beads:
+        #     if (
+        #         len(cg_beads) == len(list_cg_beads[0])
+        #         # and (len(self.list_ha) - (5 * len(cg_beads))) > 3
+        #     )::1
+        #         self.cg_beads_list.append(cg_beads)
+        # logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
 
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
-        self.max_attempts = len(self.filtered_cg_beads) 
-        logger.info("Max. number of attempts: %d", self.max_attempts)
-        attempt = 0
-
+        
+        self.max_attempts = len(list_cg_beads) 
         logger.info("Going through the candidate mappings")
         for attempt in range(self.max_attempts):
 
             if attempt % 1000 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
 
-            cg_beads = self.filtered_cg_beads[attempt]
+            cg_beads = list_cg_beads[attempt]
 
-            # if len(cg_beads) != 11:
-            #     attempt += 1
+            # if len(cg_beads) == 11:
             #     continue
-            # partitioning = get_partitioning(cg_beads, self.graph)
+            # self.partitioning = self.get_partitioning(cg_beads, self.graph)
             # exit()
 
             logger.info("Trying to partition the atoms between beads")
@@ -187,7 +183,6 @@ class Cg_molecule:
                 continue
             logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
-            # bead_pos = self._get_bead_pos(cg_beads, self.conf)
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 
             # Extract position of coarse-grained beads
@@ -245,8 +240,6 @@ class Cg_molecule:
             self._update_topology(cg_beads, cg_beads_rings, bead_types, attempt, num_ar)
             self._write_topology()
             break
-
-
 
     def extract_features(self):
         """Extract features of molecule (H-bond donors/acceptors, etc.)"""
@@ -344,22 +337,6 @@ class Cg_molecule:
             "bonds": bonds,
         }
 
-    @staticmethod
-    def get_coords(conformer, sites, avg_pos, ringatoms_flat):
-        """Extract coordinates of CG beads"""
-        # CG beads are averaged over best trial combinations for all
-        # non-aromatic atoms.
-        site_coords = []
-        for i in range(len(sites)):
-            if sites[i] in ringatoms_flat:
-                site_coords.append(
-                    np.array([conformer.GetAtomPosition(int(sites[i]))[j] for j in range(3)])
-                )
-            else:
-                # Use average
-                site_coords.append(np.array(avg_pos[i]))
-        return site_coords
-
     def get_ha_bonds(self):
         # List of bonds between heavy atoms
         list_bonds = []
@@ -369,49 +346,7 @@ class Cg_molecule:
                     list_bonds.append([self.list_ha[i], self.list_ha[j]])
         return list_bonds
 
-    def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument
-        """Check additivity assumption between sum of free energies of CG beads
-        and free energy of whole molecule"""
-        logger.debug("Entering check_additivity()")
-        # If there's only one bead, don't check.
-        sum_frag = 0.0
-        rings = False
-        logger.info("; Bead types: %s" % beadtypes)
-        for bead in beadtypes:
-            if bead[0] == "S" or bead[0] == "T": # AutoM3 change : added bead "T"
-                rings = True
-            delta_f_types = read_delta_f_types()
-            sum_frag += delta_f_types[bead] #sum of free energies of beads in ring(s)
-        # Wildman-Crippen log_p
-        wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(self.molecule)[0]
-        # Get SMILES string of entire molecule
-
-        whole_mol_dg,_ = smi2alogps(self.forcepred, self.smiles, wc_log_p, "MOL", None, None, True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
-        if whole_mol_dg != 0:
-            m_ad = math.fabs((whole_mol_dg - sum_frag) / whole_mol_dg)
-            logger.info(
-                "; Mapping additivity assumption ratio: %7.4f (whole vs sum: %7.4f vs. %7.4f)"
-                % (m_ad, whole_mol_dg / (-4.184), sum_frag / (-4.184))
-            )
-            if len(beadtypes) == 1:
-                return True
-            if (not rings and m_ad < 0.5) or rings:
-                return True
-            else:
-                return False
-        else:
-            return False
-
-    @staticmethod
-    def _get_bead_pos(trial_comb, conformer):
-        # Get bead positions
-        beadpos = [[0] * 3 for l in range(len(trial_comb))]
-        for l in range(len(trial_comb)):
-            beadpos[l] = [
-                conformer.GetAtomPosition(int(sorted(trial_comb)[l]))[m]
-                for m in range(3)
-            ]
-        return beadpos
+   
     
     def get_ha_graph(self):
         """Get graph representation of molecule based on heavy atoms only"""
@@ -469,34 +404,19 @@ class Cg_molecule:
 
         return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
 
-    @staticmethod
-    def _single_atom_in_mapping(mapping):
-        for ns in mapping:
-            if len(ns) == 1:
-                return True
-        return False
+    def get_partitioning(self, trial_comb):
+        """Get partitioning of atoms into beads for given trial combination"""
+        atoms = self.ha_graph["atoms"]
+        mapping = self._distribute_neighbors(trial_comb, atoms)
+        mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
+        partitioning = self.invert_mapping_dictionary(mapping_dict)
+        return partitioning
 
     @staticmethod
-    def _ring_beads_are_tiny(mapping, bead_is_in_ring):
-        for ns, ring in zip(mapping, bead_is_in_ring):
-            if ring and len(ns) > 2:
-                return False
-        return True
-
-    @staticmethod
-    def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
-        for ns, ring in zip(mapping, bead_is_in_ring):
-            if not ring:
-                continue
-            for atom in ns:
-                if not atom_is_in_ring[atom]:
-                    return False
-        return True
-
-    @staticmethod
-    def distribute_neighbors(trial_comb, atoms):
+    def _distribute_neighbors(trial_comb, atoms):
         """Find acceptable mappings of atoms to beads for given trial combination"""
         bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
+        print(bead_neighbors)
         bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
         atom_is_in_ring = [a["is_in_ring"] for a in atoms]
         n_atoms = len(atoms)
@@ -555,13 +475,29 @@ class Cg_molecule:
 
         return mappings[0]
 
-    def get_partitioning(self, trial_comb):
-        """Get partitioning of atoms into beads for given trial combination"""
-        atoms = self.ha_graph["atoms"]
-        mapping = self.distribute_neighbors(trial_comb, atoms)
-        mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
-        partitioning = self.invert_mapping_dictionary(mapping_dict)
-        return partitioning
+    @staticmethod
+    def _single_atom_in_mapping(mapping):
+        for ns in mapping:
+            if len(ns) == 1:
+                return True
+        return False
+
+    @staticmethod
+    def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+        for ns, ring in zip(mapping, bead_is_in_ring):
+            if ring and len(ns) > 2:
+                return False
+        return True
+
+    @staticmethod
+    def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+        for ns, ring in zip(mapping, bead_is_in_ring):
+            if not ring:
+                continue
+            for atom in ns:
+                if not atom_is_in_ring[atom]:
+                    return False
+        return True
 
     @staticmethod
     def make_mapping_dictionary(partitioning):
@@ -633,6 +569,38 @@ class Cg_molecule:
 
         return bead_cog
 
+    def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument
+        """Check additivity assumption between sum of free energies of CG beads
+        and free energy of whole molecule"""
+        logger.debug("Entering check_additivity()")
+        # If there's only one bead, don't check.
+        sum_frag = 0.0
+        rings = False
+        logger.info("; Bead types: %s" % beadtypes)
+        for bead in beadtypes:
+            if bead[0] == "S" or bead[0] == "T": # AutoM3 change : added bead "T"
+                rings = True
+            delta_f_types = read_delta_f_types()
+            sum_frag += delta_f_types[bead] #sum of free energies of beads in ring(s)
+        # Wildman-Crippen log_p
+        wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(self.molecule)[0]
+        # Get SMILES string of entire molecule
+
+        whole_mol_dg,_ = smi2alogps(self.forcepred, self.smiles, wc_log_p, "MOL", None, None, True) # AutoM3 change : None,None=converted_smi, real_smi not needed here
+        if whole_mol_dg != 0:
+            m_ad = math.fabs((whole_mol_dg - sum_frag) / whole_mol_dg)
+            logger.info(
+                "; Mapping additivity assumption ratio: %7.4f (whole vs sum: %7.4f vs. %7.4f)"
+                % (m_ad, whole_mol_dg / (-4.184), sum_frag / (-4.184))
+            )
+            if len(beadtypes) == 1:
+                return True
+            if (not rings and m_ad < 0.5) or rings:
+                return True
+            else:
+                return False
+        else:
+            return False
 
     def _build_topology(self, cg_beads, cg_beads_rings, bead_types):
         """Build topology data using Topology instance methods."""
@@ -650,7 +618,6 @@ class Cg_molecule:
             logp_file=self.logp_file,
             trial=False
         )
-        
         # Override beadtypes if provided
         if bead_types is not None:
             self.topology.beadtypes = bead_types
@@ -1062,55 +1029,3 @@ def all_atoms_in_beads_connected(trial_comb, ha_coords,
             logger.debug("Error: %s < %s, %s" % (num_bonds, num_atoms - 1, sub_bond_list))
             return False
     return True
-
-
-# --- Backwards-compatible module-level wrappers ---
-# Some external code (or older notebooks/scripts) may import these helpers from this module.
-def get_coords(conformer, sites, avg_pos, ringatoms_flat):
-    return Cg_molecule.get_coords(conformer, sites, avg_pos, ringatoms_flat)
-
-
-def get_ha_bonds(molecule, list_ha):
-    # Alias for backward compatibility - creates temporary instance
-    temp = Cg_molecule(molecule=molecule, mol_smi="", molname="temp", raw_molecule=molecule)
-    temp.list_ha = list_ha
-    return temp.get_ha_bonds()
-
-
-def check_additivity(forcepred, beadtypes, molecule, mol_smi):
-    # Alias for backward compatibility - creates temporary instance
-    temp = Cg_molecule(molecule=molecule, mol_smi=mol_smi, molname="temp", forcepred=forcepred, raw_molecule=molecule)
-    return temp.check_additivity(beadtypes)
-
-
-def get_ha_graph(mol=None, smiles=None):
-    # Alias for backward compatibility - creates temporary instance
-    temp = Cg_molecule(molecule=mol, mol_smi=smiles, molname="temp", raw_molecule=mol)
-    return temp.get_ha_graph()
-
-
-def distribute_neighbors(trial_comb, atoms):
-    return Cg_molecule.distribute_neighbors(trial_comb, atoms)
-
-
-def get_partitioning(trial_comb, graph):
-    # Alias for backward compatibility - creates temporary instance  
-    temp = Cg_molecule(molecule=None, mol_smi="", molname="temp", raw_molecule=None)
-    temp.ha_graph = graph
-    return temp.get_partitioning(trial_comb)
-
-
-def make_mapping_dictionary(partitioning):
-    return Cg_molecule.make_mapping_dictionary(partitioning)
-
-
-def invert_mapping_dictionary(mapping_dict):
-    return Cg_molecule.invert_mapping_dictionary(mapping_dict)
-
-
-def get_bead_coords(partitioning, aa_coords, molecule):
-    # Alias for backward compatibility - creates temporary instance
-    temp = Cg_molecule(molecule=molecule, mol_smi="", molname="temp", raw_molecule=molecule)
-    temp.partitioning = partitioning
-    temp.aa_coords = aa_coords
-    return temp.get_bead_coords()
