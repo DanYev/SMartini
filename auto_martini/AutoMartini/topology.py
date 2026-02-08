@@ -222,18 +222,18 @@ def get_atoms(molecule):
     """List all heavy atoms"""
     conformer = molecule.GetConformer()
     num_atoms = conformer.GetNumAtoms()
-    list_heavyatoms = []
-    list_heavyatomnames = []
+    list_has = []
+    list_hanames = []
     atoms = range(num_atoms)
     for i in np.nditer(atoms):
         atom_name = molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
         if atom_name != "H":
-            list_heavyatoms.append(atoms[i])
-            list_heavyatomnames.append(f"{atom_name}{i+1}")
-    if len(list_heavyatoms) == 0:
+            list_has.append(atoms[i])
+            list_hanames.append(f"{atom_name}{i+1}")
+    if len(list_has) == 0:
         print("Error. No heavy atom found.")
         exit(1)
-    return list_heavyatoms, list_heavyatomnames
+    return list_has, list_hanames
 
 
 def get_ring_atoms(mol):
@@ -265,9 +265,9 @@ def is_aromatic(mol): # AutoM3 function
     return (num_aromatic_atoms > 0, num_aromatic_atoms)
 
 
-def get_heavy_atom_coords(molecule):
+def get_ha_coords(molecule):
     """Extract atomic coordinates of heavy atoms in molecule mol"""
-    logger.debug("Entering get_heavy_atom_coords()")
+    logger.debug("Entering get_ha_coords()")
     heavyatom_coords = []
     allatom_coords=[] #AutoM3
     conformer = molecule.GetConformer()

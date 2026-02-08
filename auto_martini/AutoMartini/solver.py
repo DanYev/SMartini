@@ -94,7 +94,7 @@ class Cg_molecule:
 
         # Get list of heavy atoms and their coordinates
         self.list_ha, self.list_heavyatom_names = topology.get_atoms(self.molecule)
-        self.conf, self.heavy_atom_coords, self.atom_coords = topology.get_heavy_atom_coords(self.molecule)
+        self.conf, self.heavy_atom_coords, self.atom_coords = topology.get_ha_coords(self.molecule)
         self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
         logger.info("Detected %d heavy atoms", len(self.list_ha))
 
@@ -108,7 +108,7 @@ class Cg_molecule:
         self.hbond_d = topology.get_hbond_d(self.feats)
 
         # List of bonds between heavy atoms
-        self.list_bonds = self.get_heavy_atom_bonds(self.molecule, self.list_ha)
+        self.list_bonds = self.get_ha_bonds(self.molecule, self.list_ha)
 
         # Flatten list of ring atoms
         self.ring_atoms_flat = list(chain.from_iterable(self.ring_atoms))
@@ -253,7 +253,7 @@ class Cg_molecule:
         return site_coords
 
     @staticmethod
-    def get_heavy_atom_bonds(molecule, list_ha):
+    def get_ha_bonds(molecule, list_ha):
         # List of bonds between heavy atoms
         list_bonds = []
         for i in range(len(list_ha)):
@@ -938,8 +938,8 @@ def get_coords(conformer, sites, avg_pos, ringatoms_flat):
     return Cg_molecule.get_coords(conformer, sites, avg_pos, ringatoms_flat)
 
 
-def get_heavy_atom_bonds(molecule, list_ha):
-    return Cg_molecule.get_heavy_atom_bonds(molecule, list_ha)
+def get_ha_bonds(molecule, list_ha):
+    return Cg_molecule.get_ha_bonds(molecule, list_ha)
 
 
 def check_additivity(forcepred, beadtypes, molecule, mol_smi):
