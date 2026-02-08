@@ -1216,12 +1216,12 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
     exclusions_net = ""
     if len(ring_atoms[0]) > 4 and len(ring_atoms[0]) < 10 and len(bead_coords) < 6:
         #changing nrexcl to 1 if 1 cycle and max 5 beads
-        modified_lines_header=[]
+        modified_lines_header = []
         for line in list(header_write.split("\n")):
             if ("  "+molname) not in line: modified_lines_header.append(line)
             else:
-                lineH=line.split("         ")
-                txt=lineH[0]+"          1"
+                lineH = line.split("         ")
+                txt = lineH[0] + "          1"
                 modified_lines_header.append(txt)
         modified_header_write="\n".join(modified_lines_header)
 
@@ -1253,6 +1253,7 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
                     if dist > remote_dist and nb_bead1!=nb_bead2:
                         remote_beads=[nb_bead1,nb_bead2]
                         remote_dist=dist
+                        
             exclusions_net = ""
             exclusions_net = exclusions_net + "\n[exclusions]\n"
             exclusions_net = exclusions_net + "  " + str(remote_beads[0])+ " " + str(remote_beads[1])

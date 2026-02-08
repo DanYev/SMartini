@@ -161,7 +161,7 @@ class Cg_molecule:
 
         # Loop through best 1% cg_beads and avg_pos
         # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
-        
+
         self.max_attempts = len(list_cg_beads) 
         logger.info("Going through the candidate mappings")
         for attempt in range(self.max_attempts):
@@ -189,7 +189,7 @@ class Cg_molecule:
             logger.info("Extracting coordinates for CG beads")
             self.cg_bead_coords = self.get_bead_coords()
 
-            # cgbeads should take atom rings number if ring atom in bead 
+            # CG beads should take atom rings number if ring atom in bead 
             cg_beads_rings = cg_beads.copy()
             for i, b in enumerate(cg_beads):
                 if b not in self.ring_atoms_flat:
@@ -236,9 +236,9 @@ class Cg_molecule:
                 continue
             
             logger.info("Success mapping found on attempt %d", attempt)
-            num_ar = self._build_topology(cg_beads, cg_beads_rings, bead_types)
-            self._update_topology(cg_beads, cg_beads_rings, bead_types, attempt, num_ar)
-            self._write_topology()
+            num_ar = self.build_topology(cg_beads, cg_beads_rings, bead_types)
+            self.update_topology(cg_beads, cg_beads_rings, bead_types, attempt, num_ar)
+            self.write_topology()
             break
 
     def extract_features(self):
@@ -416,7 +416,6 @@ class Cg_molecule:
     def _distribute_neighbors(trial_comb, atoms):
         """Find acceptable mappings of atoms to beads for given trial combination"""
         bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
-        print(bead_neighbors)
         bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
         atom_is_in_ring = [a["is_in_ring"] for a in atoms]
         n_atoms = len(atoms)
@@ -602,7 +601,7 @@ class Cg_molecule:
         else:
             return False
 
-    def _build_topology(self, cg_beads, cg_beads_rings, bead_types):
+    def build_topology(self, cg_beads, cg_beads_rings, bead_types):
         """Build topology data using Topology instance methods."""
         
         # Build atoms data
@@ -662,7 +661,7 @@ class Cg_molecule:
         return num_ar
 
 
-    def _update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt, num_ar=0):
+    def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt, num_ar=0):
         """Update topology with formatted output strings after successful mapping."""
         
         # Store convenience references
@@ -714,7 +713,7 @@ class Cg_molecule:
             bartender=self.bartender
         )
         
-    def _write_topology(self):
+    def write_topology(self):
         """Write topology and bartender files to disk."""
         
         if self.bartender and self.bartenderfname:
@@ -782,7 +781,7 @@ def voronoi_atoms_old(cgbead_coords, ha_coords, aa_coords, molecule, in_partitio
                 logger.warning("Error. Can't find closest atom to bead %s" % i)
                 exit(1)
             closest_atoms[i] = closest_atom
-        print(closest_atoms)
+
         # If one bead has only one heavy atom, include one more
         for i in partitioning.values():
             if sum(x == i for x in partitioning.values()) == 1:
@@ -975,24 +974,19 @@ def voronoi_atoms_new(cgbead_coords, ha_coords, aa_coords, molecule, in_partitio
     for bead, coords in sorted(bead_coord.items()):
         cog = np.mean(coords,axis=0)
         bead_cog.append(cog)
-
+        
     return partitioning, bead_cog
-
 
 def sanitize_rings(partitioning, atoms_xyz, ringatoms):
     mapping_dict = Cg_molecule.make_mapping_dictionary(partitioning)
-    print(mapping_dict)
-    print(atoms_xyz)
     for bead, atoms in mapping_dict.items():
         for ring in ringatoms:
             if not set(atoms).issubset(ring):
                 continue
             if len(atoms) <= 2:
                 continue
-            print("More than 2 atoms in bead %s are in ring %s" % (bead, ring))
-
+            logger.warning("More than 2 atoms in bead %s are in ring %s" % (bead, ring))
     return partitioning
-
 
 def all_atoms_in_beads_connected(trial_comb, ha_coords, 
     list_ha, bondlist, mol, aa_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
