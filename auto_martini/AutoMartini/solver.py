@@ -37,8 +37,204 @@ logger = logging.getLogger(__name__)
 class Cg_molecule:
     """Main class to coarse-grain molecule"""
 
+    # Initialize feature factory for feature extraction
+    _fdefName = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
+    _factory = ChemicalFeatures.BuildFeatureFactory(_fdefName)
+
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
+
+    def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
+        bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
+        min_beads=None, max_beads=None, raw_molecule=None):
+        # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
+        # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
+
+        # Store all arguments as instance attributes
+        self.molecule = molecule
+        self.smiles = mol_smi
+        self.molname = molname
+        self.simple_model = simple_model
+        self.topfname = topfname
+        self.bartenderfname = bartenderfname
+        self.bartender = bartender
+        self.logp_file = logp_file
+        self.forcepred = forcepred
+        self.min_beads = min_beads
+        self.max_beads = max_beads
+        self.raw_molecule = raw_molecule
+        
+        # Initialize state attributes
+        self.heavy_atom_coords = None
+        self.atom_coords = None
+        self.list_heavyatom_names = None
+        self.partitioning = None
+        self.cg_bead_names = []
+        self.cg_bead_coords = []
+        self.topout = None
+        self.bartender_out = None
+        self.graph = None
+        self.topology = None  # Will be populated after successful mapping
+        self.force_map = False
+
+        # INITIALIZE THE AA MOLECULE
+        self.graph = self.get_ha_graph()
+
+        logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", self.molname, self.forcepred, self.simple_model)
+        logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
+
+        ## AutoM3 : MINIMIZATION with RDkit ###
+        self.molecule = Chem.Mol(self.molecule)
+        logger.debug("Embedding + MMFF optimization")
+        AllChem.EmbedMolecule(self.molecule, randomSeed=1)
+        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
+        AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
+
+        self.feats = self.extract_features(self.molecule)
+
+        # Get list of heavy atoms and their coordinates
+        self.list_ha, self.list_heavyatom_names = topology.get_atoms(self.molecule)
+        self.conf, self.heavy_atom_coords, self.atom_coords = topology.get_heavy_atom_coords(self.molecule)
+        self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
+        logger.info("Detected %d heavy atoms", len(self.list_ha))
+
+        # Identify ring-type atoms
+        self.ring_atoms = topology.get_ring_atoms(self.molecule)
+        self.is_arom, self.num_arom = topology.is_aromatic(self.molecule) # AutoM3
+        logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", len(list(chain.from_iterable(self.ring_atoms))), self.is_arom, self.num_arom)
+
+        # Get Hbond information
+        self.hbond_a = topology.get_hbond_a(self.feats)
+        self.hbond_d = topology.get_hbond_d(self.feats)
+
+        # List of bonds between heavy atoms
+        self.list_bonds = self.get_heavy_atom_bonds(self.molecule, self.list_ha)
+
+        # Flatten list of ring atoms
+        self.ring_atoms_flat = list(chain.from_iterable(self.ring_atoms))
+
+        # Actual mapping process
+        self.process()
+
+    def process(self):
+        # Optimize coarse-grained bead positions 
+        # -- keep all possibilities in case something goes wrong later in the code.
+        list_cg_beads = optimization.find_bead_pos(
+            self.molecule,
+            self.conf,
+            self.graph,
+            self.list_ha,
+            self.heavy_atom_coords,
+            self.atom_coords,
+            self.ring_atoms,
+            self.ring_atoms_flat,
+            self.force_map,  # AutoM3 new argument
+            min_beads=self.min_beads,
+            max_beads=self.max_beads,
+        )
+        logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
+
+        # Remove mappings with bead numbers less than most optimal mapping.
+        self.filtered_cg_beads = []
+        for cg_beads in list_cg_beads:
+            if (
+                len(cg_beads) == len(list_cg_beads[0])
+                # and (len(self.list_ha) - (5 * len(cg_beads))) > 3
+            ):
+                self.filtered_cg_beads.append(cg_beads)
+        logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
+        self.filtered_cg_beads = list_cg_beads
+
+        # Loop through best 1% cg_beads and avg_pos
+        # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
+        self.max_attempts = len(self.filtered_cg_beads) 
+        logger.info("Max. number of attempts: %d", self.max_attempts)
+        attempt = 0
+
+        logger.info("Going through the candidate mappings")
+        for attempt in range(self.max_attempts):
+
+            if attempt % 1000 == 0:  # Log every 1000 attempts
+                logger.info("Attempt %d/%d", attempt, self.max_attempts)
+
+            cg_beads = self.filtered_cg_beads[attempt]
+
+            # if len(cg_beads) != 11:
+            #     attempt += 1
+            #     continue
+            # partitioning = get_partitioning(cg_beads, self.graph)
+            # exit()
+
+            try:
+                partitioning = self.get_partitioning(cg_beads, self.graph)
+            except Exception:
+                continue
+
+            bead_pos = self._get_bead_pos(cg_beads, self.conf)
+            self.partitioning = partitioning
+            logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
+
+            # Extract position of coarse-grained beads
+            logger.info("Extracting coordinates for CG beads")
+            self.cg_bead_coords = self.get_bead_coords(self.partitioning, self.atom_coords, self.molecule)
+            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
+
+            # cgbeads should take atom rings number if ring atom in bead 
+            cg_beads_rings = cg_beads.copy()
+            for i, b in enumerate(cg_beads):
+                if b not in self.ring_atoms_flat:
+                    atoms_in_b = []
+                    for at,bd in self.partitioning.items():
+                        if bd == i : atoms_in_b.append(at)
+                    for a in atoms_in_b:
+                        if a in self.ring_atoms_flat:
+                            cg_beads_rings[i] = a
+            logger.info("CG beads rings updated")
+
+            # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
+            # for connectivity purposes
+            mapping_dict = make_mapping_dictionary(self.partitioning)
+            for ring in self.ring_atoms:
+                for atom_idx in ring:
+                    for bead_idx, atom_indices in mapping_dict.items():
+                        if atom_idx in atom_indices:
+                            # Add all atoms in this bead to self.ring_atoms_flat
+                            for at in atom_indices:
+                                if at not in ring:
+                                    ring.append(at)
+
+            logger.info("Building Atoms")
+            self.cg_bead_names, bead_types, _, _ = topology.build_atoms_data(
+                    self.molname,
+                    self.forcepred,
+                    cg_beads,
+                    self.molecule,
+                    self.hbond_a,
+                    self.hbond_d,
+                    self.partitioning,
+                    self.ring_atoms,
+                    self.ring_atoms_flat,
+                    self.logp_file, # AutoM3 new argument
+                    True,
+            )
+
+            # Check additivity between fragments and entire molecule
+            if not self.check_additivity(self.forcepred, bead_types, self.molecule, self.smiles):
+                continue
+            
+            logger.info("Success mapping found on attempt %d", attempt)
+            self.topology = self._build_topology(cg_beads, cg_beads_rings, bead_types)
+            self._finalize_topology(cg_beads, cg_beads_rings, bead_types, attempt)
+            break
+
+
+
+    @staticmethod
+    def extract_features(molecule):
+        """Extract features of molecule (H-bond donors/acceptors, etc.)"""
+        logger.debug("Entering extract_features()")
+        features = Cg_molecule._factory.GetFeaturesForMol(molecule)
+        return features
 
     @staticmethod
     def get_coords(conformer, sites, avg_pos, ringatoms_flat):
@@ -57,13 +253,13 @@ class Cg_molecule:
         return site_coords
 
     @staticmethod
-    def get_heavy_atom_bonds(molecule, list_heavy_atoms):
+    def get_heavy_atom_bonds(molecule, list_ha):
         # List of bonds between heavy atoms
         list_bonds = []
-        for i in range(len(list_heavy_atoms)):
-            for j in range(i + 1, len(list_heavy_atoms)):
-                if molecule.GetBondBetweenAtoms(int(list_heavy_atoms[i]), int(list_heavy_atoms[j])) is not None:
-                    list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
+        for i in range(len(list_ha)):
+            for j in range(i + 1, len(list_ha)):
+                if molecule.GetBondBetweenAtoms(int(list_ha[i]), int(list_ha[j])) is not None:
+                    list_bonds.append([list_ha[i], list_ha[j]])
         return list_bonds
 
     @staticmethod
@@ -111,13 +307,13 @@ class Cg_molecule:
             ]
         return beadpos
     
-    @staticmethod
-    def get_graph(mol=None, smiles=None):
+    def get_ha_graph(self):
+        """Get graph representation of molecule based on heavy atoms only"""
         # --- Graph representation of the molecule ---
-        if not mol:
-            if not smiles:
+        if not self.raw_molecule:
+            if not self.smiles:
                 raise ValueError("Either mol or smiles must be provided")
-            mol = Chem.MolFromSmiles(smiles)
+            mol = Chem.MolFromSmiles(self.smiles)
         # --- Node list (atoms) ---
         nodes = []
         for a in mol.GetAtoms():
@@ -432,225 +628,6 @@ class Cg_molecule:
         if self.force_map: 
             print("Converged to solution in {} iteration(s)".format(attempt + 1 + self.max_attempts))
 
-    def __init__(self, molecule, mol_smi, molname, simple_model=None, topfname=None, 
-        bartenderfname=None, bartender=None, logp_file=None, forcepred=True,
-        min_beads=None, max_beads=None, raw_molecule=None):
-        # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
-
-        # Store all arguments as instance attributes
-        self.molecule = molecule
-        self.smiles = mol_smi
-        self.molname = molname
-        self.simple_model = simple_model
-        self.topfname = topfname
-        self.bartenderfname = bartenderfname
-        self.bartender = bartender
-        self.logp_file = logp_file
-        self.forcepred = forcepred
-        self.min_beads = min_beads
-        self.max_beads = max_beads
-        self.raw_molecule = raw_molecule
-        
-        # Initialize state attributes
-        self.heavy_atom_coords = None
-        self.atom_coords = None
-        self.list_heavyatom_names = None
-        self.partitioning = None
-        self.cg_bead_names = []
-        self.cg_bead_coords = []
-        self.topout = None
-        self.bartender_out = None
-        self.graph = None
-        self.topology = None  # Will be populated after successful mapping
-        self.force_map = False
-
-        if self.raw_molecule:
-            self.graph = self.get_graph(mol=self.raw_molecule)
-        else:
-            self.graph = self.get_graph(smiles=self.smiles)
-
-        logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", self.molname, self.forcepred, self.simple_model)
-        logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
-
-        # _, _, instance_coords = topology.get_heavy_atom_coords(molecule)
-        # print(instance_coords)
-
-        ## AutoM3 : MINIMIZATION with RDkit ###
-        self.molecule = Chem.Mol(self.molecule)
-        logger.debug("Embedding + MMFF optimization")
-        AllChem.EmbedMolecule(self.molecule, randomSeed=1)
-        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
-        AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
-
-        self.feats = topology.extract_features(self.molecule)
-
-        # Get list of heavy atoms and their coordinates
-        self.list_heavy_atoms, self.list_heavyatom_names = topology.get_atoms(self.molecule)
-        self.conf, self.heavy_atom_coords, self.atom_coords = topology.get_heavy_atom_coords(self.molecule)
-        self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
-        logger.info("Detected %d heavy atoms", len(self.list_heavy_atoms))
-
-        # Identify ring-type atoms
-        self.ring_atoms = topology.get_ring_atoms(self.molecule)
-        self.is_arom, self.num_arom = topology.is_aromatic(self.molecule) # AutoM3
-        logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", len(list(chain.from_iterable(self.ring_atoms))), self.is_arom, self.num_arom)
-
-        # Get Hbond information
-        self.hbond_a = topology.get_hbond_a(self.feats)
-        self.hbond_d = topology.get_hbond_d(self.feats)
-
-        # List of bonds between heavy atoms
-        self.list_bonds = self.get_heavy_atom_bonds(self.molecule, self.list_heavy_atoms)
-
-        # Flatten list of ring atoms
-        self.ring_atoms_flat = list(chain.from_iterable(self.ring_atoms))
-
-        # Optimize coarse-grained bead positions -- keep all possibilities in case something goes
-        # wrong later in the code.
-        list_cg_beads = optimization.find_bead_pos(
-            self.molecule,
-            self.conf,
-            self.graph,
-            self.list_heavy_atoms,
-            self.heavy_atom_coords,
-            self.atom_coords,
-            self.ring_atoms,
-            self.ring_atoms_flat,
-            self.force_map,  # AutoM3 new argument
-            min_beads=self.min_beads,
-            max_beads=self.max_beads,
-        )
-        logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
-
-        # Remove mappings with bead numbers less than most optimal mapping.
-        self.filtered_cg_beads = []
-        for cg_beads in list_cg_beads:
-            if (
-                len(cg_beads) == len(list_cg_beads[0])
-                # and (len(self.list_heavy_atoms) - (5 * len(cg_beads))) > 3
-            ):
-                self.filtered_cg_beads.append(cg_beads)
-        logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
-        self.filtered_cg_beads = list_cg_beads
-
-        # Loop through best 1% cg_beads and avg_pos
-        # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
-        self.max_attempts = len(self.filtered_cg_beads) 
-        logger.info("Max. number of attempts: %d", self.max_attempts)
-        attempt = 0
-
-        logger.info("Going through the candidate mappings")
-        for attempt in range(self.max_attempts):
-
-            if attempt % 1000 == 0:  # Log every 1000 attempts
-                logger.info("Attempt %d/%d", attempt, self.max_attempts)
-
-            cg_beads = self.filtered_cg_beads[attempt]
-
-            # if len(cg_beads) != 11:
-            #     attempt += 1
-            #     continue
-            # partitioning = get_partitioning(cg_beads, self.graph)
-            # exit()
-
-            try:
-                partitioning = self.get_partitioning(cg_beads, self.graph)
-            except Exception:
-                continue
-            
-            bead_pos = self._get_bead_pos(cg_beads, self.conf)
-            success = True
-            self.partitioning = partitioning
-            logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
-
-            # Extract position of coarse-grained beads
-            logger.info("Extracting coordinates for CG beads")
-            self.cg_bead_coords = self.get_bead_coords(self.partitioning, self.atom_coords, self.molecule)
-            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
-
-            # AutoM3 : trying mapping with at least 1 of 2 new conditions : 
-            #    Max 2 aromatic atoms per bead ; 
-            #    Holding Functional groups together in bead ;
-            max_fails = 1
-            fails = 0
-            if self.is_arom and (self.num_arom % 2) == 0: # only for pair number of aromatic atoms (actual code prevents sharing/mismatch)
-                if not optimization.max2arperbead(self.partitioning, self.ring_atoms):
-                    fails += 1
-            if not optimization.functional_groups_ok(self.partitioning, self.molecule, self.ring_atoms):
-                fails += 1
-            if self.force_map:
-                if fails > max_fails:
-                    success = False
-                else:
-                    success = True
-            else:
-                if fails > 0: 
-                    success = False
-            logger.info("Atom partitioning created (%d atoms mapped)", len(self.partitioning) if self.partitioning else 0)
-
-            # cgbeads should take atom rings number if ring atom in bead 
-            cg_beads_rings = cg_beads.copy()
-            for i, b in enumerate(cg_beads):
-                if b not in self.ring_atoms_flat:
-                    atoms_in_b = []
-                    for at,bd in self.partitioning.items():
-                        if bd == i : atoms_in_b.append(at)
-                    for a in atoms_in_b:
-                        if a in self.ring_atoms_flat:
-                            cg_beads_rings[i] = a
-            logger.info("CG beads rings updated")
-
-            # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
-            # for connectivity purposes
-            mapping_dict = make_mapping_dictionary(self.partitioning)
-            for ring in self.ring_atoms:
-                for atom_idx in ring:
-                    for bead_idx, atom_indices in mapping_dict.items():
-                        if atom_idx in atom_indices:
-                            # Add all atoms in this bead to self.ring_atoms_flat
-                            for at in atom_indices:
-                                if at not in ring:
-                                    ring.append(at)
-
-            logger.info("Building Atoms")
-            self.cg_bead_names, bead_types, _, _ = topology.build_atoms_data(
-                    self.molname,
-                    self.forcepred,
-                    cg_beads,
-                    self.molecule,
-                    self.hbond_a,
-                    self.hbond_d,
-                    self.partitioning,
-                    self.ring_atoms,
-                    self.ring_atoms_flat,
-                    self.logp_file, # AutoM3 new argument
-                    True,
-            )
-
-            if not self.cg_bead_names:
-                success = False
-                continue
-            # Check additivity between fragments and entire molecule
-            if not self.check_additivity(self.forcepred, bead_types, self.molecule, self.smiles):
-                continue
-            
-            logger.info("Success mapping found on attempt %d", attempt + 1)
-            self.topology = self._build_topology(cg_beads, cg_beads_rings, bead_types)
-            self._finalize_topology(cg_beads, cg_beads_rings, bead_types, attempt)
-            break
-
-                # # AutoM3 change : force mapping by old code if new code doesn't give result
-                # attempt += 1
-                # if attempt == self.max_attempts and not self.force_map:
-                #     self.force_map = True
-                #     attempt = 0 
-                #     logger.info("Retrying with force_map=True")
-
-        if attempt == self.max_attempts and self.force_map:
-            raise RuntimeError(
-                "ERROR: no successful mapping found.\nTry running with the --fpred and/or --verbose options."
-            )
-
     def output_aa(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
         aa_out = output.output_gro(self.heavy_atom_coords, self.list_heavyatom_names, self.molname)
@@ -919,14 +896,14 @@ def sanitize_rings(partitioning, atoms_xyz, ringatoms):
 
 
 def all_atoms_in_beads_connected(trial_comb, heavyatom_coords, 
-    list_heavyatoms, bondlist, mol, allatom_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
+    list_ha, bondlist, mol, allatom_coords, force_map, in_partitioning): #AutoM3 change: added mol, force_map
     """Make sure all atoms within one CG bead are connected to at least
     one other atom in that bead"""
     # Bead coordinates are given by heavy atoms themselves
     cgbead_coords = []
 
     for i in range(len(trial_comb)):
-        cgbead_coords.append(heavyatom_coords[list_heavyatoms.index(trial_comb[i])])
+        cgbead_coords.append(heavyatom_coords[list_ha.index(trial_comb[i])])
     
     _, num_arom = topology.is_aromatic(mol) #AutoM3 change
     ### AutoM3 change of mapping approach to differenciate molecules with 0-1 and more cycles
@@ -938,13 +915,13 @@ def all_atoms_in_beads_connected(trial_comb, heavyatom_coords,
 
     for i in range(len(trial_comb)):
         cg_bead = trial_comb[i]
-        num_atoms = list(voronoi.values()).count(voronoi[list_heavyatoms.index(cg_bead)])
+        num_atoms = list(voronoi.values()).count(voronoi[list_ha.index(cg_bead)])
         # sub-part of bond list that only contains atoms within CG bead
         sub_bond_list = []
         for j in range(len(bondlist)):
             if (
-                voronoi[list_heavyatoms.index(bondlist[j][0])] == voronoi[list_heavyatoms.index(cg_bead)]
-                and voronoi[list_heavyatoms.index(bondlist[j][1])] == voronoi[list_heavyatoms.index(cg_bead)]
+                voronoi[list_ha.index(bondlist[j][0])] == voronoi[list_ha.index(cg_bead)]
+                and voronoi[list_ha.index(bondlist[j][1])] == voronoi[list_ha.index(cg_bead)]
             ):
                 sub_bond_list.append(bondlist[j])
         num_bonds = len(sub_bond_list)
@@ -961,16 +938,16 @@ def get_coords(conformer, sites, avg_pos, ringatoms_flat):
     return Cg_molecule.get_coords(conformer, sites, avg_pos, ringatoms_flat)
 
 
-def get_heavy_atom_bonds(molecule, list_heavy_atoms):
-    return Cg_molecule.get_heavy_atom_bonds(molecule, list_heavy_atoms)
+def get_heavy_atom_bonds(molecule, list_ha):
+    return Cg_molecule.get_heavy_atom_bonds(molecule, list_ha)
 
 
 def check_additivity(forcepred, beadtypes, molecule, mol_smi):
     return Cg_molecule.check_additivity(forcepred, beadtypes, molecule, mol_smi)
 
 
-def get_graph(mol=None, smiles=None):
-    return Cg_molecule.get_graph(mol=mol, smiles=smiles)
+def get_ha_graph(mol=None, smiles=None):
+    return Cg_molecule.get_ha_graph(mol=mol, smiles=smiles)
 
 
 def distribute_neighbors(trial_comb, atoms):

@@ -35,10 +35,6 @@ from .common import *
 
 logger = logging.getLogger(__name__)
 
-# For feature extraction
-fdefName = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
-factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
-
 
 @dataclass
 class Topology:
@@ -284,13 +280,6 @@ def get_heavy_atom_coords(molecule):
         else:
             allatom_coords.append(np.array([conformer.GetAtomPosition(i)[j] for j in range(3)]))
     return conformer, heavyatom_coords, allatom_coords
-
-
-def extract_features(molecule):
-    """Extract features of molecule"""
-    logger.debug("Entering extract_features()")
-    features = factory.GetFeaturesForMol(molecule)
-    return features
 
 
 def cyclic_smi_conversion(smi): # AutoM3 function
