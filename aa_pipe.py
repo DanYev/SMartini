@@ -10,6 +10,7 @@ from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 import MDAnalysis as mda
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from pdbfixer import PDBFixer
 from reforge.martini import martini_openmm
 from reforge.mdsystem.mdsystem import MDSystem, MDRun
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun
@@ -35,6 +36,22 @@ OUT_SELECTION = "resname UNK" # "all" "not resname HOH" "protein"
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 # Analysis and trjconv
 SELECTION = "resname UNK" 
+#########
+sysdir = "systems"
+sysname = "KDA"
+
+
+def setup(sysdir, sysname):
+    mdsys = MmSystem(sysdir, sysname)
+    logger.info(f"System directory set up at: {mdsys.root}")
+    ligand_resname = "ANP"
+    prepare_protein_ligand_system(
+        pdb_file= Path(sysdir) / f"{sysname}.pdb",
+        ligand_resname=ligand_resname,
+        ligand_smiles=None,
+        ligand_sdf=Path(sysdir) / f"{ligand_resname}.sdf",
+        output_dir=mdsys.root 
+    )
 
 
 def prepare_protein_ligand_system(
@@ -47,7 +64,7 @@ def prepare_protein_ligand_system(
     openff_version="openff-2.2.1.offxml",
     add_solvent=True,
     box_padding=1.0 * unit.nanometer,
-    ionic_strength=0.15 * unit.molar,
+    ionic_strength=0.10 * unit.molar,
     nonbonded_method=app.PME,
     nonbonded_cutoff=1.0 * unit.nanometer,
     constraints=app.HBonds,
@@ -128,6 +145,20 @@ def prepare_protein_ligand_system(
     protein_atoms.write(str(protein_pdb))
     ligand_atoms.write(str(ligand_pdb))
     
+    # Fix protein structure (add missing atoms, terminal groups, etc.)
+    logger.info("Fixing protein structure with PDBFixer...")
+    fixer = PDBFixer(str(protein_pdb))
+    fixer.findMissingResidues()
+    fixer.findMissingAtoms()
+    fixer.addMissingAtoms()
+    fixer.addMissingHydrogens(7.0)  # pH 7.0
+    
+    # Save fixed protein
+    fixed_protein_pdb = temp_dir / "protein_fixed.pdb"
+    with open(fixed_protein_pdb, 'w') as f:
+        app.PDBFile.writeFile(fixer.topology, fixer.positions, f)
+    logger.info(f"Fixed protein saved to {fixed_protein_pdb}")
+    
     # Get ligand molecule for OpenFF parameterization
     if ligand_sdf:
         logger.info(f"Loading ligand from SDF file: {ligand_sdf}")
@@ -167,9 +198,16 @@ def prepare_protein_ligand_system(
     # Register the ligand template generator
     forcefield.registerTemplateGenerator(smirnoff_generator.generator)
     
-    # Create modeler with the full system
-    logger.info("Creating combined system...")
-    modeller = app.Modeller(pdb.topology, pdb.positions)
+    # Load fixed protein and combine with ligand
+    logger.info("Combining fixed protein with ligand...")
+    fixed_protein = app.PDBFile(str(fixed_protein_pdb))
+    ligand_pdb_obj = app.PDBFile(str(ligand_pdb))
+    
+    # Create modeler with fixed protein
+    modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
+    
+    # Add ligand to the system
+    modeller.add(ligand_pdb_obj.topology, ligand_pdb_obj.positions)
     
     # Add solvent if requested
     if add_solvent:
@@ -539,31 +577,4 @@ def run_protein_ligand_md(
 
 
 if __name__ == "__main__":
-    sysdir = "systems"
-    sysname = "ANP"
-    ligand = "ANP"
-    
-    # Example 1: Original workflow - ligand only
-    # process_ligand(sysdir, sysname, ligand)
-    
-    # Example 2: New protein-ligand system preparation
-    # Assuming you have a PDB file with protein + ligand
-    # system, topology, positions = prepare_protein_ligand_system(
-    #     pdb_file="path/to/protein_ligand.pdb",
-    #     ligand_resname="LIG",
-    #     ligand_smiles="CCO",  # or ligand_sdf="path/to/ligand.sdf"
-    #     output_dir="output/protein_ligand_system"
-    # )
-    
-    # Example 3: Complete workflow with MD
-    # run_protein_ligand_md(
-    #     pdb_file="path/to/protein_ligand.pdb",
-    #     ligand_resname="LIG",
-    #     ligand_sdf="path/to/ligand.sdf",
-    #     output_dir="output/md_run",
-    #     n_steps=50000
-    # )
-    
-    process_ligand(sysdir, sysname, ligand)
-    # md_npt(sysdir, sysname, "run_1")
-    # trjconv(sysdir, sysname, "run_1")
+    setup(sysdir, sysname)
