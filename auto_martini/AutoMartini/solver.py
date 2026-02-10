@@ -94,7 +94,7 @@ class Cg_molecule:
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
 
         # INITIALIZE THE AA MOLECULE
-        self.ha_graph = self.get_ha_graph()  # Heavy atom graph for partitioning
+        self.ha_graph = self.build_ha_graph()  # Heavy atom graph for partitioning
 
         ## AutoM3 : MINIMIZATION with RDkit ###
         self.molecule = Chem.Mol(self.molecule)
@@ -111,7 +111,10 @@ class Cg_molecule:
         self.list_ha = self.aa_graph["list_ha"]
         self.list_ha_names = self.aa_graph["list_ha_names"]
         self.conf = self.aa_graph["conf"]
-        self.ha_coords = self.aa_graph["ha_coords"]
+        if self.raw_molecule:
+            self.ha_coords = self.ha_graph["ha_coords"]
+        else:
+            self.ha_coords = self.aa_graph["ha_coords"]
         self.aa_coords = self.aa_graph["aa_coords"]
         self.ring_atoms = self.aa_graph["ring_atoms"]
         self.ring_atoms_flat = self.aa_graph["ring_atoms_flat"]
@@ -346,9 +349,7 @@ class Cg_molecule:
                     list_bonds.append([self.list_ha[i], self.list_ha[j]])
         return list_bonds
 
-   
-    
-    def get_ha_graph(self):
+    def build_ha_graph(self):
         """Get graph representation of molecule based on heavy atoms only"""
         # --- Graph representation of the molecule ---
         if self.raw_molecule:
@@ -358,9 +359,30 @@ class Cg_molecule:
         else:
             raise ValueError("Either mol or smiles must be provided")
         
+        # Ensure molecule has conformer and extract coordinates
+        if mol.GetNumConformers() == 0:
+            AllChem.EmbedMolecule(mol, randomSeed=1)
+            AllChem.MMFFOptimizeMolecule(mol, maxIters=1000, mmffVariant='MMFF94s')
+        
+        conformer = mol.GetConformer()
+        
+        # Extract heavy atom coordinates
+        ha_coords = []
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() != "H":
+                coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
+                ha_coords.append(coord)
+        
         # --- Node list (atoms) ---
         nodes = []
+        ha_idx = 0
         for a in mol.GetAtoms():
+            # Get heavy atom coordinate if this is a heavy atom
+            coord = None
+            if a.GetSymbol() != "H":
+                coord = ha_coords[ha_idx]
+                ha_idx += 1
+            
             heavy_neighbors = [n for n in a.GetNeighbors() if n.GetAtomicNum() > 1]
             neighbor_ids = [n.GetIdx() for n in heavy_neighbors]
             neighbor_bonds = []
@@ -381,6 +403,7 @@ class Cg_molecule:
                 "neighbors": neighbor_ids,             # heavy-atom neighbors only
                 "neighbor_bonds": neighbor_bonds,      # heavy-atom neighbor + bond metadata
                 "num_h": a.GetTotalNumHs(),            # implicit H count (unless you add Hs)
+                "coord": coord,                        # coordinates (only for heavy atoms)
             })
 
         # --- Edge list (bonds) ---
@@ -402,7 +425,7 @@ class Cg_molecule:
             if sum(1 for n in a.GetNeighbors() if n.GetAtomicNum() > 1) == 1
         ]
 
-        return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms}
+        return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms, "ha_coords": ha_coords}
 
     def get_partitioning(self, trial_comb):
         """Get partitioning of atoms into beads for given trial combination"""
@@ -524,6 +547,21 @@ class Cg_molecule:
 
     def get_bead_coords(self):
         partitioning = self.partitioning
+        # if raw_molecule is provided, use its coordinates instead of the original molecule's coordinates
+        if self.raw_molecule:
+            bead_coord = {}
+            for atom in range(len(self.ha_coords)):
+                bead = partitioning[atom]
+                if bead not in bead_coord.keys():
+                    bead_coord[bead] = []
+                bead_coord[bead].append(self.ha_coords[atom])
+            bead_cog = []
+            for bead, coords in sorted(bead_coord.items()):
+                cog = np.mean(coords, axis=0)
+                bead_cog.append(cog)
+            return bead_cog
+
+        # compute COG while taking into account hydrogens
         # find all bonds between atoms in molecule
         bonds = []
         for b in range(len(self.molecule.GetBonds())):
@@ -974,7 +1012,7 @@ def voronoi_atoms_new(cgbead_coords, ha_coords, aa_coords, molecule, in_partitio
     for bead, coords in sorted(bead_coord.items()):
         cog = np.mean(coords,axis=0)
         bead_cog.append(cog)
-        
+
     return partitioning, bead_cog
 
 def sanitize_rings(partitioning, atoms_xyz, ringatoms):
