@@ -1,6 +1,7 @@
 ligands/
 output/
 systems/
+Automartini_M3/
 *.log
 *.tmp
 *.itp

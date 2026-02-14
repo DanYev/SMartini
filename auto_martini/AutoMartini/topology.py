@@ -185,7 +185,7 @@ class Topology:
                 added_to_constraints = False
                 for ring in ringatoms:
                     if cgbeads[i] in ring and cgbeads[j] in ring:
-                        self.constraints.append([i, j, dist])
+                        self.constraints.append([i, j, 1, dist])
                         added_to_constraints = True
                         break
                 if added_to_constraints:
@@ -284,7 +284,7 @@ class Topology:
 
         for c in self.constraints:
             if c not in self.bonds:
-                if cpt_ringatoms > 18 and c[2] > 0.415:
+                if cpt_ringatoms > 18 and c[3] > 0.415:
                         self.constraints.remove(c)
     
     def build_angles(self, cgbeads, molecule, partitioning, cgbead_coords, ringatoms, type_2_cutoff=160.0):
@@ -462,6 +462,36 @@ class Topology:
                                 if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
                                     already_dih = True
                                     break
+
+                            # Check if all are bonded (for proper dihedral chains)
+                            bondlist = self.bonds + self.constraints
+                            ij_bonded = False
+                            jk_bonded = False
+                            kl_bonded = False
+                            ik_bonded = False
+                            jl_bonded = False
+                            il_bonded = False
+                            for b in bondlist + constlist:
+                                connectivity = [b[0], b[1]]
+                                if i in connectivity and j in connectivity:
+                                    ij_bonded = True
+                                if j in connectivity and k in connectivity:
+                                    jk_bonded = True
+                                if k in connectivity and l in connectivity:
+                                    kl_bonded = True
+                                if i in connectivity and k in connectivity:
+                                    ik_bonded = True
+                                if j in connectivity and l in connectivity:
+                                    jl_bonded = True
+                                if i in connectivity and l in connectivity:
+                                    il_bonded = True
+                            
+                            # # Skip if any shortcut bonds exist (not a proper dihedral chain)
+                            # if ik_bonded or jl_bonded or il_bonded:
+                            #     continue
+                            # Skip if they do not form a chain (i-j-k-l)
+                            if not (ij_bonded and jk_bonded and kl_bonded):
+                                continue
 
                             if three_in_ring and close_enough and not already_dih:
                                 r1 = cgbead_coords[j] - cgbead_coords[i]
