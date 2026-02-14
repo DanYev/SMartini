@@ -1,5 +1,6 @@
 ligands/
 output/
+slurm*
 systems/
 Automartini_M3/
 *.log

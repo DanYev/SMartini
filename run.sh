@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --time=0-04:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
+#SBATCH --time=0-02:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
 #SBATCH --partition=htc
 #SBATCH --qos=public
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=6G
-##SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --gres=gpu:1
 #SBATCH -o slurm_jobs/output.%A.out
 #SBATCH -e slurm_jobs/error.%A.err
 
@@ -63,7 +63,7 @@ fi
 echo "----------------------------------------" >&2
 
 # Run the Python script
-python "$PYSCRIPT" "$@"
+python 4_cg_md.py 
 
 # Clean up MPS
 if [[ "$MPS_ENABLED" -eq 1 ]]; then
