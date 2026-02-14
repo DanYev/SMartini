@@ -82,6 +82,9 @@ class Topology:
     ringatoms: list = field(default_factory=list)
     cgbead_coords: np.ndarray = field(default_factory=lambda: np.array([]))
     
+    # Exclusions data: list of [i, j] pairs
+    exclusions: list = field(default_factory=list)
+    
     # Build methods - update topology data
     def build_atoms(self, cgbeads, forcepred, molecule, hbonda, hbondd, partitioning, 
                     ringatoms, ringatoms_flat, logp_file, trial=False):
@@ -725,16 +728,122 @@ class Topology:
                     vs+1, cb[0]+1, cb[1]+1
                 )
         
+        return text + "\n"
+    
+    def format_exclusions(self):
+        """Format exclusions section based on ring atoms.
+        
+        For rings with 5-9 atoms and total molecule < 6 beads,
+        add exclusion between the two most distant beads.
+        """
+        if not self.ringatoms or len(self.ringatoms) == 0:
+            return ""
+        
+        ring_atoms = self.ringatoms[0] if self.ringatoms else []
+        
+        # Only add exclusions for specific ring sizes and molecule sizes
+        if not (len(ring_atoms) > 4 and len(ring_atoms) < 10 and len(self.cgbeads) < 6):
+            return ""
+        
+        # Need at least 4 beads to compute distances
+        if len(self.cgbeads) <= 3:
+            return ""
+        
+        # Find the two most distant beads in the ring
+        bead_in_ring_coords = {}
+        for nb, bead_nb in enumerate(self.cgbeads):
+            bead_in_ring_coords[nb + 1] = self.cgbead_coords[nb]
+        
+        remote_dist = 0
+        remote_beads = []
+        
+        for nb_bead1, coord1 in bead_in_ring_coords.items():
+            for nb_bead2, coord2 in bead_in_ring_coords.items():
+                dist = math.sqrt(
+                    (coord1[0] - coord2[0]) ** 2 +
+                    (coord1[1] - coord2[1]) ** 2 +
+                    (coord1[2] - coord2[2]) ** 2
+                )
+                if dist > remote_dist and nb_bead1 != nb_bead2:
+                    remote_beads = [nb_bead1, nb_bead2]
+                    remote_dist = dist
+        
+        if not remote_beads:
+            return ""
+        
+        text = "\n[exclusions]\n"
+        text += f"  {remote_beads[0]} {remote_beads[1]}\n"
+        
         return text
     
-    def to_itp(self, trial=False):
-        """Generate complete ITP file content."""
+    def format_position_restraints(
+        self,
+        force_constant: str = "POSRES_FC",
+        funct: int = 1,
+        ifdef: str = "POSRES",
+        include_end_if: bool = True,
+    ):
+        """Format position restraints section for all atoms.
+        
+        Parameters
+        ----------
+        force_constant : str
+            Force constant label written for x/y/z (default: POSRES_FC).
+        funct : int
+            Gromacs function type (default: 1).
+        ifdef : str
+            Preprocessor symbol used for conditional inclusion.
+        include_end_if : bool
+            Whether to append a matching #endif line.
+        """
+        if not self.atoms:
+            return ""
+        
+        lines = [
+            "",
+            "#ifndef POSRES_FC",
+            "#define POSRES_FC 1000.0",
+            "#endif",
+            "[ position_restraints ]",
+            f"#ifdef {ifdef}",
+        ]
+        
+        for atom in self.atoms:
+            atom_id = atom['id']
+            lines.append(
+                f"{atom_id:5d} {funct:d} {force_constant} {force_constant} {force_constant}"
+            )
+        
+        if include_end_if:
+            lines.append("#endif")
+        
+        return "\n".join(lines) + "\n"
+    
+    def to_itp(self, trial=False, write_exclusions=True, write_posres=True):
+        """Generate complete ITP file content.
+        
+        Parameters
+        ----------
+        trial : bool
+            If True, skip some sections (for trial runs)
+        write_exclusions : bool
+            If True, include exclusions section
+        write_posres : bool
+            If True, include position restraints section
+        """
         text = self.format_header() + "\n"
         text += self.format_atoms(trial) + "\n"
         text += self.format_bonds() + "\n"
         text += self.format_angles() + "\n"
         text += self.format_dihedrals() + "\n"
         text += self.format_virtual_sites()
+        
+        if write_exclusions:
+            text += self.format_exclusions()
+        
+        if write_posres:
+            text += self.format_position_restraints()
+        
         return text
 
 
