@@ -243,6 +243,11 @@ class Topology:
                         # If not in bondlist and in the same ring, add the constraint
                         if not in_bond_list and in_ring and [i, j, dist] not in self.constraints:
                             self.constraints.append([i, j, dist])
+
+        for c in self.constraints:
+            if c not in self.bonds:
+                if cpt_ringatoms > 18 and c[2] > 0.415:
+                        self.constraints.remove(c)
     
     def build_angles(self, cgbeads, molecule, partitioning, cgbead_coords, ringatoms, type_2_cutoff=160.0):
         """Build angles data structure."""
@@ -573,12 +578,7 @@ class Topology:
         """Format bonds and constraints into ITP text."""
         if trial:
             return ""
-        
-        text = ""
-        cpt_ringatoms = 0
-        if ringatoms != []:
-            cpt_ringatoms = len(sum(ringatoms, []))
-        
+       
         # Create beadlist for read_params
         beadlist = []
         for bead in self.beadtypes:
@@ -587,28 +587,21 @@ class Topology:
             else:
                 beadlist.append(bead[0])
         
-        if len(self.bonds) > 0:
-            text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
-            for b in self.bonds:
-                # Make sure atoms in bond are not part of the same ring
-                fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
-                if fc >= cutoff:
-                    fc = cutoff
-                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                    b[0] + 1, b[1] + 1, b[2], fc,
+        text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
+        for b in self.bonds:
+            # Make sure atoms in bond are not part of the same ring
+            fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
+            if fc >= cutoff:
+                fc = cutoff
+            text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
+                b[0] + 1, b[1] + 1, b[2], fc,
+            )
+
+        text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
+        for c in self.constraints:
+                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
+                    c[0] + 1, c[1] + 1, c[2]
                 )
-        else:
-            text = "\n[bonds]\n"
-        
-        if len(self.constraints) > 0:
-            text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
-            for c in self.constraints:
-                if c not in self.bonds:
-                    if cpt_ringatoms > 18 and c[2] > 0.415:
-                        continue
-                    text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
-                        c[0] + 1, c[1] + 1, c[2]
-                    )
         
         return text
     
