@@ -4,6 +4,8 @@ systems/
 *.log
 *.tmp
 *.itp
+*.png
+*.txt
 
 # ---- Python ----
 __pycache__/
