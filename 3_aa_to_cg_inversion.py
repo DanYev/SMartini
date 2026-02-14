@@ -809,7 +809,8 @@ if __name__ == "__main__":
     logger.info(f"Starting analysis for molecule: {molname}")
     
     # CG topology from .itp file
-    in_itp = Path("output") / molname / f"ligand_{molname}.itp"
+    wdir = Path("systems") / molname
+    in_itp = wdir / "mapping" / f"{molname}.itp"
     logger.info(f"Reading topology from {in_itp}")
     topo = am.topology.read_itp(str(in_itp))
     logger.info(f"Loaded topology: {len(topo.atoms)} atoms, {len(topo.bonds)} bonds, "
@@ -817,7 +818,7 @@ if __name__ == "__main__":
                 f"{len(topo.dihedrals)} dihedrals")
 
     # Trajectory
-    mddir = Path("systems") / molname / "mdruns" / "mdrun"
+    mddir = wdir / "aa_md" 
     in_pdb = mddir / "md.pdb"
     in_xtc = mddir / "md.xtc"
     logger.info(f"Reading trajectory files from {mddir}")
@@ -827,10 +828,10 @@ if __name__ == "__main__":
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
     
     # Plot all internal coordinates
-    plot_internal_coordinates(internal_coords, topo, output_file="internal_coords.png")
+    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "mapping" / "internal_coords.png")
     
     # Update topology with Boltzmann-inverted parameters
-    out_itp = Path("output") / molname / f"ligand_{molname}_boltzmann.itp"
+    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     updated_topo = update_topology_with_boltzmann(topo, internal_coords, out_itp)
     
     logger.info(f"Analysis complete!")

@@ -16,7 +16,8 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 if __name__ == "__main__":
     molname = "FTA"
     n_beads = 11
-    outdir = Path("output") / molname
+    wdir = Path("systems") / molname
+    outdir = wdir / "mapping"
     outdir.mkdir(parents=True, exist_ok=True)
 
     # smiles = "CCC"
@@ -30,34 +31,34 @@ if __name__ == "__main__":
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
-    sdf_file = Path("ligands") / f"{molname}.sdf"
+    sdf_file = wdir / f"{molname}.sdf"
     mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
     # Save the atomistic RDKit molecule to SDF
-    sdf_path = outdir / f"{molname.lower()}_aa.sdf"
+    sdf_path = outdir / f"{molname}_aa.sdf"
     w = Chem.SDWriter(str(sdf_path))
     w.write(mol_am)
     w.close()
     logging.info(f"Wrote: {sdf_path}")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
-    itp_path = outdir / f"ligand_{molname}.itp"
+    itp_path = outdir / f"{molname}.itp"
     cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
         min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_molecule)
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)
-    pdb_path = outdir / f"{molname.lower()}.pdb"
+    pdb_path = outdir / f"{molname}.pdb"
     cg.output_cg_pdb(str(pdb_path))
     logging.info(f"Wrote: {pdb_path}")
 
     # Save AA structure (.gro)
-    gro_path = outdir / f"{molname.lower()}_aa.gro"
+    gro_path = outdir / f"{molname}_aa.gro"
     cg.output_aa_gro(str(gro_path))
     logging.info(f"Wrote: {gro_path}")
 
     # Make .map file
-    map_path = outdir / f"{molname.lower()}.map"
+    map_path = outdir / f"{molname}.map"
     am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname)
     logging.info(f"Wrote: {map_path}")
