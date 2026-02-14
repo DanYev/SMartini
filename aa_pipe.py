@@ -29,10 +29,10 @@ TOTAL_TIME = 1000 * unit.nanoseconds # USED BY DEFAULT. NSTEPS = TOTAL_TIME / TS
 TSTEP = 2 * unit.femtoseconds
 TOTAL_STEPS = 100000 
 # Reporting: save every NOUT steps
-TRJ_NOUT = 10000 # normally you want ~10000 here
+TRJ_NOUT = 1000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
 CHK_NOUT = 100000 
-OUT_SELECTION = "protein or resname ANP or resname MG" # "all" "not resname HOH" "protein"
+OUT_SELECTION = "resname UNK" # "all" "not resname HOH" "protein"
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 # Analysis and trjconv
 SELECTION = OUT_SELECTION 
@@ -41,16 +41,19 @@ SELECTION = OUT_SELECTION
 sysdir = "systems"
 runname = "mdrun"
 ligand_name = "FTA"
+sysname = ligand_name
 
 
 def process_ligand(sysdir, sysname, ligand_name):
+    # INPUTS
     mdsys = MmSystem(sysdir, sysname)
     logger.info("Processing ligand: %s", ligand_name)
     wdir = Path("systems") / ligand_name
     wdir.mkdir(parents=True, exist_ok=True)
     logger.info("Ligand working directory: %s", wdir)
-    input_file = Path(sysdir) / f"{ligand_name}.sdf"
+    input_file = Path("ligands") / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
+    # Generate ligand topology and structure using OpenFF Toolkit and Interchange
     ligand = Molecule.from_file(str(input_file))
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
     forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
@@ -66,7 +69,7 @@ def process_ligand(sysdir, sysname, ligand_name):
         model='tip3p', 
         boxShape='cube', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
         padding=1.5 * unit.nanometer,
-        ionicStrength=0.1 * unit.molar,
+        ionicStrength=0.0 * unit.molar,
         positiveIon='Na+',
         negativeIon='Cl-')    
     with open(mdsys.syspdb, "w", encoding="utf-8") as file:
@@ -173,12 +176,9 @@ def add_extra_forces(system): # for NPT
     system.addForce(com_remover)
     logger.info("Added center of mass drift remover")
     # Barostat
-    barostat = mm.MonteCarloMembraneBarostat(
+    barostat = mm.MonteCarloBarostat(
         PRESSURE,          # pressure
-        0.0*unit.bar*unit.nanometer,  # surface tension (0 = tensionless)
-        TEMPERATURE,       # temperature
-        mm.MonteCarloMembraneBarostat.XYIsotropic,
-        mm.MonteCarloMembraneBarostat.ZFree
+        TEMPERATURE        # temperature
     )
     system.addForce(barostat)
     logger.info("Added barostat")
@@ -251,3 +251,4 @@ def trjconv(sysdir, sysname, runname):
 
 if __name__ == "__main__":
     process_ligand(sysdir, sysname, ligand_name)
+    md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")

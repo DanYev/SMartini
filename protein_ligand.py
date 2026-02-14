@@ -337,7 +337,7 @@ def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"):
     # Create system object
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(mdsys.sysxml)
-    _add_bb_restraints(system, pdb, bb_aname='P*')
+    _add_bb_restraints(system, pdb, bb_aname='CA')
     # Create simulation object
     integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator)
@@ -408,12 +408,9 @@ def add_extra_forces(system): # for NPT
     system.addForce(com_remover)
     logger.info("Added center of mass drift remover")
     # Barostat
-    barostat = mm.MonteCarloMembraneBarostat(
+    barostat = mm.MonteCarloBarostat(
         PRESSURE,          # pressure
-        0.0*unit.bar*unit.nanometer,  # surface tension (0 = tensionless)
-        TEMPERATURE,       # temperature
-        mm.MonteCarloMembraneBarostat.XYIsotropic,
-        mm.MonteCarloMembraneBarostat.ZFree
+        TEMPERATURE        # temperature
     )
     system.addForce(barostat)
     logger.info("Added barostat")
