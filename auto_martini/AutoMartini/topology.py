@@ -27,6 +27,7 @@ If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """ 
 from dataclasses import dataclass, field
+from pathlib import Path
 from sys import exit
 
 from AutoMartini._version import __version__
@@ -49,11 +50,12 @@ class Topology:
     
     # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logp_origin
     atoms: list = field(default_factory=list)
+    partitioning: dict = field(default_factory=dict)
     atomnames: list = field(default_factory=list)
     beadtypes: list = field(default_factory=list)
     atoms_in_smi_dict: dict = field(default_factory=dict)
     
-    # Bonds data: list of [i, j, dist]
+    # Bonds data: list of [i, j, dist, k]
     bonds: list = field(default_factory=list)
     
     # Constraints data: list of [i, j, dist]
@@ -74,16 +76,33 @@ class Topology:
     # Metadata
     nrexcl: int = 2
     
+    # Store context for formatting (needed by to_itp)
+    num_ar: int = 0
+    cgbeads: list = field(default_factory=list)
+    ringatoms: list = field(default_factory=list)
+    cgbead_coords: np.ndarray = field(default_factory=lambda: np.array([]))
+    
     # Build methods - update topology data
     def build_atoms(self, cgbeads, forcepred, molecule, hbonda, hbondd, partitioning, 
                     ringatoms, ringatoms_flat, logp_file, trial=False):
         """Build atoms data structure."""
         logger.debug("Entering Topology.build_atoms()")
+        self.partitioning = partitioning
+        
+        # Create global atom name map (PDB-style: N1, C1, C2, etc.)
+        atom_name_map = {}
+        atom_type_counter = {}
+        for at_idx in range(molecule.GetNumAtoms()):
+            at_symbol = molecule.GetAtomWithIdx(at_idx).GetSymbol()
+            if at_symbol not in atom_type_counter:
+                atom_type_counter[at_symbol] = 0
+            atom_type_counter[at_symbol] += 1
+            atom_name_map[at_idx] = f"{at_symbol}{atom_type_counter[at_symbol]}"
         
         for bead in range(len(cgbeads)):
             try:
                 smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(
-                    molecule, partitioning, bead
+                    molecule, partitioning, bead, atom_name_map
                 )
             except Exception:
                 raise
@@ -193,7 +212,23 @@ class Topology:
                         found_connection = True
                 
                 if found_connection:
-                    self.bonds.append([i, j, dist])
+                    # Create beadlist for read_params
+                    beadlist = []
+                    for bead in self.beadtypes:
+                        if not bead.startswith('T') and not bead.startswith('S'):
+                            beadlist.append('R')
+                        else:
+                            beadlist.append(bead[0])
+                    
+                    # Get force constant from database or use default
+                    if len(beadlist) > max(i, j):
+                        fc = read_params(dist, beadlist[i] + "-" + beadlist[j])
+                        if fc is None:
+                            fc = 10000
+                    else:
+                        fc = 10000
+                    
+                    self.bonds.append([i, j, dist, fc])
                 else:
                     if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in self.constraints:
                         self.constraints.append([i, j, dist])
@@ -344,9 +379,24 @@ class Topology:
                                 if i in self.angles[a1] and j in self.angles[a1] and j in self.angles[a2] and k in self.angles[a2]:
                                     break
                     
+                    # Create beadlist for read_params
+                    beadlist = []
+                    for bead in self.beadtypes:
+                        if not bead.startswith('T') and not bead.startswith('S'):
+                            beadlist.append('R')
+                        else:
+                            beadlist.append(bead[0])
+                    
                     funct = 1
                     if angle > type_2_cutoff:
                         force_const = 250.0
+                    else:
+                        # Try to get force from database
+                        if len(beadlist) > max(i, j, k):
+                            db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k])
+                            if db_force is not None:
+                                force_const = db_force
+                    
                     self.angles.append([i, j, k, funct, angle, force_const])
     
     def build_dihedrals(self, cgbeads, ringatoms, cgbead_coords):
@@ -355,6 +405,11 @@ class Topology:
 
         num_ar = 0
         constlist = self.constraints
+        
+        # Store for later use
+        self.cgbeads = cgbeads
+        self.ringatoms = ringatoms
+        self.cgbead_coords = cgbead_coords
 
         if len(cgbeads) <= 3:
             return num_ar
@@ -419,7 +474,32 @@ class Topology:
                                 r2_2 = cgbead_coords[j] - cgbead_coords[k]
                                 angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
                                 angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
+                                
+                                # Create beadlist for read_params
+                                beadlist = []
+                                for bead in self.beadtypes:
+                                    if not bead.startswith('T') and not bead.startswith('S'):
+                                        beadlist.append('R')
+                                    else:
+                                        beadlist.append(bead[0])
+                                
+                                # Compute force constant from database or default
+                                bead_in_ring_coords = {}
+                                for nb, bead_nb in enumerate(cgbeads):
+                                    for ring in ringatoms:
+                                        if bead_nb in ring:
+                                            bead_in_ring_coords[nb] = cgbead_coords[nb]
+                                
                                 forc_const = 10.0
+                                if len(beadlist) > max(i, j, k, l):
+                                    db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k] + "-" + beadlist[l])
+                                    if db_force is not None:
+                                        forc_const = db_force
+                                        # Adjust for non-ring beads
+                                        if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
+                                                           k not in bead_in_ring_coords or l not in bead_in_ring_coords):
+                                            forc_const = forc_const / 2
+                                
                                 if angle_ijk < 145.0 and angle_jkl < 145.0:
                                     dihed_list.append([i, j, k, l, angle, forc_const])
 
@@ -433,6 +513,7 @@ class Topology:
                                 dihed_list.remove(di)
         
         self.dihedrals = dihed_list
+        self.num_ar = num_ar
         return num_ar
     
     def build_virtual_sites(self, ringatoms, cg_bead_coords, partitioning, molecule):
@@ -549,8 +630,10 @@ class Topology:
             "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
             + "; updated to Martini 3 force field by Magdalena Szczuka\n"
             + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
-            + "; SMILES code : " + self.mol_smi + "\n\n"
-            + "\n[moleculetype]\n"
+            + "; SMILES code : " + self.mol_smi + "\n"
+            + "; Partitioning: " + str(self.partitioning) + "\n"
+            + "\n"
+            + "[moleculetype]\n"
             + "; molname       nrexcl\n"
             + "  {:5s}         {:d}\n\n".format(self.molname, self.nrexcl)
             + "[atoms]\n"
@@ -574,27 +657,13 @@ class Topology:
             )
         return text
     
-    def format_bonds(self, ringatoms, trial=False, cutoff=1e4):
+    def format_bonds(self):
         """Format bonds and constraints into ITP text."""
-        if trial:
-            return ""
-       
-        # Create beadlist for read_params
-        beadlist = []
-        for bead in self.beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'):
-                beadlist.append('R')
-            else:
-                beadlist.append(bead[0])
-        
         text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
         for b in self.bonds:
-            # Make sure atoms in bond are not part of the same ring
-            fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
-            if fc >= cutoff:
-                fc = cutoff
+            # Bond data is [i, j, dist, k]
             text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                b[0] + 1, b[1] + 1, b[2], fc,
+                b[0] + 1, b[1] + 1, b[2], b[3],
             )
 
         text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
@@ -608,60 +677,28 @@ class Topology:
     def format_angles(self):
         """Format angles into ITP text."""
         text = ""
-        
-        ### AutoM3 ###
-        beadlist = []
-        for bead in self.beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'):
-                beadlist.append('R')
-            else:
-                beadlist.append(bead[0])
-
         if len(self.angles) > 0:
             text = text + "\n[angles]\n"
             text = text + ";  i  j  k    funct  angle  force.c.\n"
             for a in self.angles:
-                force = read_params(a[4], beadlist[a[0]] + "-" + beadlist[a[1]] + "-" + beadlist[a[2]])
-                if force is None:
-                    force = a[5]
+                # Angle data is [i, j, k, funct, angle, force_const]
                 text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
-                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
+                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], a[5]
                 )
         return text
     
-    def format_dihedrals(self, num_ar, cgbeads, ringatoms, cgbead_coords):
+    def format_dihedrals(self):
         """Format dihedrals into ITP text."""
         text = ""
-        
-        ### AutoM3 ###
-        bead_in_ring_coords = {}
-        for nb, bead_nb in enumerate(cgbeads):
-            for ring in ringatoms:
-                if bead_nb in ring:
-                    bead_in_ring_coords[nb] = cgbead_coords[nb]
-        
-        beadlist = []
-        for bead in self.beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'):
-                beadlist.append('R')
-            else:
-                beadlist.append(bead[0])
-        
         if len(self.dihedrals) > 0:
             text = text + "\n[dihedrals]\n"
             text = text + ";  i  j  k  l  funct  angle  force.c.\n"
-            
             for d in self.dihedrals:
-                ### AutoM3 ###
-                force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
-                if num_ar > 0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None:
-                    force = force / 2  # for dihedral between cycle-bead and non-cycled bead: decrease of force
-                if force is None:
-                    force = d[5]
+                # Dihedral data is [i, j, k, l, angle, force_const]
                 text = (
                     text
                     + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
+                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5]
                     )
                 )
         return text
@@ -690,15 +727,190 @@ class Topology:
         
         return text
     
-    def to_itp(self, num_ar, cgbeads, ringatoms, cgbead_coords, trial=False):
+    def to_itp(self, trial=False):
         """Generate complete ITP file content."""
         text = self.format_header() + "\n"
         text += self.format_atoms(trial) + "\n"
-        text += self.format_bonds(ringatoms, trial) + "\n"
+        text += self.format_bonds() + "\n"
         text += self.format_angles() + "\n"
-        text += self.format_dihedrals(num_ar, cgbeads, ringatoms, cgbead_coords) + "\n"
+        text += self.format_dihedrals() + "\n"
         text += self.format_virtual_sites()
         return text
+
+
+def read_itp(itp_file):
+    """Read an ITP file and create a Topology object.
+    
+    Parameters
+    ----------
+    itp_file : str
+        Path to the ITP file
+        
+    Returns
+    -------
+    Topology
+        Topology object populated with data from ITP file
+    """
+    
+    itp_path = Path(itp_file)
+    if not itp_path.exists():
+        raise FileNotFoundError(f"ITP file not found: {itp_file}")
+    
+    content = itp_path.read_text()
+    lines = content.splitlines()
+    
+    # Initialize topology object
+    topo = Topology()
+    
+    # Track current section
+    current_section = None
+    
+    # Parse line by line
+    for line in lines:
+        stripped = line.strip()
+        
+        # Skip empty lines
+        if not stripped:
+            continue
+            
+        # Check for section headers
+        if stripped.startswith('[') and stripped.endswith(']'):
+            current_section = stripped[1:-1].strip().lower()
+            continue
+        
+        # Skip comments (except those with info we need)
+        if stripped.startswith(';'):
+            # Extract SMILES from header comment
+            if 'SMILES code :' in line:
+                topo.mol_smi = line.split('SMILES code :')[1].strip()
+            # Extract Partitioning from header comment
+            if 'Partitioning:' in line:
+                import ast
+                partitioning_str = line.split('Partitioning:')[1].strip()
+                try:
+                    topo.partitioning = ast.literal_eval(partitioning_str)
+                except (ValueError, SyntaxError):
+                    logger.warning(f"Could not parse partitioning from ITP: {partitioning_str}")
+            continue
+        
+        # Parse based on current section
+        if current_section == 'moleculetype':
+            parts = stripped.split()
+            if len(parts) >= 2:
+                topo.molname = parts[0]
+                topo.nrexcl = int(parts[1])
+        
+        elif current_section == 'atoms':
+            # Parse atom line with comment
+            # Format: id type resnr residue atom cgnr charge mass ; smiles ; atoms: N1, C1, ...
+            pre_comment, _, comment = line.partition(';')
+            parts = pre_comment.split()
+            
+            if len(parts) >= 8:
+                atom_id = int(parts[0])
+                atom_type = parts[1]
+                resnr = int(parts[2])
+                residue = parts[3]
+                atom_name = parts[4]
+                cgnr = int(parts[5])
+                charge = int(parts[6])
+                mass = int(parts[7])
+                
+                # Extract smiles and atom info from comment
+                smiles_part = ""
+                atoms_in_smi = ""
+                logp_origin = ""
+                
+                if comment:
+                    # Split multiple comment sections
+                    comment_parts = comment.split(';')
+                    if len(comment_parts) >= 1:
+                        smiles_part = comment_parts[0].strip()
+                    if len(comment_parts) >= 2:
+                        atoms_str = comment_parts[1].strip()
+                        if atoms_str.startswith('atoms:'):
+                            atoms_in_smi = '; ' + atoms_str
+                    if len(comment_parts) >= 3:
+                        logp_origin = '; ' + comment_parts[2].strip()
+                
+                atom_dict = {
+                    'id': atom_id,
+                    'type': atom_type,
+                    'resnr': resnr,
+                    'residue': residue,
+                    'atom': atom_name,
+                    'cgnr': cgnr,
+                    'charge': charge,
+                    'mass': mass,
+                    'smiles': smiles_part,
+                    'atoms_in_smi': atoms_in_smi,
+                    'logp_origin': logp_origin
+                }
+                
+                topo.atoms.append(atom_dict)
+                topo.atomnames.append(atom_name)
+                topo.beadtypes.append(atom_type)
+                
+                # Extract atom labels for partitioning
+                if atoms_in_smi:
+                    atoms_label_str = atoms_in_smi.replace('; atoms:', '').strip()
+                    atom_labels = [a.strip().rstrip(',') for a in atoms_label_str.split(',') if a.strip()]
+                    topo.atoms_in_smi_dict[atom_id] = ', '.join(atom_labels)
+        
+        elif current_section == 'bonds':
+            parts = stripped.split()
+            if len(parts) >= 4 and parts[0].isdigit():
+                i = int(parts[0]) - 1  # Convert to 0-based
+                j = int(parts[1]) - 1
+                funct = int(parts[2])
+                length = float(parts[3])
+                force_const = float(parts[4]) if len(parts) >= 5 else 10000
+                # Store as [i, j, length, force_const]
+                topo.bonds.append([i, j, length, force_const])
+        
+        elif current_section == 'constraints':
+            parts = stripped.split()
+            if len(parts) >= 4 and parts[0].isdigit():
+                i = int(parts[0]) - 1  # Convert to 0-based
+                j = int(parts[1]) - 1
+                funct = int(parts[2])
+                length = float(parts[3])
+                topo.constraints.append([i, j, length])
+        
+        elif current_section == 'angles':
+            parts = stripped.split()
+            if len(parts) >= 5 and parts[0].isdigit():
+                i = int(parts[0]) - 1  # Convert to 0-based
+                j = int(parts[1]) - 1
+                k = int(parts[2]) - 1
+                funct = int(parts[3])
+                angle = float(parts[4])
+                force_const = float(parts[5]) if len(parts) >= 6 else 0.0
+                # Determine angle type based on force constant
+                angle_type = 2 if force_const >= 100 else 10
+                topo.angles.append([i, j, k, angle, force_const, angle_type])
+        
+        elif current_section == 'dihedrals':
+            parts = stripped.split()
+            if len(parts) >= 6 and parts[0].isdigit():
+                i = int(parts[0]) - 1  # Convert to 0-based
+                j = int(parts[1]) - 1
+                k = int(parts[2]) - 1
+                l = int(parts[3]) - 1
+                funct = int(parts[4])
+                angle = float(parts[5])
+                force_const = float(parts[6]) if len(parts) >= 7 else 0.0
+                topo.dihedrals.append([i, j, k, l, angle, force_const])
+        
+        elif current_section == 'virtual_sitesn':
+            parts = stripped.split()
+            if len(parts) >= 3 and parts[0].isdigit():
+                vs_id = int(parts[0]) - 1  # Convert to 0-based
+                funct = int(parts[1])
+                constructing_atoms = [int(parts[i]) - 1 for i in range(2, len(parts))]
+                topo.virtual_sites[vs_id] = constructing_atoms
+        
+    return topo
 
 
 def read_delta_f_types():
@@ -810,7 +1022,6 @@ def gen_molecule_sdf(sdf):
     return molecule, raw_molecule
 
 
-
 def letter_occurrences(string):
     """Count letter occurences"""
     frequencies = defaultdict(lambda: 0)
@@ -917,7 +1128,7 @@ def read_params(val, size):  # AutoM3 function
                     return force
 
 
-def substruct2smi(molecule, partitioning, cg_bead):
+def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
     """Substructure to smiles conversion; also output Wildman-Crippen log_p;
     and charge of group."""
     frag = rdchem.EditableMol(molecule)
@@ -961,8 +1172,12 @@ def substruct2smi(molecule, partitioning, cg_bead):
     real_smi = None
     for at, bd in partitioning.items():
         if bd == cg_bead:
-            at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
-            atoms_in_smi += at_symbol + str(at+1) + ", "
+            if atom_name_map:
+                atom_label = atom_name_map[at]
+            else:
+                at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
+                atom_label = at_symbol + str(at+1)
+            atoms_in_smi += atom_label + ", "
     if "c" in smi or "n" in smi or "s" in smi:
         converted_smi = True
         real_smi = smi
@@ -995,161 +1210,6 @@ def get_standard_mass(bead_type): # AutoM3
     else: 
         if bead_type.startswith('S'): return 54
         else: return 72
-
-
-def build_virtual_sites_data(ringatoms, cg_bead_coords, partitioning, molecule):
-    """
-    Build virtual sites data structure (decoupled from formatting).
-    Returns: (virtual_sites_dict, rigid_dihedrals_list)
-    """
-    logger.debug("Entering build_virtual_sites_data()")
-
-    # Get number of bonds for each atom
-    atom_bond_counts = {atom.GetIdx(): 0 for atom in molecule.GetAtoms()}
-    
-    for bond in molecule.GetBonds():
-        begin_atom_idx = bond.GetBeginAtomIdx()
-        end_atom_idx = bond.GetEndAtomIdx()
-        
-        if (molecule.GetAtomWithIdx(begin_atom_idx).GetSymbol() != "H" and 
-            molecule.GetAtomWithIdx(end_atom_idx).GetSymbol() != "H") and \
-           (partitioning[begin_atom_idx] != partitioning[end_atom_idx]):
-            if begin_atom_idx not in atom_bond_counts:
-                atom_bond_counts[begin_atom_idx] = 1
-            else:
-                atom_bond_counts[begin_atom_idx] += 1
-            
-            if end_atom_idx not in atom_bond_counts:
-                atom_bond_counts[end_atom_idx] = 1
-            else:
-                atom_bond_counts[end_atom_idx] += 1
-    
-    bead_bond_counts = {}
-    for a, b in partitioning.items():
-        if b not in bead_bond_counts: 
-            bead_bond_counts[b] = 0
-        for at, cpt in atom_bond_counts.items():
-            if at == a: 
-                bead_bond_counts[b] += cpt
-
-    ring_atoms = []
-    virtual_sites = {}
-    for ra in ringatoms:
-        ring_atoms += ra
-
-    # Find beads constructing rings
-    bead_in_ring_coords = {}
-    for atom, bead in partitioning.items():
-        if atom in ring_atoms and bead not in bead_in_ring_coords:
-            bead_in_ring_coords[bead] = cg_bead_coords[bead]
-    
-    # Count distances between each pair of beads
-    distances = {}
-    for bead, coord in bead_in_ring_coords.items():
-        distances[bead] = {}
-        for other_bead, other_coord in bead_in_ring_coords.items():
-            if bead != other_bead:
-                distance = np.linalg.norm(coord - other_coord) 
-                distances[bead][other_bead] = distance
-    
-    def find_more_vs(num_vs, bead_bond_counts_sorted, cg_bead_coords, distances):
-        virtual_sites = {}
-        vs_list = []
-        for i in range(num_vs):
-            vs_bead = int(list(bead_bond_counts_sorted.keys())[i])
-            vs_list.append(vs_bead)
-        
-        for vs in vs_list:
-            constructing_beads_dist = dict(sorted(distances[vs].items(), key=lambda item: item[1]))
-            constructing_beads = [bead for bead in constructing_beads_dist.keys()]
-            for bead in constructing_beads:
-                if bead in vs_list:
-                    constructing_beads.remove(bead)
-            
-            if vs not in virtual_sites.keys():
-                virtual_sites[vs] = constructing_beads[:4]
-        return virtual_sites
-
-    # Find number of fused cycles = number of needed virtual sites    
-    bead_bond_counts_sorted = dict(sorted(bead_bond_counts.items(), key=lambda item: item[1], reverse=True))
-    cpt_ringatoms = len(sum(ringatoms, []))
-
-    for r_nb in range(len(ringatoms)):
-        if cpt_ringatoms > 6 and cpt_ringatoms < 19: 
-            virtual_sites = find_more_vs(1, bead_bond_counts_sorted, cg_bead_coords, distances)
-
-        if cpt_ringatoms > 18:  # more than 4 fused cycles
-            virtual_sites = find_more_vs(3, bead_bond_counts_sorted, cg_bead_coords, distances)
-
-    # Calculate rigid dihedrals for 4-atom virtual sites
-    rigid_dihedrals = []
-    for vs, cb in virtual_sites.items():
-        if len(cb) == 4:
-            # Find dihedral from constructing beads
-            i = cb[0]
-            j = cb[1]
-            k = cb[2]
-            l = cb[3]
-            r1 = cg_bead_coords[j] - cg_bead_coords[i]
-            r2 = cg_bead_coords[k] - cg_bead_coords[j]
-            r3 = cg_bead_coords[l] - cg_bead_coords[k]
-            p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-            p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-            r2 /= np.linalg.norm(r2)
-            cosphi = np.dot(p1, p2)
-            sinphi = np.dot(r2, np.cross(p1, p2))
-            angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-            force = 100
-            rigid_dihedrals.append({
-                'atoms': [cb[0], cb[1], cb[2], cb[3]],
-                'angle': round(angle, 2),
-                'force': force
-            })
-        
-    return virtual_sites, rigid_dihedrals
-
-
-def format_virtual_sites(virtual_sites):
-    """Format virtual sites data for .itp output."""
-    if not virtual_sites:
-        return ""
-    
-    text = "\n[virtual_sitesn]\n"
-    text += "; site funct  constructing atom indices"
-    
-    for vs, cb in virtual_sites.items():
-        if len(cb) == 4:
-            text += "\n   {:d}       1     {:d} {:d} {:d} {:d}".format(
-                vs+1, cb[0]+1, cb[1]+1, cb[2]+1, cb[3]+1
-            )
-        elif len(cb) == 3:
-            text += "\n   {:d}       1     {:d} {:d} {:d}".format(
-                vs+1, cb[0]+1, cb[1]+1, cb[2]+1
-            )
-        elif len(cb) == 2:
-            text += "\n   {:d}       1     {:d} {:d}".format(
-                vs+1, cb[0]+1, cb[1]+1
-            )
-    
-    return text
-
-
-def topout(header_write, atoms_write, bonds_write, angles_write):
-    """Print simple itp file"""
-    text = header_write + "\n" + atoms_write + "\n" + bonds_write + "\n" + angles_write
-
-    # bartender info search
-    bartender_input_info = {}
-    bartender_input_info["BONDS"] = []
-    for line in list(bonds_write.split("\n")):
-        if ";" not in line and len(line.split()) > 4:
-            bartender_input_info["BONDS"].append(line.split()[:2])
-
-    bartender_input_info["ANGLES"] = []
-    for line in list(angles_write.split("\n")):
-        if ";" not in line and len(line.split()) > 5:
-            bartender_input_info["ANGLES"].append(line.split()[:3])
-    return text, bartender_input_info
 
 
 def write_position_restraints(
@@ -1317,8 +1377,8 @@ def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_
 
 
 def run_bartender(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, 
-                                   bead_coords, ring_atoms, cg_beads, molecule, molname, atoms_in_smi_dict,
-                                   bartender=False, write_exclusions=True):
+                    bead_coords, ring_atoms, cg_beads, molecule, molname, atoms_in_smi_dict,
+                    write_exclusions=True):
     """
     Combined function to build topology output and bartender input.
     
@@ -1330,214 +1390,211 @@ def run_bartender(header_write, atoms_write, bonds_write, angles_write, dihedral
         molecule: RDKit molecule object
         molname: Molecule name
         atoms_in_smi_dict: Atoms in SMILES dictionary
-        bartender: Whether to generate bartender output
         write_exclusions: Whether to write exclusions
         
     Returns:
         tuple: (topout_text, bartender_out or None)
     """
     # Build topology output
-    topout_text, bartender_input_info = topout_noVS(
+    _, bartender_input_info = topout_noVS(
         header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
         bead_coords, ring_atoms, cg_beads, write_exclusions
     )
     
     # Build bartender output if requested
-    bartender_out = None
-    if bartender:
-        bartender_out = bartender_input(molecule, molname, atoms_in_smi_dict, bartender_input_info)
+    bartender_out = bartender_input(molecule, molname, atoms_in_smi_dict, bartender_input_info)
     
-    return topout_text, bartender_out
+    return _, bartender_out
 
 
-def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###
+# def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###
 
-    """AutoM3 : Prints whole .itp file with all bonded and nonbonded parameters. """
-    text = ""
-    bartender_input_info = {}
-    nb_beads = 0
-    molname=""
-    for line in list(atoms_write.split("\n")):
-        if line != "":
-            x = line.split()
-            molname=x[3]
-            nb_beads=int(x[0])
+#     """AutoM3 : Prints whole .itp file with all bonded and nonbonded parameters. """
+#     text = ""
+#     bartender_input_info = {}
+#     nb_beads = 0
+#     molname=""
+#     for line in list(atoms_write.split("\n")):
+#         if line != "":
+#             x = line.split()
+#             molname=x[3]
+#             nb_beads=int(x[0])
 
-    #Atoms: add bead VS
-    vs_bead_names=""
-    #Atoms: change mass of VS to 0 and divide it between constructing beads
-    modified_lines_atoms = list(atoms_write.split("\n"))
-    vs_mass={}
-    for vs, cb in virtual_sites.items():
-        for i, line in enumerate(modified_lines_atoms):
-            if line:
-                atom_line = line.split()
-                if str(vs+1) == atom_line[0] and atom_line[7] != '0': 
-                    vs_bead_names+=atom_line[1]
-                    vs_mass[vs]=int(atom_line[7])
-                    fields = line.split()
-                    comments = line.split('   ;   ')[1]
-                    modified_lines_atoms[i] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}     0   ;   {:24s}".format(
-                        int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]), comments)
+#     #Atoms: add bead VS
+#     vs_bead_names=""
+#     #Atoms: change mass of VS to 0 and divide it between constructing beads
+#     modified_lines_atoms = list(atoms_write.split("\n"))
+#     vs_mass={}
+#     for vs, cb in virtual_sites.items():
+#         for i, line in enumerate(modified_lines_atoms):
+#             if line:
+#                 atom_line = line.split()
+#                 if str(vs+1) == atom_line[0] and atom_line[7] != '0': 
+#                     vs_bead_names+=atom_line[1]
+#                     vs_mass[vs]=int(atom_line[7])
+#                     fields = line.split()
+#                     comments = line.split('   ;   ')[1]
+#                     modified_lines_atoms[i] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}     0   ;   {:24s}".format(
+#                         int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]), comments)
 
-    for vs, cb in virtual_sites.items():
-        for vs_env in cb:
-            for j, line2 in enumerate(modified_lines_atoms):
-                if line2 :
-                    atom_line2 = line2.split()
-                    if str(vs_env+1) == atom_line2[0]:
-                        new_mass = int(int(atom_line2[7]) + vs_mass[vs] / len(cb) ) #add 1/cb mass of VS
-                        fields = line2.split()
-                        comments = line2.split('   ;   ')[1]
-                        modified_lines_atoms[j] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:24s}".format(
-                            int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]),
-                            int(new_mass), comments
-)
-    modified_atoms_write = "\n".join(modified_lines_atoms)
+#     for vs, cb in virtual_sites.items():
+#         for vs_env in cb:
+#             for j, line2 in enumerate(modified_lines_atoms):
+#                 if line2 :
+#                     atom_line2 = line2.split()
+#                     if str(vs_env+1) == atom_line2[0]:
+#                         new_mass = int(int(atom_line2[7]) + vs_mass[vs] / len(cb) ) #add 1/cb mass of VS
+#                         fields = line2.split()
+#                         comments = line2.split('   ;   ')[1]
+#                         modified_lines_atoms[j] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:24s}".format(
+#                             int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]),
+#                             int(new_mass), comments
+# )
+#     modified_atoms_write = "\n".join(modified_lines_atoms)
 
-    modified_lines_header=[]
-    for line in list(header_write.split("\n")):
-        if ("  "+molname) not in line: modified_lines_header.append(line)
-        else:
-            lineH = line.split("         ")
-            txt = lineH[0] + "         1"
-            modified_lines_header.append(txt)
-    modified_header_write = "\n".join(modified_lines_header)
+#     modified_lines_header=[]
+#     for line in list(header_write.split("\n")):
+#         if ("  "+molname) not in line: modified_lines_header.append(line)
+#         else:
+#             lineH = line.split("         ")
+#             txt = lineH[0] + "         1"
+#             modified_lines_header.append(txt)
+#     modified_header_write = "\n".join(modified_lines_header)
 
-    # Adding force to constraints
-    modified_lines_bonds = []
-    bonds_list = []
-    for line in list(bonds_write.split("\n")):
-        if '1' in line:
-            bonds_list.append(f"{line.split('   ')[1]},{line.split('   ')[2]}")
-        if '1' in line and len(line.split("   ")) < 7:
-            modified_lines_bonds.append(line + "    1000000")
-        else:
-            modified_lines_bonds.append(line)
-        if line == "[constraints]":
-            if line in modified_lines_bonds: modified_lines_bonds.remove(line)
-            txt = "#ifndef FLEXIBLE\n[constraints]\n#endif"
-            modified_lines_bonds.append(txt)
-    modified_bonds_write = "\n".join(modified_lines_bonds)
+#     # Adding force to constraints
+#     modified_lines_bonds = []
+#     bonds_list = []
+#     for line in list(bonds_write.split("\n")):
+#         if '1' in line:
+#             bonds_list.append(f"{line.split('   ')[1]},{line.split('   ')[2]}")
+#         if '1' in line and len(line.split("   ")) < 7:
+#             modified_lines_bonds.append(line + "    1000000")
+#         else:
+#             modified_lines_bonds.append(line)
+#         if line == "[constraints]":
+#             if line in modified_lines_bonds: modified_lines_bonds.remove(line)
+#             txt = "#ifndef FLEXIBLE\n[constraints]\n#endif"
+#             modified_lines_bonds.append(txt)
+#     modified_bonds_write = "\n".join(modified_lines_bonds)
     
-    #Bonds / Constraints: delete lines describing interactions with VS
-    bond_with_vs={}
-    for line in list(modified_bonds_write.split("\n")):
-        if line !="":
-            bond_line = line.split()
-            if len(bond_line)>2 and not line.startswith(";"):
-                for vs, cb in virtual_sites.items():
-                    if str(vs+1) in bond_line[:2]:
-                        # memorizing atom bonded with VS = vs_bond
-                        if str(vs+1) == bond_line[0] : vs_bond = bond_line[1] 
-                        if str(vs+1) == bond_line[1] : vs_bond = bond_line[0]
+#     #Bonds / Constraints: delete lines describing interactions with VS
+#     bond_with_vs={}
+#     for line in list(modified_bonds_write.split("\n")):
+#         if line !="":
+#             bond_line = line.split()
+#             if len(bond_line)>2 and not line.startswith(";"):
+#                 for vs, cb in virtual_sites.items():
+#                     if str(vs+1) in bond_line[:2]:
+#                         # memorizing atom bonded with VS = vs_bond
+#                         if str(vs+1) == bond_line[0] : vs_bond = bond_line[1] 
+#                         if str(vs+1) == bond_line[1] : vs_bond = bond_line[0]
 
-                        #memorize VS bond count
-                        if str(vs+1) not in bond_with_vs:
-                            bond_with_vs[str(vs+1)]=[]
-                        if vs_bond not in bond_with_vs.values():
-                            bond_with_vs[str(vs+1)].append(vs_bond) #beads bounded to VS
+#                         #memorize VS bond count
+#                         if str(vs+1) not in bond_with_vs:
+#                             bond_with_vs[str(vs+1)]=[]
+#                         if vs_bond not in bond_with_vs.values():
+#                             bond_with_vs[str(vs+1)].append(vs_bond) #beads bounded to VS
 
-                        #Check if bond between bead B and VS is the only bond connecting B to the rest of the molecule: if yes, don't remove it
-                        nb_occ=0
-                        if str(vs+1) == bond_line[0]:
-                            for i in bonds_list:
-                                if bond_line[1] in i: nb_occ+=1
-                        else:
-                            for i in bonds_list:
-                                if bond_line[0] in i: nb_occ+=1
-                        if line in modified_lines_bonds and nb_occ>1: modified_lines_bonds.remove(line)
-    modified_bonds_write = "\n".join(modified_lines_bonds)
+#                         #Check if bond between bead B and VS is the only bond connecting B to the rest of the molecule: if yes, don't remove it
+#                         nb_occ=0
+#                         if str(vs+1) == bond_line[0]:
+#                             for i in bonds_list:
+#                                 if bond_line[1] in i: nb_occ+=1
+#                         else:
+#                             for i in bonds_list:
+#                                 if bond_line[0] in i: nb_occ+=1
+#                         if line in modified_lines_bonds and nb_occ>1: modified_lines_bonds.remove(line)
+#     modified_bonds_write = "\n".join(modified_lines_bonds)
 
-    #Angles: delete lines describing interactions with VS 
-    modified_lines_angles = []
-    for line in list(angles_write.split("\n")):
-        if line !="":
-            angle_line = line.split()
-            if line not in modified_lines_angles: 
-                modified_lines_angles.append(line)
-            if len(angle_line)>2 and not line.startswith(";"):
-                for vs, cb in virtual_sites.items():
-                    #if str(vs+1) == angle_line[0] or str(vs+1) == angle_line[1] or str(vs+1) == angle_line[2] :
-                    if str(vs+1) in angle_line[:3] :
-                        if line in modified_lines_angles : modified_lines_angles.remove(line)
+#     #Angles: delete lines describing interactions with VS 
+#     modified_lines_angles = []
+#     for line in list(angles_write.split("\n")):
+#         if line !="":
+#             angle_line = line.split()
+#             if line not in modified_lines_angles: 
+#                 modified_lines_angles.append(line)
+#             if len(angle_line)>2 and not line.startswith(";"):
+#                 for vs, cb in virtual_sites.items():
+#                     #if str(vs+1) == angle_line[0] or str(vs+1) == angle_line[1] or str(vs+1) == angle_line[2] :
+#                     if str(vs+1) in angle_line[:3] :
+#                         if line in modified_lines_angles : modified_lines_angles.remove(line)
 
-    #Clean angles already described by dihedrals 
-    for lineA in modified_lines_angles:
-        for lineD in list(dihedrals_write.split("\n")):
-            angle_line = lineA.split()
-            dihed_line = lineD.split()
-            if len(dihed_line)>2 and not lineD.startswith(";") and len(angle_line)>2 and not lineA.startswith(";"):
-                if angle_line[0] in dihed_line[:4] and angle_line[1] in dihed_line[:4] and angle_line[2] in dihed_line[:4]:
-                    if lineA in modified_lines_angles : modified_lines_angles.remove(lineA)
-    modified_angles_write = "\n".join(modified_lines_angles)
+#     #Clean angles already described by dihedrals 
+#     for lineA in modified_lines_angles:
+#         for lineD in list(dihedrals_write.split("\n")):
+#             angle_line = lineA.split()
+#             dihed_line = lineD.split()
+#             if len(dihed_line)>2 and not lineD.startswith(";") and len(angle_line)>2 and not lineA.startswith(";"):
+#                 if angle_line[0] in dihed_line[:4] and angle_line[1] in dihed_line[:4] and angle_line[2] in dihed_line[:4]:
+#                     if lineA in modified_lines_angles : modified_lines_angles.remove(lineA)
+#     modified_angles_write = "\n".join(modified_lines_angles)
 
-    if not simple_model:
-        #Dihedrals: delete lines describing interactions with VS
-        modified_lines_dihedrals = []
-        dih_list = []
-        for line in list(dihedrals_write.split("\n")):
-            if line !="":
-                dihed_line = line.split()
-                if line not in modified_lines_dihedrals: modified_lines_dihedrals.append(line)
-                if len(dihed_line)>2 and not line.startswith(";"):
-                    dih_list.append(dihed_line[:4])
-                    for vs, cb in virtual_sites.items():
-                        if str(vs+1) in dihed_line[:4] :
-                            if line in modified_lines_dihedrals : modified_lines_dihedrals.remove(line)
-        for i in rigid_dih:
-            modified_lines_dihedrals.append(i)
+#     if not simple_model:
+#         #Dihedrals: delete lines describing interactions with VS
+#         modified_lines_dihedrals = []
+#         dih_list = []
+#         for line in list(dihedrals_write.split("\n")):
+#             if line !="":
+#                 dihed_line = line.split()
+#                 if line not in modified_lines_dihedrals: modified_lines_dihedrals.append(line)
+#                 if len(dihed_line)>2 and not line.startswith(";"):
+#                     dih_list.append(dihed_line[:4])
+#                     for vs, cb in virtual_sites.items():
+#                         if str(vs+1) in dihed_line[:4] :
+#                             if line in modified_lines_dihedrals : modified_lines_dihedrals.remove(line)
+#         for i in rigid_dih:
+#             modified_lines_dihedrals.append(i)
         
-        modified_dihedrals_write = "\n".join(modified_lines_dihedrals)
-    else:
-        modified_dihedrals_write = dihedrals_write
+#         modified_dihedrals_write = "\n".join(modified_lines_dihedrals)
+#     else:
+#         modified_dihedrals_write = dihedrals_write
 
-    exclusions_net=""
-    exclusions_net = exclusions_net + "\n[exclusions]\n"
-    for i in range(1,nb_beads):
-        row = " ".join(map(str, range(i, nb_beads + 1)))
-        exclusions_net="   "+exclusions_net+row+"\n"
+#     exclusions_net=""
+#     exclusions_net = exclusions_net + "\n[exclusions]\n"
+#     for i in range(1,nb_beads):
+#         row = " ".join(map(str, range(i, nb_beads + 1)))
+#         exclusions_net="   "+exclusions_net+row+"\n"
     
 
-    # bartender info search
-    bartender_input_info["VSITES"] = []
-    for line in list(vs_write.split("\n")):
-        if ";" not in line and len(line.split()) > 3:
-            info_vs = f"{line.split()[0]} {','.join(line.split()[2:])} 1"
-            bartender_input_info["VSITES"].append(info_vs)
+#     # bartender info search
+#     bartender_input_info["VSITES"] = []
+#     for line in list(vs_write.split("\n")):
+#         if ";" not in line and len(line.split()) > 3:
+#             info_vs = f"{line.split()[0]} {','.join(line.split()[2:])} 1"
+#             bartender_input_info["VSITES"].append(info_vs)
 
-    bartender_input_info["BONDS"] = []
-    for line in list(modified_bonds_write.split("\n")):
-        if ";" not in line and len(line.split()) > 4:
-            bartender_input_info["BONDS"].append(line.split()[:2])
+#     bartender_input_info["BONDS"] = []
+#     for line in list(modified_bonds_write.split("\n")):
+#         if ";" not in line and len(line.split()) > 4:
+#             bartender_input_info["BONDS"].append(line.split()[:2])
 
-    bartender_input_info["ANGLES"] = []
-    for line in list(modified_angles_write.split("\n")):
-        if ";" not in line and len(line.split()) > 5:
-            bartender_input_info["ANGLES"].append(line.split()[:3])
+#     bartender_input_info["ANGLES"] = []
+#     for line in list(modified_angles_write.split("\n")):
+#         if ";" not in line and len(line.split()) > 5:
+#             bartender_input_info["ANGLES"].append(line.split()[:3])
 
-    bartender_input_info["IMPROPERS"] = []
-    for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write
-        if ";" not in line and len(line.split()) > 6:
-            bartender_input_info["IMPROPERS"].append(line.split()[:4])
+#     bartender_input_info["IMPROPERS"] = []
+#     for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write
+#         if ";" not in line and len(line.split()) > 6:
+#             bartender_input_info["IMPROPERS"].append(line.split()[:4])
 
-    position_restraints = write_position_restraints(range(1, nb_beads + 1))
-    text = (
-        modified_header_write
-        + "\n"
-        + modified_atoms_write
-        + "\n"
-        + modified_bonds_write
-        + "\n"
-        + modified_angles_write
-        + "\n"
-        + modified_dihedrals_write
-        + "\n"
-        + vs_write
-        + exclusions_net
-        + position_restraints
-    )
-    return text, vs_bead_names, bartender_input_info
+#     position_restraints = write_position_restraints(range(1, nb_beads + 1))
+#     text = (
+#         modified_header_write
+#         + "\n"
+#         + modified_atoms_write
+#         + "\n"
+#         + modified_bonds_write
+#         + "\n"
+#         + modified_angles_write
+#         + "\n"
+#         + modified_dihedrals_write
+#         + "\n"
+#         + vs_write
+#         + exclusions_net
+#         + position_restraints
+#     )
+#     return text, vs_bead_names, bartender_input_info
 
 
 def bartender_input(mol, molname, atoms_in_beads, bart_info_dict): ### AutoM3 ###
@@ -1783,532 +1840,3 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
             bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
 
     return bead_type
-
-
-# ==============================================================================
-# NEW: Topology Building Functions (decoupled data from formatting)
-# ==============================================================================
-
-def build_topology(cgbeads, molname, mol_smi, forcepred, cgbeads_ring, molecule, hbonda, hbondd, 
-                    partitioning, cgbead_coords, ringatoms, ringatoms_flat, logp_file, beadtypes=None, trial=False, simple_model=False):
-    """
-    Build complete Topology object with all CG data.
-    
-    This function centralizes topology construction and returns a Topology object
-    containing all topology data in structured form (atoms, bonds, angles, dihedrals, etc.).
-    
-    Args:
-        molname: Molecule name
-        mol_smi: SMILES string
-        forcepred: Force field prediction model
-        cgbeads: List of CG beads
-        cgbeads_ring: List of ring CG beads
-        molecule: RDKit molecule object
-        hbonda: H-bond acceptors
-        hbondd: H-bond donors
-        partitioning: Atom to bead mapping
-        cgbead_coords: CG bead coordinates
-        ringatoms: List of ring atoms
-        ringatoms_flat: Flattened ring atoms
-        logp_file: LogP file handle
-        beadtypes: Pre-computed bead types (optional, will compute if None)
-        trial: Whether this is a trial run
-        simple_model: Whether to skip dihedrals
-    
-    Returns:
-        Topology: object containing all topology data
-    """
-    topo = Topology(molname=molname, mol_smi=mol_smi)
-    
-    # Build atoms
-    atomnames, computed_beadtypes, atoms_data, atoms_in_smi_dict = build_atoms_data(
-        cgbeads, molname, forcepred,  molecule, hbonda, hbondd,
-        partitioning, ringatoms, ringatoms_flat, logp_file, trial
-    )
-    topo.atomnames = atomnames
-    topo.beadtypes = beadtypes if beadtypes is not None else computed_beadtypes
-    topo.atoms = atoms_data
-    topo.atoms_in_smi_dict = atoms_in_smi_dict
-    
-    # Build bonds and constraints
-    bonds, constraints = build_bonds_data(
-        cgbeads, cgbeads_ring, molecule, partitioning, cgbead_coords, ringatoms
-    )
-    topo.bonds = bonds
-    topo.constraints = constraints
-    
-    # Build angles
-    angles = build_angles_data(
-        cgbeads, molecule, partitioning, cgbead_coords, bonds, constraints, ringatoms
-    )
-    topo.angles = angles
-    
-    # Build dihedrals (unless simple model)
-    if not simple_model:
-        dihedrals, num_ar = build_dihedrals_data(
-            cgbeads, constraints, ringatoms, cgbead_coords
-        )
-        topo.dihedrals = dihedrals
-    
-    return topo
-
-
-def build_atoms_data(cgbeads, molname, forcepred, molecule, hbonda, hbondd, partitioning, 
-                      ringatoms, ringatoms_flat, logp_file, trial=False):
-    """Build atoms data structure (decoupled from formatting)."""
-    logger.debug("Entering build_atoms_data()")
-    atomnames = []
-    beadtypes = []
-    atoms_data = []
-    atoms_in_smi_dict = {}
-
-    for bead in range(len(cgbeads)):
-        try:
-            smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(
-                molecule, partitioning, bead
-            )
-        except Exception:
-            raise
-        atoms_in_smi_dict[bead + 1] = atoms_in_smi.replace(" ; atoms: ", "")
-
-        atom_name = ""
-        for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
-            try:
-                float(character)
-            except ValueError:
-                if count == 1:
-                    atom_name += "{:s}".format(character)
-                else:
-                    atom_name += "{:s}{:s}".format(character, str(count))
-        
-        mol_frag, errval = gen_molecule_smi(smi_frag)
-        charge_frag = get_charge(mol_frag)
-
-        if errval == 0:
-            try:
-                if charge_frag == 0:
-                    alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
-                else:
-                    alogps = 0.0
-                    logp_origin = "; Charged fragment"
-            except (NameError, TypeError, ValueError):
-                return atomnames, beadtypes, atoms_data, atoms_in_smi_dict
-
-            hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
-            hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
-            in_ring = cgbeads[bead] in ringatoms_flat
-
-            bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
-            atom_name = ""
-            name_index = 0
-            while atom_name in atomnames or name_index == 0:
-                name_index += 1
-                atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
-            atomnames.append(atom_name)
-            
-            mass = get_standard_mass(bead_type)
-
-            atom_dict = {
-                'id': bead + 1,
-                'type': bead_type,
-                'resnr': 1,
-                'residue': molname[:4] if len(molname) > 4 else molname,
-                'atom': atom_name,
-                'cgnr': bead + 1,
-                'charge': charge,
-                'mass': mass,
-                'smiles': smi_frag,
-                'atoms_in_smi': atoms_in_smi,
-                'logp_origin': logp_origin
-            }
-            atoms_data.append(atom_dict)
-            beadtypes.append(bead_type)
-
-    return atomnames, beadtypes, atoms_data, atoms_in_smi_dict
-
-
-def format_topology_header(topo):
-    """Format Topology header section."""
-    text = "; GENERATED WITH Auto_Martini M3FF for {}\n".format(topo.molname)
-    info = (
-        "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
-        + "; updated to Martini 3 force field by Magdalena Szczuka\n"
-        + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
-        + "; SMILES code : " + topo.mol_smi + "\n\n"
-        + "\n[moleculetype]\n"
-        + "; molname       nrexcl\n"
-        + "  {:5s}         {:d}\n\n".format(topo.molname, topo.nrexcl)
-        + "[atoms]\n"
-        + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num"
-    )
-    return text + info
-
-
-def format_topology_atoms(atoms_data, trial=False):
-    """Format atoms list into ITP text."""
-    if trial:
-        return ""
-    
-    text = ""
-    for atom in atoms_data:
-        text += (
-            "   {:<5d}   {:5s}   {:d}   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
-                atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
-                atom['cgnr'], atom['charge'], atom['mass'], atom['smiles'],
-                atom['atoms_in_smi'], atom['logp_origin']
-            )
-        )
-    return text
-
-
-def format_topology_bonds(bonds, constraints, beadtypes, ringatoms, trial=False, cutoff=1e4):
-    """Format bonds and constraints into ITP text."""
-    if trial:
-        return ""
-    
-    text = ""
-    cpt_ringatoms = 0
-    if ringatoms != []:
-        cpt_ringatoms = len(sum(ringatoms, []))
-    
-    # Create beadlist for read_params
-    beadlist = []
-    for bead in beadtypes:
-        if not bead.startswith('T') and not bead.startswith('S'):
-            beadlist.append('R')
-        else:
-            beadlist.append(bead[0])
-    
-    if len(bonds) > 0:
-        text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
-        for b in bonds:
-            # Make sure atoms in bond are not part of the same ring
-            fc = read_params(b[2], beadlist[b[0]] + "-" + beadlist[b[1]])
-            if fc >= cutoff:
-                fc = cutoff
-            text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                b[0] + 1, b[1] + 1, b[2], fc,
-            )
-    else:
-        text = "\n[bonds]\n"
-    
-    if len(constraints) > 0:
-        text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
-        for c in constraints:
-            if c not in bonds:
-                if cpt_ringatoms > 18 and c[2] > 0.415:
-                    continue
-                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
-                    c[0] + 1, c[1] + 1, c[2]
-                )
-    
-    return text
-
-
-def build_angles_data(cgbeads, molecule, partitioning, cgbead_coords, bondlist, constlist, ringatoms, type_2_cutoff=160.0):
-    """Build angles data structure (decoupled from formatting)."""
-    logger.debug("Entering build_angles_data()")
-    
-    angle_list = []
-
-    # Angles
-    if len(cgbeads) <= 2:
-        return angle_list
-
-    for i in range(len(cgbeads)):
-        for j in range(len(cgbeads)): 
-            for k in range(len(cgbeads)):     
-
-                # Check if all indices are different
-                if i == j or j == k or i == k:
-                    continue
-
-                # Check if angle already exists
-                stop_iteration = False
-                for a in angle_list:
-                    it, jt, kt = a[0], a[1], a[2]
-                    if i == kt and j == jt and k == it:
-                        stop_iteration = True
-                        break
-                if stop_iteration:
-                    continue
-
-                # Check if all of them are in one ring
-                for ring in ringatoms:
-                    if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
-                        stop_iteration = True
-                        break
-                if stop_iteration:
-                    continue
-
-                # Check if all are bonded
-                ij_bonded = False
-                jk_bonded = False
-                ik_bonded = False
-                for b in bondlist + constlist:
-                    connectivity = [b[0], b[1]]
-                    if i in connectivity and j in connectivity:
-                        ij_bonded = True
-                    if j in connectivity and k in connectivity:
-                        jk_bonded = True
-                    if i in connectivity and k in connectivity:
-                        ik_bonded = True
-                # If all three are bonded, skip. If only ij and jk are bonded, keep.
-                if ij_bonded and jk_bonded and ik_bonded:
-                    continue
-                # Skip if they do not form a chain (i-j-k or k-j-i)
-                if not (ij_bonded and jk_bonded):
-                    continue
-
-                # Measure angle between i, j, and k.
-                angle = (
-                    180.0
-                    / math.pi
-                    * math.acos(
-                        np.dot(
-                            cgbead_coords[i] - cgbead_coords[j],
-                            cgbead_coords[k] - cgbead_coords[j],
-                        )
-                        / (
-                            np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
-                            * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
-                        )
-                    )
-                )
-                # Look for any double bond between atoms belonging to these CG beads.
-                atoms_in_fragment = []
-                for aa in partitioning.keys():
-                    if partitioning[aa] == j:
-                        atoms_in_fragment.append(aa)
-                force_const = 100.0
-                for ib in range(len(molecule.GetBonds())):
-                    abond = molecule.GetBondWithIdx(ib)
-                    if (
-                        abond.GetBeginAtomIdx() in atoms_in_fragment
-                        and abond.GetEndAtomIdx() in atoms_in_fragment
-                    ):
-                        bondtype = molecule.GetBondBetweenAtoms(
-                            abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
-                        ).GetBondType()
-                        if bondtype == rdchem.BondType.DOUBLE:
-                            force_const = 45.0
-
-                ### AutoM3 ###
-                if len(partitioning) > 15:
-                    for a1 in range(len(angle_list)):
-                        for a2 in range(len(angle_list)):
-                            if i in angle_list[a1] and j in angle_list[a1] and j in angle_list[a2] and k in angle_list[a2]:
-                                break
-                
-                funct = 1
-                if angle > type_2_cutoff:
-                    force_const = 250.0
-                angle_list.append([i, j, k, funct, angle, force_const])
-
-    return angle_list
-
-
-def build_dihedrals_data(cgbeads, constlist, ringatoms, cgbead_coords):
-    """Build dihedrals data structure (decoupled from formatting)."""
-    logger.debug("Entering build_dihedrals_data()")
-
-    new_dihed_list = []
-    num_ar = 0
-
-    if len(cgbeads) > 3: 
-        # Dihedrals
-        dihed_list = []
-        # Three ring atoms and one non ring
-        for i in range(len(cgbeads)):
-            for j in range(len(cgbeads)):
-                for k in range(len(cgbeads)):
-                    for l in range(len(cgbeads)):
-                        if i != j and i != k and i != l and j != k and j != l and k != l:
-
-                            three_in_ring = False
-                            for ring in ringatoms:
-                                num_ar += len(ring)
-                                if [
-                                    [cgbeads[i] in ring],
-                                    [cgbeads[j] in ring],
-                                    [cgbeads[k] in ring],
-                                    [cgbeads[l] in ring],
-                                ].count([True]) >= 3:
-                                    three_in_ring = True
-                                    break
-                            for b in constlist:
-                                if i in [b[0], b[1]] and j in [b[0], b[1]]:
-                                    pass
-                                if j in [b[0], b[1]] and k in [b[0], b[1]]:
-                                    pass
-                                if k in [b[0], b[1]] and l in [b[0], b[1]]:
-                                    pass
-                            # Distance criterion--beads can't be far apart
-                            disthres = 0.5
-                            close_enough = False
-                            if (
-                                np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[j] - cgbead_coords[k]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[k] - cgbead_coords[l]) * 0.1
-                                < disthres
-                            ):
-                                close_enough = True
-
-                            already_dih = False
-                            for dih in dihed_list:
-                                if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
-                                    already_dih = True
-                                    break
-
-                            if three_in_ring and close_enough and not already_dih:
-                                r1 = cgbead_coords[j] - cgbead_coords[i]
-                                r2 = cgbead_coords[k] - cgbead_coords[j]
-                                r3 = cgbead_coords[l] - cgbead_coords[k]
-                                p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-                                p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-                                r2 /= np.linalg.norm(r2)
-                                cosphi = np.dot(p1, p2)
-                                sinphi = np.dot(r2, np.cross(p1, p2))
-                                angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-                                r1_1 = cgbead_coords[i] - cgbead_coords[j]
-                                r2_2 = cgbead_coords[j] - cgbead_coords[k]
-                                angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
-                                angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
-                                forc_const = 10.0
-                                if angle_ijk < 145.0 and angle_jkl < 145.0:
-                                    dihed_list.append([i, j, k, l, angle, forc_const])
-
-        new_dihed_list = dihed_list
-        if len(dihed_list) > 0:
-            for dl in dihed_list:
-                for di in dihed_list[1:]:
-                    if dl != di:
-                        # Check if beads are repeating
-                        if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]):
-                            new_dihed_list.remove(di)
-
-    return new_dihed_list, num_ar
-
-
-def format_topology_angles(angle_list, beadtypes):
-    """Format angles into ITP text."""
-    text = ""
-    
-    ### AutoM3 ###
-    beadlist = []
-    for bead in beadtypes:
-        if not bead.startswith('T') and not bead.startswith('S'):
-            beadlist.append('R')
-        else:
-            beadlist.append(bead[0])
-
-    if len(angle_list) > 0:
-        text = text + "\n[angles]\n"
-        text = text + ";  i  j  k    funct  angle  force.c.\n"
-        for a in angle_list:
-            force = read_params(a[4], beadlist[a[0]] + "-" + beadlist[a[1]] + "-" + beadlist[a[2]])
-            if force is None:
-                force = a[5]
-            text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
-                a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], force
-            )
-    return text
-
-
-def format_topology_dihedrals(dihed_list, num_ar, cgbeads, ringatoms, cgbead_coords, beadtypes):
-    """Format dihedrals into ITP text."""
-    text = ""
-    
-    ### AutoM3 ###
-    bead_in_ring_coords = {}
-    for nb, bead_nb in enumerate(cgbeads):
-        for ring in ringatoms:
-            if bead_nb in ring:
-                bead_in_ring_coords[nb] = cgbead_coords[nb]
-    
-    beadlist = []
-    for bead in beadtypes:
-        if not bead.startswith('T') and not bead.startswith('S'):
-            beadlist.append('R')
-        else:
-            beadlist.append(bead[0])
-    
-    if len(dihed_list) > 0:
-        text = text + "\n[dihedrals]\n"
-        text = text + ";  i  j  k  l  funct  angle  force.c.\n"
-        
-        for d in dihed_list:
-            ### AutoM3 ###
-            force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
-            if num_ar > 0 and (d[0] or d[1] or d[2] or d[3] not in bead_in_ring_coords.keys()) and force is not None:
-                force = force / 2  # for dihedral between cycle-bead and non-cycled bead: decrease of force
-            if force is None:
-                force = d[5]
-            text = (
-                text
-                + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
-                    d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
-                )
-            )
-    return text
-
-
-def format_topology_to_itp(topo, trial=False):
-    """
-    Format complete Topology object to ITP file text.
-    
-    Args:
-        topo: Topology object
-        trial: Whether this is a trial run
-        
-    Returns:
-        str: Complete ITP file content
-    """
-    text = ""
-    
-    # Header
-    text += "; GENERATED WITH Auto_Martini M3FF for {}\n".format(topo.molname)
-    text += (
-        "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
-        + "; updated to Martini 3 force field by Magdalena Szczuka\n"
-        + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
-        + "; SMILES code : " + topo.mol_smi + "\n\n"
-        + "\n[moleculetype]\n"
-        + "; molname       nrexcl\n"
-        + "  {:5s}         {:d}\n\n".format(topo.molname, topo.nrexcl)
-        + "[atoms]\n"
-        + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num\n"
-    )
-    
-    # Atoms
-    text += format_topology_atoms(topo.atoms, trial)
-    
-    # Bonds and constraints
-    text += format_topology_bonds(topo.bonds, topo.constraints, topo.beadtypes, [], trial)
-    
-    # Angles
-    text += format_topology_angles(topo.angles, topo.beadtypes)
-    
-    # Dihedrals
-    if topo.dihedrals:
-        # Need cgbeads and ringatoms for formatting dihedrals
-        # For now, skip num_ar calculation - will need to refactor if needed
-        text += "\n[dihedrals]\n;  i  j  k  l  funct  angle  force.c.\n"
-        beadlist = []
-        for bead in topo.beadtypes:
-            if not bead.startswith('T') and not bead.startswith('S'):
-                beadlist.append('R')
-            else:
-                beadlist.append(bead[0])
-        
-        for d in topo.dihedrals:
-            force = read_params(d[4], beadlist[d[0]] + "-" + beadlist[d[1]] + "-" + beadlist[d[2]] + "-" + beadlist[d[3]])
-            if force is None:
-                force = d[5]
-            text += "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
-                d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], force
-            )
-    
-    return text

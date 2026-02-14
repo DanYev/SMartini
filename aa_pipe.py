@@ -105,7 +105,7 @@ def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"):
     # Create system object
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(mdsys.sysxml)
-    _add_bb_restraints(system, pdb, bb_aname='P*')
+    _add_bb_restraints(system, pdb, bb_aname='C*')
     # Create simulation object
     integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator)

@@ -1,260 +1,330 @@
-import numpy as np
-import os
-import pickle
-import sys
+import logging
 from pathlib import Path
-import reforge.forge.forcefields as ffs
-import reforge.forge.cgmap as cgmap
-from reforge.forge.topology import Topology, BondList
-from reforge.forge.geometry import get_cg_bonds, get_aa_bonds
-from reforge.plotting import init_figure, make_hist, plot_figure
-from reforge.mdsystem import gmxmd
-from reforge.pdbtools import AtomList, pdb2system
+import copy
+import numpy as np
+from MDAnalysis import Universe
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import AutoMartini as am
+import rdkit
+from rdkit import Chem
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
+    force=True,  # override any prior logging config set by imported libs
+)
+logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
-def process_chain(_chain, _ff, _start_idx, _mol_name):
+def read_cog_trajectory(in_pdb, in_xtc, partitioning):
+    """Read AA trajectory and calculate COG trajectory for CG beads.
+    
+    Parameters
+    ----------
+    in_pdb : str or Path
+        Path to atomistic PDB file
+    in_xtc : str or Path
+        Path to atomistic XTC trajectory
+    partitioning : dict
+        Mapping of atom indices to bead indices {atom_idx: bead_idx}
+        
+    Returns
+    -------
+    numpy.ndarray
+        CG trajectory array with shape (n_frames, n_beads, 3)
     """
-    Process an individual RNA chain: map it to coarse-grained representation and
-    generate a topology.
+    # Load universe
+    u = Universe(str(in_pdb), str(in_xtc))
+    
+    # Group atoms by bead
+    n_beads = max(partitioning.values()) + 1
+    bead_to_atoms = {i: [] for i in range(n_beads)}
+    for atom_idx, bead_idx in partitioning.items():
+        bead_to_atoms[bead_idx].append(atom_idx)
+    
+    # Prepare output array
+    n_frames = len(u.trajectory)
+    cg_trajectory = np.zeros((n_frames, n_beads, 3))
+    
+    # Calculate COG for each bead at each frame
+    for frame_idx, ts in enumerate(u.trajectory):
+        for bead_idx in range(n_beads):
+            atom_indices = bead_to_atoms[bead_idx]
+            if atom_indices:
+                # Get positions of atoms in this bead (in Angstroms)
+                positions = u.atoms[atom_indices].positions
+                # Calculate center of geometry (mean position) and convert to nm
+                cg_trajectory[frame_idx, bead_idx] = positions.mean(axis=0) / 10.0
+    
+    return cg_trajectory[:-2, :n_beads, :]
 
-    Args:
-        chain (iterable): An RNA chain from the parsed system.
-        ff: Force field object.
-        start_idx (int): Starting atom index for mapping.
-        mol_name (str): Molecule name.
 
-    Returns:
-        tuple: (cg_atoms, chain_topology)
+def calculate_bond_distances(cg_trajectory, topo):
+    """Calculate bond distances from CG trajectory.
+    
+    Parameters
+    ----------
+    cg_trajectory : numpy.ndarray
+        CG trajectory array with shape (n_frames, n_beads, 3)
+    topo : Topology
+        Topology object containing bonds and constraints
+        
+    Returns
+    -------
+    dict
+        Dictionary with bond/constraint info as keys and distances as arrays
+        Format: {(bead_i, bead_j, 'bond'|'constraint'): distances_array}
     """
-    _cg_atoms = cgmap.map_chain(_chain, _ff, atid=_start_idx)
-    sequence = [res.resname for res in _chain]
-    chain_topology = Topology(forcefield=_ff, sequence=sequence, molname=_mol_name)
-    chain_topology.process_atoms()
-    chain_topology.process_bb_bonds()
-    chain_topology.process_sc_bonds()
-    return _cg_atoms, chain_topology
+    n_frames = cg_trajectory.shape[0]
+    bond_distances = {}
+    
+    # Calculate distances for bonds
+    for bond in topo.bonds:
+        i, j = int(bond[0]), int(bond[1])
+        distances = np.zeros(n_frames)
+        
+        for frame_idx in range(n_frames):
+            pos_i = cg_trajectory[frame_idx, i]
+            pos_j = cg_trajectory[frame_idx, j]
+            distances[frame_idx] = np.linalg.norm(pos_i - pos_j)
+        
+        bond_distances[(i, j, 'bond')] = distances
+    
+    # Calculate distances for constraints
+    for constraint in topo.constraints:
+        i, j = int(constraint[0]), int(constraint[1])
+        distances = np.zeros(n_frames)
+        
+        for frame_idx in range(n_frames):
+            pos_i = cg_trajectory[frame_idx, i]
+            pos_j = cg_trajectory[frame_idx, j]
+            distances[frame_idx] = np.linalg.norm(pos_i - pos_j)
+        
+        bond_distances[(i, j, 'constraint')] = distances
+    
+    return bond_distances
 
 
-def merge_topologies(top_list):
+def boltzmann_inversion(distances, temperature=300.0):
+    """Calculate spring constant using Boltzmann inversion.
+    
+    Parameters
+    ----------
+    distances : numpy.ndarray
+        Array of bond distances from trajectory (in nm)
+    temperature : float
+        Temperature in Kelvin (default: 300.0)
+        
+    Returns
+    -------
+    tuple
+        (r0, k) where r0 is equilibrium distance (nm) and k is spring constant (kJ/mol/nm^2)
     """
-    Merge multiple Topology objects into one.
-
-    Args:
-        top_list (list): List of Topology objects.
-
-    Returns:
-        Topology: The merged Topology.
-    """
-    _merged_topology = top_list.pop(0)
-    for new_top in top_list:
-        _merged_topology += new_top
-    return _merged_topology
-
-
-def get_reference_topology(inpdb, mol_name='dsrna'):
-    # Need to get the topology from the reference system
-    print(f'Calculating the reference topology from {inpdb}...', file=sys.stderr)
-    system = pdb2system(inpdb)
-    cgmap.move_o3(system)  # Adjust O3 atoms as required
-    structure = AtomList()
-    topologies = []
-    start_idx = 1
-    for chain in system.chains():
-        cg_atoms, chain_top = process_chain(chain, ff, start_idx, mol_name)
-        structure.extend(cg_atoms)
-        topologies.append(chain_top)
-        start_idx += len(cg_atoms)
-    top = merge_topologies(topologies)
-    print('Done!', file=sys.stderr)
-    return top
-
-
-def prep_data_tmp(aabonds, cgbonds, resname):
-    cg_dict = cgbonds.categorize()
-    aa_dict = aabonds.categorize()
-    if resname == 'all':
-        keys = [comm.split()[1] for comm in aabonds.comms]
-        keys = sorted(set(keys))
-        aadatas, cgdatas = [], []
-        for key in keys:
-            filtered = BondList([bond for bond in aabonds if key in bond[2]])
-            aadatas.append(filtered.measures)
-            filtered = BondList([bond for bond in cgbonds if key in bond[2]])
-            cgdatas.append(filtered.measures)
-            axtitles = keys
+    # Physical constants
+    kB = 0.008314462618  # Boltzmann constant in kJ/mol/K
+    kT = kB * temperature
+    
+    # Calculate histogram
+    hist, bin_edges = np.histogram(distances, bins=50, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+    
+    # Remove zero probability bins
+    nonzero_mask = hist > 0
+    hist = hist[nonzero_mask]
+    bin_centers = bin_centers[nonzero_mask]
+    
+    # Calculate PMF (potential of mean force)
+    # PMF(r) = -kT * ln(P(r))
+    pmf = -kT * np.log(hist)
+    
+    # Shift PMF so minimum is at zero
+    pmf = pmf - np.min(pmf)
+    
+    # Equilibrium distance is at minimum PMF
+    r0 = bin_centers[np.argmin(pmf)]
+    
+    # Fit quadratic around minimum to extract spring constant
+    # V(r) = 0.5 * k * (r - r0)^2
+    # Near minimum, fit: PMF = a * (r - r0)^2
+    # Then k = 2 * a
+    
+    # Use points within 0.05 nm of minimum
+    fit_mask = np.abs(bin_centers - r0) < 0.05
+    if np.sum(fit_mask) >= 3:
+        r_fit = bin_centers[fit_mask]
+        pmf_fit = pmf[fit_mask]
+        
+        # Fit parabola: y = a*(x-r0)^2
+        # Using polyfit with shifted coordinates
+        coeffs = np.polyfit(r_fit - r0, pmf_fit, 2)
+        k = 2.0 * coeffs[0]  # Spring constant
     else:
-        res_keys = [key for key in sorted(aa_dict.keys()) if key.startswith(resname)]
-        aadatas = [aa_dict[key].measures for key in res_keys]
-        cgdatas = [cg_dict[key].measures for key in res_keys]
-        axtitles = [key.split()[1] for key in res_keys]
-    return aadatas, cgdatas, axtitles
+        # Fallback: estimate from variance
+        variance = np.var(distances)
+        k = kT / variance
+    
+    return r0, k
 
 
-def prep_data(bonds, resname):
-    adict = bonds.categorize()
-    if resname == 'all':
-        keys = [comm.split()[1] for comm in bonds.comms]
-        keys = sorted(set(keys))
-        datas = []
-        for key in keys:
-            filtered = BondList([bond for bond in bonds if key in bond[2]])
-            datas.append(filtered.measures)
-            axtitles = keys
+def plot_bond_histograms(bond_distances, topo, output_file=None):
+    """Plot histograms of bond/constraint distances in a single figure.
+    
+    Parameters
+    ----------
+    bond_distances : dict
+        Dictionary from calculate_bond_distances()
+    topo : Topology
+        Topology object for reference lengths
+    output_file : str or Path, optional
+        Path to save the figure. If None, displays interactively.
+    """
+    # Create reference dictionaries for equilibrium lengths
+    bond_ref = {(int(b[0]), int(b[1])): b[2] for b in topo.bonds}
+    constraint_ref = {(int(c[0]), int(c[1])): c[2] for c in topo.constraints}
+    
+    # Determine grid layout
+    n_plots = len(bond_distances)
+    n_cols = min(4, n_plots)  # Max 4 columns
+    n_rows = int(np.ceil(n_plots / n_cols))
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 3*n_rows))
+    if n_plots == 1:
+        axes = [axes]
     else:
-        res_keys = [key for key in sorted(adict.keys()) if key.startswith(resname)]
-        datas = [adict[key].measures for key in res_keys]
-        axtitles = [key.split()[1] for key in res_keys]
-    return datas, axtitles
-
-
-def make_histograms(bonds_list, params_list, resid='all', resname='all', figname='all', grid=(3, 4), figpath=f'png/test.png'):
-    print(f'Plotting {resname}...', file=sys.stderr)
-    # prep data for plotting 
-    datas_list = []
-    axtitles_list = []
-    for bonds in bonds_list:
-        datas, axtitles = prep_data(bonds, resid)
-        datas_list.append(datas)
-        axtitles_list.append(axtitles)
-    datas_tr = list(zip(*datas_list))
-    axtitles = axtitles_list[0]
-    # plotting 
-    fig, axes = init_figure(grid=grid, axsize=(3, 3))
-    for ax, axtitle, datas_tr_list in zip(axes, axtitles, datas_tr):
-        datas_list = unwrap_list_of_dihedrals(datas_tr_list, figname)
-        make_hist(ax, datas_list, params_list)
-        ax.tick_params(left=False, labelleft=False)
-        ax.set_title(axtitle, fontsize=12)
-    # Hide the remaining unused subplots
-    for j in range(len(datas_tr), len(axes.flat)):
-        fig.delaxes(axes.flat[j])    
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower right', ncol=1, bbox_to_anchor=(0.984, 0.062), frameon=True)
-    plot_figure(fig, axes, figname=figname, figpath=figpath)
-    print(f'Done!', file=sys.stderr)
-
-
-def unwrap_dihedrals(dihs):
-    dihs = np.array(dihs)
-    neg_dihs = dihs[dihs < 0]
-    pos_dihs = dihs[dihs > 0]
-    neg_av = np.average(neg_dihs)
-    pos_av = np.average(pos_dihs)
-    if pos_av - neg_av > 180:
-        dihs[dihs < 0] = dihs[dihs < 0] + 360
-    return dihs
-
-
-def unwrap_list_of_dihedrals(datas_list, figname):
-    unwrapped_list = []
-    if figname.split()[0] == 'Dihedral':
-        for datas in datas_list:
-            datas = unwrap_dihedrals(datas)
-            unwrapped_list.append(datas)
+        axes = axes.flatten()
+    
+    # Plot each bond/constraint
+    for idx, ((i, j, bond_type), distances) in enumerate(bond_distances.items()):
+        ax = axes[idx]
+        
+        # Plot histogram
+        ax.hist(distances, bins=30, alpha=0.7, edgecolor='black')
+        
+        # Add reference line
+        if bond_type == 'bond' and (i, j) in bond_ref:
+            ref_length = bond_ref[(i, j)]
+            ax.axvline(ref_length, color='red', linestyle='--', linewidth=1.5, 
+                      label=f'ITP: {ref_length:.3f}')
+        elif bond_type == 'constraint' and (i, j) in constraint_ref:
+            ref_length = constraint_ref[(i, j)]
+            ax.axvline(ref_length, color='red', linestyle='--', linewidth=1.5,
+                      label=f'ITP: {ref_length:.3f}')
+        
+        # Labels and formatting
+        ax.set_xlabel('Distance (nm)', fontsize=9)
+        ax.set_title(f'{bond_type.capitalize()}: {i+1}-{j+1}', fontsize=10)
+        ax.legend(fontsize=8)
+        ax.grid(alpha=0.3)
+        
+        # Remove y-axis labels and ticks
+        ax.set_yticks([])
+        
+        # Set x-axis ticks to 0.01 intervals
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.01))
+        
+        # Calculate spring constant via Boltzmann inversion
+        r0_calc, k_calc = boltzmann_inversion(distances)
+        
+        # Get reference force constant from ITP if available
+        ref_fc = None
+        if bond_type == 'bond':
+            for bond in topo.bonds:
+                if int(bond[0]) == i and int(bond[1]) == j:
+                    if len(bond) >= 4:  # Has force constant
+                        ref_fc = bond[3]
+                    break
+        
+        # Add statistics
+        mean_dist = np.mean(distances)
+        std_dist = np.std(distances)
+        k_rounded = round(k_calc / 1000) * 1000  # Round to nearest 1000
+        stats_text = f'μ={mean_dist:.3f}\nσ={std_dist:.3f}\n'
+        stats_text += f'r₀={r0_calc:.3f}\nk={int(k_rounded/1000)}e3'
+        if ref_fc is not None:
+            ref_k_rounded = round(ref_fc / 1000) * 1000
+            stats_text += f'\nITP k={int(ref_k_rounded/1000)}e3'
+        
+        ax.text(0.98, 0.98, stats_text,
+                transform=ax.transAxes, fontsize=8,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    # Hide unused subplots
+    for idx in range(n_plots, len(axes)):
+        axes[idx].axis('off')
+    
+    plt.tight_layout()
+    
+    if output_file:
+        plt.savefig(output_file, dpi=100, bbox_inches='tight')
+        plt.close()
     else:
-        unwrapped_list = datas_list
-    return unwrapped_list
+        plt.show()
 
 
-def plot_all(dists_tuple, angles_tuple, dihs_tuple):
-    bins = 200
-    ch_params = {'label': 'CHARMM', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'blue', 'alpha': 1.0, 'linewidth': 1.5}
-    am_params = {'label': 'AMBER', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'red', 'alpha': 1.0, 'linewidth': 1.5}
-    cg_params = {'label': 'Martini', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'black', 'alpha': 1.0, 'linewidth': 1.5}
-    params_list = [ch_params, am_params, cg_params]
-    make_histograms(dihs_tuple, params_list, 
-        figname=f'Dihedral distributions (degrees)', grid=(4, 4), figpath=os.path.join(figdir, 'dihs_all.png'))
-    make_histograms(angles_tuple, params_list, 
-        figname=f'Angle distributions (degrees)', grid=(3, 4), figpath=os.path.join(figdir, 'angles_all.png'))
-    make_histograms(dists_tuple, params_list, 
-        figname=f'Distance distributions (nm)', grid=(4, 4), figpath=os.path.join(figdir, 'bonds_all.png'))
-
-
-def plot_by_residue(dists_tuple, angles_tuple, dihs_tuple): 
-    bins = 200
-    ch_params = {'label': 'CHARMM', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'blue', 'alpha': 1.0, 'linewidth': 1.5}
-    am_params = {'label': 'AMBER', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'red', 'alpha': 1.0, 'linewidth': 1.5}
-    cg_params = {'label': 'Martini', 'bins': bins, 'density': True, 'histtype': 'step', 'color': 'black', 'alpha': 1.0, 'linewidth': 1.5}
-    params_list = [ch_params, am_params, cg_params]
-    resnames = {'A': 'Adenine', 'C': 'Cytosine', 'G': 'Guanine', 'U': 'Uracil'}
-    # resnames = {'A': 'Adenine', 'U': 'Uracil'}
-    for resid, resname in resnames.items():
-        make_histograms(dihs_tuple, params_list, resid, resname, 
-            figname=f'Dihedrals {resname}', grid=(3, 4), figpath=os.path.join(figdir, f'dihs_{resid}.png'))
-        make_histograms(angles_tuple, params_list, resid, resname, 
-            figname=f'Angles {resname}', grid=(2, 4), figpath=os.path.join(figdir, f'angles_{resid}.png'))
-        make_histograms(dists_tuple, params_list, resid, resname, 
-            figname=f'Distances {resname}', grid=(3, 4), figpath=os.path.join(figdir, f'bonds_{resid}.png'))
-
-
-def rename_residues_in_charmm_pdb(aapdb):
-    res_map = {'ADE':'A', 'CYT':'C', 'GUA':'G', 'URA':'U'}
-    system = pdb2system(aapdb)
-    for atom in system.atoms:
-        atom.resname = res_map[atom.resname]
-    system.write_pdb(aapdb)
-
-
-def rename_residues_in_amber_pdb(aapdb):
-    res_map = {'A5':'A', 'C5':'C', 'G5':'G', 'U5':'U', 
-        'A3':'A', 'C3':'C', 'G3':'G', 'U3':'U',
-        'A':'A', 'C':'C', 'G':'G', 'U':'U'}
-    system = pdb2system(aapdb)
-    for atom in system.atoms:
-        atom.resname = res_map[atom.resname]
-    system.write_pdb(aapdb)
-
-
-def save_datas(datas, fpath):
-    with open(fpath, "wb") as file:
-        pickle.dump(datas, file)
-
-
-def read_datas(fpath):
-    with open(fpath, "rb") as f:
-        datas = pickle.load(f)
-    return datas
+def update_topology_with_boltzmann(topo, bond_distances, output_itp):
+    """Update topology with Boltzmann-inverted parameters and write new ITP.
+    
+    Parameters
+    ----------
+    topo : Topology
+        Original topology object
+    bond_distances : dict
+        Dictionary from calculate_bond_distances()
+    output_itp : str or Path
+        Path to write the updated ITP file
+    
+    Returns
+    -------
+    Topology
+        Updated topology object
+    """
+    # Create a copy of topology
+    updated_topo = copy.deepcopy(topo)
+    
+    # Update bonds with Boltzmann-inverted values
+    for idx, bond in enumerate(updated_topo.bonds):
+        i, j = int(bond[0]), int(bond[1])
+        
+        # Find corresponding distances
+        if (i, j, 'bond') in bond_distances:
+            distances = bond_distances[(i, j, 'bond')]
+            r0_calc, k_calc = boltzmann_inversion(distances)
+            
+            # Round k to nearest 1000
+            k_rounded = round(k_calc / 1000) * 1000
+            
+            # Update bond: [i, j, length, force_const]
+            updated_topo.bonds[idx] = [i, j, r0_calc, k_rounded]
+    
+    # Write updated topology to ITP file using built-in method
+    itp_content = updated_topo.to_itp(trial=False)
+    
+    # Write to file
+    with open(output_itp, 'w') as f:
+        f.write(itp_content)
+    
+    return updated_topo
 
 
 if __name__ == "__main__":
-    mol_name = 'dsrna'
-    cg_sys = gmxmd.GmxSystem('systems', 'dsrna')
-    ch_sys = gmxmd.GmxSystem('systems', 'dsrna_charmm')
-    am_sys = gmxmd.GmxSystem('systems', 'dsrna_amber')
-    figdir = os.path.join('png', mol_name)
-    cg_pdb = cg_sys.root / 'mdruns' / 'mdrun_1' / 'conv.pdb' # mdrun_2 for the paper
-    cg_refpdb = cg_sys.root / 'inpdb.pdb'
-    ch_pdb = ch_sys.root / 'mdruns' / 'mdrun_2' / 'conv.pdb'
-    ch_refpdb = ch_sys.root / 'ref.pdb'
-    am_pdb = am_sys.root / 'mdruns' / 'mdrun_2' / 'conv.pdb'
-    am_refpdb = am_sys.root / 'ref.pdb'
-    # Neeed to rename the residues before using the PDB
-    # rename_residues_in_charmm_pdb(ch_pdb)
-    # rename_residues_in_amber_pdb(am_pdb)
-    ff = ffs.Martini30RNA()
-    ch_reftop = get_reference_topology(ch_refpdb, mol_name=mol_name)
-    am_reftop = get_reference_topology(am_refpdb, mol_name=mol_name)
-    cg_reftop = get_reference_topology(cg_refpdb, mol_name=mol_name)
-    ch_dists, ch_angles, ch_dihs = get_aa_bonds(ch_pdb, ff, ch_reftop)
-    am_dists, am_angles, am_dihs = get_aa_bonds(am_pdb, ff, am_reftop)
-    cg_dists, cg_angles, cg_dihs = get_cg_bonds(cg_pdb, cg_reftop)
-    # am_dists, am_angles, am_dihs = cg_dists, cg_angles, cg_dihs
-    # ch_dists, ch_angles, ch_dihs = cg_dists, cg_angles, cg_dihs
-    datas = (ch_dists, am_dists, cg_dists), (ch_angles, am_angles, cg_angles), (ch_dihs, am_dihs, cg_dihs)
-    # save_datas(datas, 'data/datas.pkl')
-    # datas = read_datas('data/datas.pkl')
-    plot_all(*datas)
-    plot_by_residue(*datas)
-
-
+    molname = "FTA"
     
+    # CG topology from .itp file
+    in_itp = Path("output") / molname / f"ligand_{molname}.itp"
+    topo = am.topology.read_itp(str(in_itp))
 
+    # Trajectory
+    mddir = Path("systems") / molname / "mdruns" / "mdrun"
+    in_pdb = mddir / "md.pdb"
+    in_xtc = mddir / "md.xtc"
+    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning)
+    bond_distances = calculate_bond_distances(cg_traj, topo)
+    plot_bond_histograms(bond_distances, topo, output_file="bond_histograms.png")
     
-
-
-
-
-
-
-        
-   
+    # Update topology with Boltzmann-inverted parameters
+    out_itp = Path("output") / molname / f"ligand_{molname}_boltzmann.itp"
+    updated_topo = update_topology_with_boltzmann(topo, bond_distances, out_itp)
+    print(f"Updated ITP file written to: {out_itp}")

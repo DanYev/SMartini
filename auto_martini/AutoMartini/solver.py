@@ -727,29 +727,26 @@ class Cg_molecule:
         # Generate formatted outputs using topology methods
         header_write = self.topology.format_header()
         atoms_write = self.topology.format_atoms(trial=False)
-        bonds_write = self.topology.format_bonds(ringatoms=self.ring_atoms, trial=False)
+        bonds_write = self.topology.format_bonds()
         angles_write = self.topology.format_angles()
         
         if not self.simple_model and self.topology.dihedrals:
-            dihedrals_write = self.topology.format_dihedrals(
-                num_ar=num_ar,
-                cgbeads=cg_beads,
-                ringatoms=self.ring_atoms,
-                cgbead_coords=self.cg_bead_coords
-            )
+            dihedrals_write = self.topology.format_dihedrals()
         else:
             dihedrals_write = ""
         
         virtual_sites_write = self.topology.format_virtual_sites()
 
+        self.topout = self.topology.to_itp()
+
         # Build topology output and bartender input
         # run_bartender generates complete topology including exclusions and position_restraints
-        self.topout, self.bartender_out = run_bartender(
+        if self.bartender and self.bartenderfname:
+            self.bartender_out = run_bartender(
             header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
             self.cg_bead_coords, self.ring_atoms, cg_beads,
             self.molecule, self.molname, self.topology.atoms_in_smi_dict,
-            bartender=self.bartender
-        )
+            )
         
     def write_topology(self):
         """Write topology and bartender files to disk."""
