@@ -14,8 +14,8 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "ANP"
-    n_beads = 12
+    molname = "FTA"
+    n_beads = None
     outdir = Path("output") / molname
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -47,14 +47,14 @@ if __name__ == "__main__":
         min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_molecule)
     logging.info(f"Wrote: {itp_path}")
 
-    # Save CG structure (.gro)
-    gro_path = outdir / f"{molname.lower()}.gro"
-    cg.output_cg(str(gro_path))
-    logging.info(f"Wrote: {gro_path}")
+    # Save CG structure (.pdb)
+    pdb_path = outdir / f"{molname.lower()}.pdb"
+    cg.output_cg_pdb(str(pdb_path))
+    logging.info(f"Wrote: {pdb_path}")
 
     # Save AA structure (.gro)
     gro_path = outdir / f"{molname.lower()}_aa.gro"
-    cg.output_aa(str(gro_path))
+    cg.output_aa_gro(str(gro_path))
     logging.info(f"Wrote: {gro_path}")
 
     # Make .map file

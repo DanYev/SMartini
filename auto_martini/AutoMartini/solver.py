@@ -124,7 +124,7 @@ class Cg_molecule:
         self.hbond_d = self.aa_graph["hbond_d"]
         self.list_bonds = self.aa_graph["bonds"]
         
-        self.output_aa(f"{self.molname}_aa.gro") # AutoM3 change : output AA structure to .gro file (for visualization purposes)
+        # self.output_aa(f"{self.molname}_aa.gro") 
         logger.info("Detected %d heavy atoms", len(self.list_ha))
         logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", 
                     len(self.ring_atoms_flat), 
@@ -764,7 +764,7 @@ class Cg_molecule:
                 fp.write(self.topout)
             logger.info("Wrote topology: %s", self.topfname)
 
-    def output_aa(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def output_aa_gro(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
         aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
         if aa_output:
@@ -773,9 +773,39 @@ class Cg_molecule:
         else:
             return aa_out
 
-    def output_cg(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def output_cg_gro(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional coarse-grained output to GRO file
         cg_out = output.output_gro(self.cg_bead_coords, self.cg_bead_names, self.molname)
+        if cg_output:
+            with open(cg_output, "w") as fp:
+                fp.write(cg_out)
+        else:
+            return cg_out
+
+    def output_cg_pdb(self, cg_output=None):
+        """Output CG structure to PDB file with CONECT records from topology
+        
+        Parameters
+        ----------
+        cg_output : str, optional
+            Path to output PDB file. If None, returns PDB string.
+            
+        Returns
+        -------
+        str or None
+            PDB format string if cg_output is None, otherwise None
+        """
+        # Get bonds and constraints from topology
+        bonds = self.topology.bonds if hasattr(self, 'topology') else None
+        constraints = self.topology.constraints if hasattr(self, 'topology') else None
+        # Generate PDB output with connectivity information
+        cg_out = output.output_pdb(
+            self.cg_bead_coords, 
+            self.cg_bead_names, 
+            self.molname,
+            bonds=bonds,
+            constraints=constraints
+        )
         if cg_output:
             with open(cg_output, "w") as fp:
                 fp.write(cg_out)
