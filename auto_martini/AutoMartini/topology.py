@@ -55,16 +55,16 @@ class Topology:
     beadtypes: list = field(default_factory=list)
     atoms_in_smi_dict: dict = field(default_factory=dict)
     
-    # Bonds data: list of [i, j, dist, k]
+    # Bonds data: list of [i, j, funct, dist, k]
     bonds: list = field(default_factory=list)
     
-    # Constraints data: list of [i, j, dist]
+    # Constraints data: list of [i, j, funct, dist]
     constraints: list = field(default_factory=list)
     
-    # Angles data: list of [i, j, k, angle, force_const, angle_type]
+    # Angles data: list of [i, j, k, funct, angle, force_const]
     angles: list = field(default_factory=list)
     
-    # Dihedrals data: list of [i, j, k, l, angle, force_const]
+    # Dihedrals data: list of [i, j, k, l, funct, angle, force_const]
     dihedrals: list = field(default_factory=list)
     
     # Virtual sites (if any)
@@ -231,10 +231,10 @@ class Topology:
                     else:
                         fc = 10000
                     
-                    self.bonds.append([i, j, dist, fc])
+                    self.bonds.append([i, j, 1, dist, fc])
                 else:
-                    if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, dist] not in self.constraints:
-                        self.constraints.append([i, j, dist])
+                    if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, 1, dist] not in self.constraints:
+                        self.constraints.append([i, j, 1, dist])
 
         # Ring beads check
         for ir in range(len(cgbeads_ring)):
@@ -243,8 +243,8 @@ class Topology:
                 if distr < 0.65:
                     for ring in ringatoms:
                         if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
-                            ) and ([ir, jr, distr] not in self.constraints and [ir, jr, distr] not in  self.bonds ):
-                            self.constraints.append([ir, jr, distr])
+                            ) and ([ir, jr, 1, distr] not in self.constraints and [ir, jr, 1, distr] not in  self.bonds ):
+                            self.constraints.append([ir, jr, 1, distr])
 
         # Go through list of constraints. If we find an extra
         # possible constraint between beads that have constraints, add it.
@@ -279,8 +279,8 @@ class Topology:
                                 in_ring = True
                                 break
                         # If not in bondlist and in the same ring, add the constraint
-                        if not in_bond_list and in_ring and [i, j, dist] not in self.constraints:
-                            self.constraints.append([i, j, dist])
+                        if not in_bond_list and in_ring and [i, j, 1, dist] not in self.constraints:
+                            self.constraints.append([i, j, 1, dist])
 
         for c in self.constraints:
             if c not in self.bonds:
@@ -504,7 +504,7 @@ class Topology:
                                             forc_const = forc_const / 2
                                 
                                 if angle_ijk < 145.0 and angle_jkl < 145.0:
-                                    dihed_list.append([i, j, k, l, angle, forc_const])
+                                    dihed_list.append([i, j, k, l, 2, angle, forc_const])
 
         if len(dihed_list) > 0:
             for dl in dihed_list:
@@ -664,15 +664,16 @@ class Topology:
         """Format bonds and constraints into ITP text."""
         text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
         for b in self.bonds:
-            # Bond data is [i, j, dist, k]
-            text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}       {:4.1f}".format(
-                b[0] + 1, b[1] + 1, b[2], b[3],
+            # Bond data is [i, j, funct, dist, k]
+            text = text + "\n   {:<3d} {:<3d}   {:1d}       {:4.2f}       {:4.1f}".format(
+                b[0] + 1, b[1] + 1, b[2], b[3], b[4],
             )
 
         text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
         for c in self.constraints:
-                text = text + "\n   {:<3d} {:<3d}   1       {:4.2f}".format(
-                    c[0] + 1, c[1] + 1, c[2]
+                # Constraint data is [i, j, funct, dist]
+                text = text + "\n   {:<3d} {:<3d}   {:1d}       {:4.2f}".format(
+                    c[0] + 1, c[1] + 1, c[2], c[3]
                 )
         
         return text
@@ -697,11 +698,11 @@ class Topology:
             text = text + "\n[dihedrals]\n"
             text = text + ";  i  j  k  l  funct  angle  force.c.\n"
             for d in self.dihedrals:
-                # Dihedral data is [i, j, k, l, angle, force_const]
+                # Dihedral data is [i, j, k, l, funct, angle, force_const]
                 text = (
                     text
-                    + "  {:2} {:2} {:2} {:2}    2    {:<5.1f}  {:5.1f}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5]
+                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}\n".format(
+                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6]
                     )
                 )
         return text
@@ -974,8 +975,8 @@ def read_itp(itp_file):
                 funct = int(parts[2])
                 length = float(parts[3])
                 force_const = float(parts[4]) if len(parts) >= 5 else 10000
-                # Store as [i, j, length, force_const]
-                topo.bonds.append([i, j, length, force_const])
+                # Store as [i, j, funct, length, force_const]
+                topo.bonds.append([i, j, funct, length, force_const])
         
         elif current_section == 'constraints':
             parts = stripped.split()
@@ -984,7 +985,8 @@ def read_itp(itp_file):
                 j = int(parts[1]) - 1
                 funct = int(parts[2])
                 length = float(parts[3])
-                topo.constraints.append([i, j, length])
+                # Store as [i, j, funct, length]
+                topo.constraints.append([i, j, funct, length])
         
         elif current_section == 'angles':
             parts = stripped.split()
@@ -995,9 +997,8 @@ def read_itp(itp_file):
                 funct = int(parts[3])
                 angle = float(parts[4])
                 force_const = float(parts[5]) if len(parts) >= 6 else 0.0
-                # Determine angle type based on force constant
-                angle_type = 2 if force_const >= 100 else 10
-                topo.angles.append([i, j, k, angle, force_const, angle_type])
+                # Store as [i, j, k, funct, angle, force_const]
+                topo.angles.append([i, j, k, funct, angle, force_const])
         
         elif current_section == 'dihedrals':
             parts = stripped.split()
@@ -1009,7 +1010,8 @@ def read_itp(itp_file):
                 funct = int(parts[4])
                 angle = float(parts[5])
                 force_const = float(parts[6]) if len(parts) >= 7 else 0.0
-                topo.dihedrals.append([i, j, k, l, angle, force_const])
+                # Store as [i, j, k, l, funct, angle, force_const]
+                topo.dihedrals.append([i, j, k, l, funct, angle, force_const])
         
         elif current_section == 'virtual_sitesn':
             parts = stripped.split()

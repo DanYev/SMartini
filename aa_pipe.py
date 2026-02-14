@@ -40,7 +40,7 @@ SELECTION = OUT_SELECTION
 
 sysdir = "systems"
 runname = "mdrun"
-ligand_name = "FTA"
+ligand_name = "ANP"
 sysname = ligand_name
 
 
