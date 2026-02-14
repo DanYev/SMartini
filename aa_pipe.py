@@ -21,32 +21,33 @@ logger = get_logger()
 
 # Global settings
 # Production parameters
-TEMPERATURE = 300 * unit.kelvin  # for equilibraion
+TEMPERATURE = 300 * unit.kelvin  # for equilibration
 GAMMA = 1 / unit.picosecond
 PRESSURE = 1 * unit.bar
 # Either steps or time
-TOTAL_TIME = 1000 * unit.nanoseconds
-TSTEP = 4 * unit.femtoseconds
+TOTAL_TIME = 1000 * unit.nanoseconds # USED BY DEFAULT. NSTEPS = TOTAL_TIME / TSTEP
+TSTEP = 2 * unit.femtoseconds
 TOTAL_STEPS = 100000 
 # Reporting: save every NOUT steps
-TRJ_NOUT = 1000 # normally you want ~10000 here
+TRJ_NOUT = 10000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
 CHK_NOUT = 100000 
-OUT_SELECTION = "resname UNK" # "all" "not resname HOH" "protein"
+OUT_SELECTION = "protein or resname ANP or resname MG" # "all" "not resname HOH" "protein"
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 # Analysis and trjconv
-SELECTION = "resname UNK" 
+SELECTION = OUT_SELECTION 
 #########
+
 sysdir = "systems"
 sysname = "KDA"
-
+runname = "mdrun"
 
 def setup(sysdir, sysname):
     mdsys = MmSystem(sysdir, sysname)
     logger.info(f"System directory set up at: {mdsys.root}")
     ligand_resname = "ANP"
     prepare_protein_ligand_system(
-        pdb_file= Path(sysdir) / f"{sysname}.pdb",
+        pdb_file=Path(sysdir) / f"{sysname}.pdb",
         ligand_resname=ligand_resname,
         ligand_smiles=None,
         ligand_sdf=Path(sysdir) / f"{ligand_resname}.sdf",
@@ -465,116 +466,25 @@ def _get_reporters(mdrun, append=False, prefix="md"):
     return log_reporter, err_reporter, traj_reporter, state_reporter
 
 
-def run_protein_ligand_md(
-    pdb_file,
-    ligand_resname="UNK",
-    ligand_smiles=None,
-    ligand_sdf=None,
-    output_dir="protein_ligand_md",
-    n_steps=10000,
-    temperature=300*unit.kelvin,
-    pressure=1*unit.bar,
-    timestep=2*unit.femtoseconds,
-    save_interval=1000,
-    platform_name="CUDA"
-):
-    """
-    Complete workflow to prepare and run MD simulation of protein-ligand complex.
-    
-    Parameters
-    ----------
-    pdb_file : str or Path
-        Path to PDB file with protein-ligand complex
-    ligand_resname : str
-        Residue name of ligand in PDB
-    ligand_smiles : str, optional
-        SMILES string of ligand
-    ligand_sdf : str or Path, optional
-        SDF file with ligand structure
-    output_dir : str or Path
-        Directory for all output files
-    n_steps : int
-        Number of MD steps to run
-    temperature : Quantity
-        Simulation temperature
-    pressure : Quantity
-        Simulation pressure
-    timestep : Quantity
-        Integration timestep
-    save_interval : int
-        Save trajectory every N steps
-    platform_name : str
-        OpenMM platform ('CUDA', 'OpenCL', 'CPU')
-    """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Prepare the system
-    system, topology, positions = prepare_protein_ligand_system(
-        pdb_file=pdb_file,
-        ligand_resname=ligand_resname,
-        ligand_smiles=ligand_smiles,
-        ligand_sdf=ligand_sdf,
-        add_solvent=True,
-        output_dir=output_dir
-    )
-    
-    # Set up simulation
-    logger.info(f"Setting up simulation on {platform_name} platform")
-    
-    if platform_name == "CUDA":
-        platform = mm.Platform.getPlatformByName("CUDA")
-        properties = {'CudaPrecision': 'mixed'}
-    else:
-        platform = mm.Platform.getPlatformByName(platform_name)
-        properties = {}
-    
-    # Add barostat for NPT
-    barostat = mm.MonteCarloBarostat(pressure, temperature)
-    system.addForce(barostat)
-    
-    # Create integrator and simulation
-    integrator = mm.LangevinMiddleIntegrator(temperature, 1.0/unit.picosecond, timestep)
-    simulation = app.Simulation(topology, system, integrator, platform, properties)
-    simulation.context.setPositions(positions)
-    
-    # Minimize energy
-    logger.info("Minimizing energy...")
-    simulation.minimizeEnergy(maxIterations=1000)
-    
-    # Set up reporters
-    simulation.reporters.append(
-        app.StateDataReporter(
-            str(output_dir / 'md.log'),
-            save_interval,
-            step=True,
-            time=True,
-            potentialEnergy=True,
-            kineticEnergy=True,
-            temperature=True,
-            speed=True
-        )
-    )
-    simulation.reporters.append(
-        app.DCDReporter(str(output_dir / 'trajectory.dcd'), save_interval)
-    )
-    simulation.reporters.append(
-        app.CheckpointReporter(str(output_dir / 'checkpoint.chk'), save_interval*10)
-    )
-    
-    # Run simulation
-    logger.info(f"Running {n_steps} steps of MD...")
-    simulation.step(n_steps)
-    
-    # Save final state
-    final_state = simulation.context.getState(getPositions=True, getVelocities=True)
-    with open(output_dir / 'final_positions.pdb', 'w') as f:
-        app.PDBFile.writeFile(topology, final_state.getPositions(), f)
-    
-    logger.info(f"Simulation complete! Output saved to {output_dir}")
-    
-    return simulation
+def trjconv(sysdir, sysname, runname):
+    system = MDSystem(sysdir, sysname)
+    mdrun = MDRun(sysdir, sysname, runname)
+    logger.info(f"WDIR: %s", mdrun.rundir)
+    # INPUT
+    top = mdrun.rundir / "md.pdb"
+    # top = mdrun.root / "system.pdb"
+    traj = mdrun.rundir / f"md.{TRJEXT}"
+    ext_trajs = sorted([f for f in mdrun.rundir.glob(f"md_*.{TRJEXT}")])
+    trajs = [traj] + ext_trajs
+    logger.info(f'Input trajectory files: {trajs}')
+    out_top = mdrun.rundir / "topology.pdb"
+    out_traj = mdrun.rundir / f"samples.{TRJEXT}"
+    # CONVERT
+    convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0000, stop=None, step=10, fit=True)
+    logger.info("Done!")
 
 
 if __name__ == "__main__":
-    setup(sysdir, sysname)
+    # setup(sysdir, sysname)
+    # md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
+    trjconv(sysdir, sysname, runname)
