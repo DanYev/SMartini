@@ -1,0 +1,154 @@
+import logging
+from pathlib import Path
+import copy
+import numpy as np
+import AutoMartini as am
+import rdkit
+from rdkit import Chem
+
+from lpmath import (
+    read_cog_trajectory,
+    calculate_internal_coordinates,
+    boltzmann_inversion_bond,
+    boltzmann_inversion_angle,
+    boltzmann_inversion_dihedral,
+)
+from plots import plot_internal_coordinates
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
+    force=True,  # override any prior logging config set by imported libs
+)
+logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def update_topology_with_boltzmann(topo, internal_coords, output_itp):
+    """Update topology with Boltzmann-inverted parameters and write new ITP.
+    
+    Parameters
+    ----------
+    topo : Topology
+        Original topology object
+    internal_coords : dict
+        Dictionary from calculate_internal_coordinates()
+    output_itp : str or Path
+        Path to write the updated ITP file
+    
+    Returns
+    -------
+    Topology
+        Updated topology object
+    """
+    logger.info(f"Updating topology with Boltzmann-inverted parameters")
+    
+    # Create a copy of topology
+    updated_topo = copy.deepcopy(topo)
+    
+    # Update bonds with Boltzmann-inverted values
+    n_bonds_updated = 0
+    for idx, bond in enumerate(updated_topo.bonds):
+        i, j = int(bond[0]), int(bond[1])
+        
+        # Find corresponding distances
+        if (i, j, 'bond') in internal_coords:
+            distances = internal_coords[(i, j, 'bond')]
+            r0_calc, k_calc = boltzmann_inversion_bond(distances)
+            
+            # Round k to nearest 1000
+            k_rounded = round(k_calc / 1000) * 1000
+            
+            # Update bond: [i, j, funct, length, force_const]
+            logger.debug(f"Bond {i+1}-{j+1}: r0 {bond[3]:.4f} -> {r0_calc:.4f} nm, k -> {int(k_rounded)}")
+            updated_topo.bonds[idx] = [i, j, bond[2], r0_calc, k_rounded]
+            n_bonds_updated += 1
+    
+    logger.info(f"Updated {n_bonds_updated} bonds with Boltzmann-inverted parameters")
+    
+    # Update angles with Boltzmann-inverted values
+    n_angles_updated = 0
+    for idx, angle in enumerate(updated_topo.angles):
+        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
+        
+        # Find corresponding angles
+        if (i, j, k, 'angle') in internal_coords:
+            angles = internal_coords[(i, j, k, 'angle')]
+            theta0_calc, k_calc = boltzmann_inversion_angle(angles)
+            
+            # Round k to nearest 10
+            k_rounded = round(k_calc / 10) * 10
+            
+            # Update angle: [i, j, k, funct, angle, force_const]
+            logger.debug(f"Angle {i+1}-{j+1}-{k+1}: θ0 {angle[4]:.2f} -> {theta0_calc:.2f} deg, k -> {int(k_rounded)}")
+            updated_topo.angles[idx] = [i, j, k, angle[3], theta0_calc, k_rounded]
+            n_angles_updated += 1
+    
+    logger.info(f"Updated {n_angles_updated} angles with Boltzmann-inverted parameters")
+    
+    # Update dihedrals with Boltzmann-inverted values
+    n_dihedrals_updated = 0
+    for idx, dihedral in enumerate(updated_topo.dihedrals):
+        i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
+        
+        # Find corresponding dihedrals
+        if (i, j, k, l, 'dihedral') in internal_coords:
+            dihedrals = internal_coords[(i, j, k, l, 'dihedral')]
+            phi0_calc, k_calc = boltzmann_inversion_dihedral(dihedrals)
+            
+            # Round k to nearest 10
+            k_rounded = round(k_calc / 10) * 10
+            
+            # Update dihedral: [i, j, k, l, funct, angle, force_const]
+            logger.debug(f"Dihedral {i+1}-{j+1}-{k+1}-{l+1}: φ0 {dihedral[5]:.2f} -> {phi0_calc:.2f} deg, k -> {int(k_rounded)}")
+            updated_topo.dihedrals[idx] = [i, j, k, l, dihedral[4], phi0_calc, k_rounded]
+            n_dihedrals_updated += 1
+    
+    logger.info(f"Updated {n_dihedrals_updated} dihedrals with Boltzmann-inverted parameters")
+    
+    # Write updated topology to ITP file using built-in method
+    logger.info(f"Generating updated ITP file")
+    itp_content = updated_topo.to_itp(trial=False)
+    
+    # Write to file
+    logger.info(f"Writing updated topology to {output_itp}")
+    with open(output_itp, 'w') as f:
+        f.write(itp_content)
+    
+    return updated_topo
+
+
+if __name__ == "__main__":
+    molname = "FTA"
+    
+    logger.info(f"Starting analysis for molecule: {molname}")
+    
+    # CG topology from .itp file
+    wdir = Path("systems") / molname
+    in_itp = wdir / "mapping" / f"{molname}.itp"
+    logger.info(f"Reading topology from {in_itp}")
+    topo = am.topology.read_itp(str(in_itp))
+    logger.info(f"Loaded topology: {len(topo.atoms)} atoms, {len(topo.bonds)} bonds, "
+                f"{len(topo.constraints)} constraints, {len(topo.angles)} angles, "
+                f"{len(topo.dihedrals)} dihedrals")
+
+    # Trajectory
+    mddir = wdir / "aa_md" 
+    in_pdb = mddir / "md.pdb"
+    in_xtc = mddir / "md.xtc"
+    logger.info(f"Reading trajectory files from {mddir}")
+    
+    # Calculate internal coordinates
+    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, trim_frames=2)
+    internal_coords = calculate_internal_coordinates(cg_traj, topo)
+    
+    # Plot all internal coordinates
+    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "mapping" / "internal_coords.png")
+    
+    # Update topology with Boltzmann-inverted parameters
+    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
+    updated_topo = update_topology_with_boltzmann(topo, internal_coords, out_itp)
+    
+    logger.info(f"Analysis complete!")
+    logger.info(f"Updated ITP file written to: {out_itp}")
