@@ -45,5 +45,5 @@ if __name__ == "__main__":
 		aa_internal,
 		cg_internal,
 		topo,
-		output_file=wdir / "mapping" / "internal_coords_aa_vs_cg.png",
+		output_file=wdir / "png" / "cg_vs_aa.png",
 	)

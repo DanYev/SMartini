@@ -144,7 +144,7 @@ if __name__ == "__main__":
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
     
     # Plot all internal coordinates
-    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "mapping" / "internal_coords.png")
+    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
     
     # Update topology with Boltzmann-inverted parameters
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"

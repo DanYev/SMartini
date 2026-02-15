@@ -546,6 +546,7 @@ def _save_or_show(output_file, suffix):
     if output_file:
         base = Path(output_file).stem if isinstance(output_file, (str, Path)) else "internal_coords"
         out_path = Path(output_file).parent / f"{base}_{suffix}.png" if isinstance(output_file, (str, Path)) else f"{suffix}.png"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Saving %s plot to %s", suffix, out_path)
         plt.savefig(out_path, dpi=100, bbox_inches="tight")
         plt.close()
