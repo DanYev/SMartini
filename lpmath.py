@@ -163,8 +163,9 @@ def boltzmann_inversion_bond(distances, temperature=300.0):
         coeffs = np.polyfit(r_fit - r0, pmf_fit, 2)
         k = 2.0 * coeffs[0]
     else:
-        variance = np.var(distances)
-        k = kT / variance
+        pass
+    variance = np.var(distances)
+    k = kT / variance
 
     return r0, k
 
@@ -194,8 +195,9 @@ def boltzmann_inversion_angle(angles, temperature=300.0):
         coeffs = np.polyfit(theta_fit_rad, pmf_fit, 2)
         k = 2.0 * coeffs[0]
     else:
-        variance_rad = np.var(np.deg2rad(angles))
-        k = kT / variance_rad
+        pass
+    variance_rad = np.var(np.deg2rad(angles))
+    k = kT / variance_rad
 
     return theta0, k
 
@@ -243,7 +245,8 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
         coeffs = np.polyfit(phi_fit_rad, pmf_fit, 2)
         k = 2.0 * coeffs[0]
     else:
-        variance_rad = np.var(np.deg2rad(dihedrals_shifted))
-        k = kT / variance_rad
+        pass
+    variance_rad = np.var(np.deg2rad(dihedrals_shifted))
+    k = kT / variance_rad
 
     return phi0, k

@@ -30,8 +30,8 @@ if __name__ == "__main__":
 	aa_xtc = aa_dir / "md.xtc"
 
 	cg_dir = wdir / "cg_md"
-	cg_pdb = cg_dir / "topology.pdb"
-	cg_xtc = cg_dir / "samples.xtc"
+	cg_pdb = cg_dir / "mdrun" / "topology.pdb"
+	cg_xtc = cg_dir / "mdrun" / "samples.xtc"
 
 	logger.info("Reading AA trajectory from %s", aa_dir)
 	aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, trim_frames=1)

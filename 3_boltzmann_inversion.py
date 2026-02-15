@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def update_topology_with_boltzmann(topo, internal_coords, output_itp):
+def update_topology_with_boltzmann(topo, internal_coords, output_itp, constraint_k_cutoff=20000):
     """Update topology with Boltzmann-inverted parameters and write new ITP.
     
     Parameters
@@ -107,6 +107,35 @@ def update_topology_with_boltzmann(topo, internal_coords, output_itp):
     
     logger.info(f"Updated {n_dihedrals_updated} dihedrals with Boltzmann-inverted parameters")
     
+    # Move stiff bonds to constraints
+    if constraint_k_cutoff is not None:
+        new_bonds = []
+        constraints_to_add = []
+        existing_constraints = {
+            (int(c[0]), int(c[1])) for c in updated_topo.constraints
+        }
+        moved_count = 0
+        for bond in updated_topo.bonds:
+            i, j, funct, dist, k = bond
+            if k > constraint_k_cutoff:
+                key = (int(i), int(j))
+                rev_key = (int(j), int(i))
+                if key not in existing_constraints and rev_key not in existing_constraints:
+                    constraints_to_add.append([i, j, funct, dist])
+                    existing_constraints.add(key)
+                moved_count += 1
+            else:
+                new_bonds.append(bond)
+
+        if moved_count:
+            updated_topo.bonds = new_bonds
+            updated_topo.constraints.extend(constraints_to_add)
+            logger.info(
+                "Moved %s bonds to constraints (k > %s)",
+                moved_count,
+                constraint_k_cutoff,
+            )
+
     # Write updated topology to ITP file using built-in method
     logger.info(f"Generating updated ITP file")
     itp_content = updated_topo.to_itp(trial=False)
@@ -148,7 +177,12 @@ if __name__ == "__main__":
     
     # Update topology with Boltzmann-inverted parameters
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
-    updated_topo = update_topology_with_boltzmann(topo, internal_coords, out_itp)
+    updated_topo = update_topology_with_boltzmann(
+        topo,
+        internal_coords,
+        out_itp,
+        constraint_k_cutoff=20000,
+    )
     
     logger.info(f"Analysis complete!")
     logger.info(f"Updated ITP file written to: {out_itp}")

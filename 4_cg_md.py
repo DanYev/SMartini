@@ -23,7 +23,8 @@ runname = "mdrun"
 def setup_martini(sysdir, sysname):
     ### FOR CG PROTEIN+/RNA SYSTEMS ###
     mdsys = GmxSystem(sysdir, sysname)
-    # mdsys.prepare_files(pour_martini=True)
+    mdsys.prepare_files(pour_martini=True)
+    shutil.copy("md_cg.mdp", mdsys.mdpdir / "md_cg.mdp")
    
     # LIGANDS 
     pdb_file = Path(sysdir) / "mapping" / f"{ligand}.pdb"
@@ -47,15 +48,13 @@ def setup_martini(sysdir, sysname):
     mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
 
     
-def md_npt(sysdir, sysname, runname, nsteps=None): 
+def md_npt(sysdir, sysname, runname, nsteps=-2): 
     mdrun = GmxRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root 
+    mdrun.rundir = mdrun.root / "mdrun"
     ntomp = get_ntomp()
     mdrun.empp(f=mdrun.mdpdir / "em_cg.mdp")
     mdrun.mdrun(deffnm="em", ntomp=ntomp)
-    mdrun.hupp(f=mdrun.mdpdir / "hu_cg.mdp", c="em.gro", r="em.gro", maxwarn="1") 
-    mdrun.mdrun(deffnm="hu", ntomp=ntomp)
-    mdrun.eqpp(f=mdrun.mdpdir / "eq_cg.mdp", c="hu.gro", r="hu.gro", maxwarn="1") 
+    mdrun.eqpp(f=mdrun.mdpdir / "eq_cg.mdp", c="em.gro", r="em.gro", maxwarn="1") 
     mdrun.mdrun(deffnm="eq", ntomp=ntomp)
     mdrun.mdpp(f=mdrun.mdpdir / "md_cg.mdp", maxwarn="1")    
     if nsteps is None:
@@ -65,10 +64,10 @@ def md_npt(sysdir, sysname, runname, nsteps=None):
     
 def trjconv(sysdir, sysname, runname, **kwargs):
     kwargs.setdefault("b", 0) # in ps
-    kwargs.setdefault("dt", 200) # in ps
-    kwargs.setdefault("e", 10000000) # in ps
+    kwargs.setdefault("dt", 2) # in ps
+    kwargs.setdefault("e", 1e6) # in ps
     mdrun = GmxRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root 
+    mdrun.rundir = mdrun.root / "mdrun"
     k = 1 # k=1 to remove solvent, k=2 for backbone analysis, k=4 to include ions
     # mdrun.trjconv(clinput=f"0\n 0\n", s="eq.tpr", f="eq.gro", o="viz.pdb", n=mdrun.sysndx, pbc="atom", ur="compact", e=0)
     mdrun.convert_tpr(clinput=f"{k}\n", s="md.tpr", n=mdrun.sysndx, o="topology.tpr")
@@ -79,9 +78,9 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 
 if __name__ == "__main__":
-    # setup_martini(sysdir, sysname)
+    setup_martini(sysdir, sysname)
     # md_npt(sysdir, sysname, runname)
-    trjconv(sysdir, sysname, runname, b=0, dt=200, e=10000000)
+    # trjconv(sysdir, sysname, runname, b=0, dt=2, e=1e6)
 
 
     
