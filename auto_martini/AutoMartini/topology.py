@@ -692,17 +692,17 @@ class Topology:
     
     def format_bonds(self):
         """Format bonds and constraints into ITP text."""
-        text = "\n[bonds]\n" + ";  i   j     funct   length   force.c."
+        text = "\n[bonds]\n" + ";  i  j     funct   length   force.c.\n"
         for b in self.bonds:
             # Bond data is [i, j, funct, dist, k]
-            text = text + "\n   {:<3d} {:<3d}   {:1d}       {:4.2f}       {:4.1f}".format(
+            text = text + "  {:2} {:2}       {:2}      {:<5.3f}       {:4.1f}\n".format(
                 b[0] + 1, b[1] + 1, b[2], b[3], b[4],
             )
 
-        text = text + "\n\n[constraints]\n" + ";  i   j     funct   length"
+        text = text + "\n\n[constraints]\n" + ";  i   j     funct   length\n"
         for c in self.constraints:
                 # Constraint data is [i, j, funct, dist]
-                text = text + "\n   {:<3d} {:<3d}   {:1d}       {:4.2f}".format(
+                text = text + "  {:2} {:2}       {:2}      {:<5.3f}\n".format(
                     c[0] + 1, c[1] + 1, c[2], c[3]
                 )
         
@@ -850,7 +850,7 @@ class Topology:
         
         return "\n".join(lines) + "\n"
     
-    def to_itp(self, trial=False, write_exclusions=True, write_posres=True):
+    def to_itp(self, out_file=None, trial=False, write_exclusions=True, write_posres=True):
         """Generate complete ITP file content.
         
         Parameters
@@ -874,7 +874,9 @@ class Topology:
         
         if write_posres:
             text += self.format_position_restraints()
-        
+        if out_file:
+            with open(out_file, 'w') as f:
+                f.write(text)
         return text
 
 

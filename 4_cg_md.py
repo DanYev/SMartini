@@ -48,9 +48,10 @@ def setup_martini(sysdir, sysname):
     mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
 
     
-def md_npt(sysdir, sysname, runname, nsteps=-2): 
+def md_npt(sysdir, sysname, runname, nsteps=None): 
     mdrun = GmxRun(sysdir, sysname, runname)
     mdrun.rundir = mdrun.root / "mdrun"
+    mdrun.rundir.mkdir(parents=True, exist_ok=True)
     ntomp = get_ntomp()
     mdrun.empp(f=mdrun.mdpdir / "em_cg.mdp")
     mdrun.mdrun(deffnm="em", ntomp=ntomp)
@@ -79,8 +80,8 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 if __name__ == "__main__":
     setup_martini(sysdir, sysname)
-    # md_npt(sysdir, sysname, runname)
-    # trjconv(sysdir, sysname, runname, b=0, dt=2, e=1e6)
+    md_npt(sysdir, sysname, runname, nsteps=-2)
+    trjconv(sysdir, sysname, runname, b=0, dt=2, e=1e6)
 
 
     

@@ -64,7 +64,7 @@ def _plot_bonds(bonds_data, topo, output_file):
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.01))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         r0_calc, k_calc = boltzmann_inversion_bond(distances)
 
@@ -132,7 +132,7 @@ def _plot_angles(angles_data, topo, output_file):
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         theta0_calc, k_calc = boltzmann_inversion_angle(angles)
 
@@ -203,7 +203,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         ax.grid(alpha=0.3)
         ax.set_yticks([])
         ax.set_xlim(-180, 180)
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         phi0_calc, k_calc = boltzmann_inversion_dihedral(dihedrals)
         phi0_shifted = wrap_to_180(phi0_calc - circ_mean)
@@ -315,7 +315,7 @@ def _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file):
         ax.set_title(f"{bond_type.capitalize()}: {i+1}-{j+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.01))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
         if hist_range is not None:
             ax.set_xlim(hist_range)
 
@@ -368,7 +368,7 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
         ax.set_title(f"Angle: {i+1}-{j+1}-{k+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
         if hist_range is not None:
             ax.set_xlim(hist_range)
 
@@ -424,7 +424,7 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral")
         ax.legend(fontsize=8)

@@ -46,7 +46,7 @@ def update_topology_with_boltzmann(topo, internal_coords, output_itp, constraint
     
     # Create a copy of topology
     updated_topo = copy.deepcopy(topo)
-    
+
     # Update bonds with Boltzmann-inverted values
     n_bonds_updated = 0
     for idx, bond in enumerate(updated_topo.bonds):
@@ -56,6 +56,7 @@ def update_topology_with_boltzmann(topo, internal_coords, output_itp, constraint
         if (i, j, 'bond') in internal_coords:
             distances = internal_coords[(i, j, 'bond')]
             r0_calc, k_calc = boltzmann_inversion_bond(distances)
+            r0_calc = round(r0_calc, 3)
             
             # Round k to nearest 1000
             k_rounded = round(k_calc / 1000) * 1000
@@ -66,6 +67,31 @@ def update_topology_with_boltzmann(topo, internal_coords, output_itp, constraint
             n_bonds_updated += 1
     
     logger.info(f"Updated {n_bonds_updated} bonds with Boltzmann-inverted parameters")
+
+    # Update constraints with Boltzmann-inverted values (distance only)
+    n_constraints_updated = 0
+    for idx, constraint in enumerate(updated_topo.constraints):
+        i, j = int(constraint[0]), int(constraint[1])
+
+        if (i, j, 'constraint') in internal_coords:
+            distances = internal_coords[(i, j, 'constraint')]
+            r0_calc, _ = boltzmann_inversion_bond(distances)
+            r0_calc = round(r0_calc, 3)
+
+            logger.debug(
+                "Constraint %s-%s: r0 %0.4f -> %0.4f nm",
+                i + 1,
+                j + 1,
+                constraint[3],
+                r0_calc,
+            )
+            updated_topo.constraints[idx] = [i, j, constraint[2], r0_calc]
+            n_constraints_updated += 1
+
+    logger.info(
+        "Updated %s constraints with Boltzmann-inverted parameters",
+        n_constraints_updated,
+    )
     
     # Update angles with Boltzmann-inverted values
     n_angles_updated = 0
@@ -138,13 +164,8 @@ def update_topology_with_boltzmann(topo, internal_coords, output_itp, constraint
 
     # Write updated topology to ITP file using built-in method
     logger.info(f"Generating updated ITP file")
-    itp_content = updated_topo.to_itp(trial=False)
-    
-    # Write to file
-    logger.info(f"Writing updated topology to {output_itp}")
-    with open(output_itp, 'w') as f:
-        f.write(itp_content)
-    
+    itp_content = updated_topo.to_itp(out_file=output_itp)
+
     return updated_topo
 
 

@@ -38,10 +38,9 @@ TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 SELECTION = OUT_SELECTION 
 #########
 
-sysdir = "systems"
-runname = "mdrun"
-ligand_name = "FTA"
-sysname = ligand_name
+ligand = "FTA"
+sysdir = f"systems/{ligand}"
+sysname = "aa_md"
 
 
 def process_ligand(sysdir, sysname, ligand_name):
@@ -89,6 +88,7 @@ def process_ligand(sysdir, sysname, ligand_name):
 def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"): 
     mdsys = MmSystem(sysdir, sysname)
     mdrun = MmRun(sysdir, sysname, runname)
+    mdrun.rundir = mdrun.root / "mdrun"
     mdrun.rundir.mkdir(parents=True, exist_ok=True)
     logger.info(f"WDIR: %s", mdrun.rundir)
     # Log platform info
@@ -154,6 +154,7 @@ def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"):
 def trjconv(sysdir, sysname, runname):
     system = MDSystem(sysdir, sysname)
     mdrun = MDRun(sysdir, sysname, runname)
+    mdrun.rundir = mdrun.root / "mdrun"
     logger.info(f"WDIR: %s", mdrun.rundir)
     # INPUT
     top = mdrun.rundir / "md.pdb"
@@ -197,19 +198,6 @@ def _load_system_from_xml(filename):
     return system
 
 
-def _add_bb_restraints(system, pdb, bb_aname='CA'):
-    restraint = mm.CustomExternalForce('bb_fc*periodicdistance(x, y, z, x0, y0, z0)^2')
-    restraint.setName('BackboneRestraint')
-    restraint.addGlobalParameter('bb_fc', 1000.0*unit.kilojoules_per_mole/unit.nanometer)
-    restraint.addPerParticleParameter('x0')
-    restraint.addPerParticleParameter('y0')
-    restraint.addPerParticleParameter('z0')
-    system.addForce(restraint)
-    for atom in pdb.topology.atoms():
-        if atom.name == bb_aname:
-            restraint.addParticle(atom.index, pdb.positions[atom.index])
-
-
 def _get_reporters(mdrun, append=False, prefix="md"):
     """Get reporters for MD simulation using custom MmReporter for velocities"""
     mdrun.rundir.mkdir(parents=True, exist_ok=True)
@@ -231,22 +219,23 @@ def _get_reporters(mdrun, append=False, prefix="md"):
     return log_reporter, err_reporter, traj_reporter, state_reporter
 
 
-def trjconv(sysdir, sysname, runname):
-    system = MDSystem(sysdir, sysname)
-    mdrun = MDRun(sysdir, sysname, runname)
-    logger.info(f"WDIR: %s", mdrun.rundir)
-    # INPUT
-    top = mdrun.rundir / "md.pdb"
-    # top = mdrun.root / "system.pdb"
-    traj = mdrun.rundir / f"md.{TRJEXT}"
-    ext_trajs = sorted([f for f in mdrun.rundir.glob(f"md_*.{TRJEXT}")])
-    trajs = [traj] + ext_trajs
-    logger.info(f'Input trajectory files: {trajs}')
-    out_top = mdrun.rundir / "topology.pdb"
-    out_traj = mdrun.rundir / f"samples.{TRJEXT}"
-    # CONVERT
-    convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0000, stop=None, step=10, fit=True)
-    logger.info("Done!")
+# def trjconv(sysdir, sysname, runname):
+#     system = MDSystem(sysdir, sysname)
+#     mdrun = MDRun(sysdir, sysname, runname)
+#     mdrun.rundir = mdrun.root / "mdrun"
+#     logger.info(f"WDIR: %s", mdrun.rundir)
+#     # INPUT
+#     top = mdrun.rundir / "md.pdb"
+#     # top = mdrun.root / "system.pdb"
+#     traj = mdrun.rundir / f"md.{TRJEXT}"
+#     ext_trajs = sorted([f for f in mdrun.rundir.glob(f"md_*.{TRJEXT}")])
+#     trajs = [traj] + ext_trajs
+#     logger.info(f'Input trajectory files: {trajs}')
+#     out_top = mdrun.rundir / "topology.pdb"
+#     out_traj = mdrun.rundir / f"samples.{TRJEXT}"
+#     # CONVERT
+#     convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0000, stop=None, step=10, fit=True)
+#     logger.info("Done!")
 
 
 if __name__ == "__main__":
