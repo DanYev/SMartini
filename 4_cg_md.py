@@ -79,8 +79,9 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 
 if __name__ == "__main__":
-    setup_martini(sysdir, sysname)
-    md_npt(sysdir, sysname, runname)
+    # setup_martini(sysdir, sysname)
+    # md_npt(sysdir, sysname, runname)
+    trjconv(sysdir, sysname, runname, b=0, dt=200, e=10000000)
 
 
     
