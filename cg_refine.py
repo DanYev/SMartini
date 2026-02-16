@@ -15,13 +15,8 @@ InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
 @dataclass
 class RefineSettings:
-    bond_round: int = 3
-    bond_k_round: int = 1000
-    angle_k_round: int = 10
-    dihedral_k_round: int = 10
-
     angle_k_min: Optional[float] = 25.0
-    dihedral_k_min: Optional[float] = 5.0
+    dihedral_k_min: Optional[float] = 0.0
 
     # Optional guards against extreme updates
     max_k_scale: float = 25.0
@@ -124,11 +119,10 @@ def refine_topology_from_cg_vs_aa(
 
         r0_old = float(bond[3])
         k_old = float(bond[4]) if len(bond) >= 5 else None
-        r0_new = round(r0_old + delta, settings.bond_round)
+        r0_new = float(r0_old + delta)
 
         if k_old is not None:
             k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
-            k_new = round(k_new / settings.bond_k_round) * settings.bond_k_round
             new_bonds.append([i, j, bond[2], r0_new, k_new])
         else:
             new_bonds.append([i, j, bond[2], r0_new])
@@ -153,7 +147,7 @@ def refine_topology_from_cg_vs_aa(
         delta = mu_aa - mu_cg
 
         r0_old = float(constraint[3])
-        r0_new = round(r0_old + delta, settings.bond_round)
+        r0_new = float(r0_old + delta)
         new_constraints.append([i, j, constraint[2], r0_new])
         n_constraints_updated += 1
 
@@ -188,7 +182,6 @@ def refine_topology_from_cg_vs_aa(
             if settings.angle_k_min is not None and k_new < settings.angle_k_min:
                 n_angles_removed += 1
                 continue
-            k_new = round(k_new / settings.angle_k_round) * settings.angle_k_round
             new_angles.append([i, j, k, angle[3], theta0_new, k_new])
         else:
             new_angles.append([i, j, k, angle[3], theta0_new])
@@ -238,7 +231,6 @@ def refine_topology_from_cg_vs_aa(
             if settings.dihedral_k_min is not None and k_new < settings.dihedral_k_min:
                 n_dihedrals_removed += 1
                 continue
-            k_new = round(k_new / settings.dihedral_k_round) * settings.dihedral_k_round
             new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new, k_new])
         else:
             new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new])

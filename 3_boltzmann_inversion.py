@@ -157,7 +157,7 @@ def update_topology_with_boltzmann(
     internal_coords,
     constraint_k_cutoff=20000,
     angle_k_cutoff=25,
-    dihedral_k_cutoff=5,
+    dihedral_k_cutoff=None,
 ):
     """Update topology with Boltzmann-inverted parameters and write new ITP.
     
@@ -189,10 +189,7 @@ def update_topology_with_boltzmann(
         if (i, j, 'bond') in internal_coords:
             distances = internal_coords[(i, j, 'bond')]
             r0_calc, k_calc = boltzmann_inversion_bond(distances)
-            r0_calc = round(r0_calc, 3)
-            
-            # Round k to nearest 1000
-            k_rounded = round(k_calc / 1000) * 1000
+            k_rounded = float(k_calc)
             
             # Update bond: [i, j, funct, length, force_const]
             logger.debug(f"Bond {i+1}-{j+1}: r0 {bond[3]:.4f} -> {r0_calc:.4f} nm, k -> {int(k_rounded)}")
@@ -209,7 +206,6 @@ def update_topology_with_boltzmann(
         if (i, j, 'constraint') in internal_coords:
             distances = internal_coords[(i, j, 'constraint')]
             r0_calc, _ = boltzmann_inversion_bond(distances)
-            r0_calc = round(r0_calc, 3)
 
             logger.debug(
                 "Constraint %s-%s: r0 %0.4f -> %0.4f nm",
@@ -242,8 +238,7 @@ def update_topology_with_boltzmann(
                 n_angles_removed += 1
                 continue
 
-            # Round k to nearest 10
-            k_rounded = round(k_calc / 10) * 10
+            k_rounded = float(k_calc)
 
             # Update angle: [i, j, k, funct, angle, force_const]
             logger.debug(
@@ -285,10 +280,11 @@ def update_topology_with_boltzmann(
                 continue
 
             # Round k to nearest 10
-            k_rounded = round(k_calc / 10) * 10
+            # k_rounded = round(k_calc / 10) * 10
+            k_rounded = k_calc 
 
             # Update dihedral: [i, j, k, l, funct, angle, force_const]
-            logger.debug(
+            logger.info(
                 f"Dihedral {i+1}-{j+1}-{k+1}-{l+1}: φ0 {dihedral[5]:.2f} -> {phi0_calc:.2f} deg, k -> {int(k_rounded)}"
             )
             new_dihedrals.append([i, j, k, l, dihedral[4], phi0_calc, k_rounded])
