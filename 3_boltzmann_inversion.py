@@ -157,7 +157,7 @@ def update_topology_with_boltzmann(
     internal_coords,
     constraint_k_cutoff=20000,
     angle_k_cutoff=25,
-    dihedral_k_cutoff=None,
+    dihedral_k_cutoff=5,
 ):
     """Update topology with Boltzmann-inverted parameters and write new ITP.
     

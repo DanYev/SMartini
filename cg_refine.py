@@ -16,7 +16,7 @@ InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 @dataclass
 class RefineSettings:
     angle_k_min: Optional[float] = 25.0
-    dihedral_k_min: Optional[float] = 0.0
+    dihedral_k_min: Optional[float] = 5.0
 
     # Optional guards against extreme updates
     max_k_scale: float = 25.0
