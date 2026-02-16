@@ -370,8 +370,6 @@ dependencies:
   - pip:
       - amberutils==21.0
       - asteval==1.0.8
-      - auto-martinim3==0.0.0
-      - automartini==0.0.0
       - cgsmiles==1.0.1
       - cython==3.2.4
       - edgembar==3.0

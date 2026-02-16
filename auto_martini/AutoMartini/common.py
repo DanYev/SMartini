@@ -1,4 +1,4 @@
-"""
+r"""
 Created on March 14, 2019 by Andrew Abi-Mansour
 Updated to Martini 3 force field on January 31, 2025 by Magdalena Szczuka
 

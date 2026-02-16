@@ -47,7 +47,7 @@ readme = "README.md"
 homepage = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
 repository = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
 documentation = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
-build = "build_ext.py"
+build = "setup.py"
 
 [tool.poetry-dynamic-versioning]
 enable = true
