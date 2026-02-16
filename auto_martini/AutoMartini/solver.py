@@ -79,7 +79,9 @@ class Cg_molecule:
         self.hbond_a = None
         self.hbond_d = None
         self.list_bonds = None
+        self.neighbors = None
         self.partitioning = None
+        self.mapping = None
         self.cg_bead_names = []
         self.cg_bead_coords = []
         self.topout = None
@@ -95,6 +97,7 @@ class Cg_molecule:
 
         # INITIALIZE THE AA MOLECULE
         self.ha_graph = self.build_ha_graph()  # Heavy atom graph for partitioning
+        self.ha_neighbors = [a["neighbors"] for a in self.ha_graph["atoms"]]  # Precompute neighbors for partitioning
 
         ## AutoM3 : MINIMIZATION with RDkit ###
         self.molecule = Chem.Mol(self.molecule)
@@ -102,6 +105,8 @@ class Cg_molecule:
         AllChem.EmbedMolecule(self.molecule, randomSeed=1)
         AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
         AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
+        if not self.raw_molecule:
+            self.raw_molecule = self.molecule
 
         # Extract features and build all-atom graph structure
         self.feats = self.extract_features()
@@ -111,10 +116,7 @@ class Cg_molecule:
         self.list_ha = self.aa_graph["list_ha"]
         self.list_ha_names = self.aa_graph["list_ha_names"]
         self.conf = self.aa_graph["conf"]
-        if self.raw_molecule:
-            self.ha_coords = self.ha_graph["ha_coords"]
-        else:
-            self.ha_coords = self.aa_graph["ha_coords"]
+        self.ha_coords = self.ha_graph["ha_coords"]
         self.aa_coords = self.aa_graph["aa_coords"]
         self.ring_atoms = self.aa_graph["ring_atoms"]
         self.ring_atoms_flat = self.aa_graph["ring_atoms_flat"]
@@ -184,13 +186,13 @@ class Cg_molecule:
                 self.partitioning = self.get_partitioning(cg_beads)
             except Exception:
                 continue
-            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
             self.cg_bead_coords = self.get_bead_coords()
+            logger.info("Partitioned atoms into %d beads", len(self.cg_bead_coords))
 
             # CG beads should take atom rings number if ring atom in bead 
             cg_beads_rings = cg_beads.copy()
@@ -206,10 +208,10 @@ class Cg_molecule:
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
-            mapping_dict = self.make_mapping_dictionary(self.partitioning)
+            self.mapping = self.make_mapping_dictionary(self.partitioning)
             for ring in self.ring_atoms:
                 for atom_idx in ring:
-                    for bead_idx, atom_indices in mapping_dict.items():
+                    for bead_idx, atom_indices in self.mapping.items():
                         if atom_idx in atom_indices:
                             # Add all atoms in this bead to self.ring_atoms_flat
                             for at in atom_indices:
@@ -661,16 +663,15 @@ class Cg_molecule:
         
         # Build bonds and constraints
         self.topology.build_bonds(
-            cgbeads=cg_beads,
-            cgbeads_ring=cg_beads_rings,
-            molecule=self.molecule,
-            partitioning=self.partitioning,
+            mapping=self.mapping,
+            ha_neighbors=self.ha_neighbors,
             cgbead_coords=self.cg_bead_coords,
             ringatoms=self.ring_atoms
         )
         
         # Build angles
         self.topology.build_angles(
+            mapping=self.mapping,
             cgbeads=cg_beads,
             molecule=self.molecule,
             partitioning=self.partitioning,

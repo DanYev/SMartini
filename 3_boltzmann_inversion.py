@@ -24,6 +24,8 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+MOLNAME = "ANP"
+
 
 def _pair_key(i: int, j: int):
     return (int(i), int(j)) if int(i) <= int(j) else (int(j), int(i))
@@ -342,8 +344,7 @@ def update_topology_with_boltzmann(
 
 
 if __name__ == "__main__":
-    molname = "FTA"
-    
+    molname = MOLNAME
     logger.info(f"Starting analysis for molecule: {molname}")
     
     # CG topology from .itp file

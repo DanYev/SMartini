@@ -38,9 +38,10 @@ TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 SELECTION = OUT_SELECTION 
 #########
 
-ligand = "FTA"
+ligand = "ANP"
 sysdir = f"systems/{ligand}"
 sysname = "aa_md"
+runname = "."
 
 
 def process_ligand(sysdir, sysname, ligand_name):
@@ -88,7 +89,7 @@ def process_ligand(sysdir, sysname, ligand_name):
 def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"): 
     mdsys = MmSystem(sysdir, sysname)
     mdrun = MmRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / "mdrun"
+    mdrun.rundir = mdrun.root / runname
     mdrun.rundir.mkdir(parents=True, exist_ok=True)
     logger.info(f"WDIR: %s", mdrun.rundir)
     # Log platform info
@@ -154,7 +155,7 @@ def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"):
 def trjconv(sysdir, sysname, runname):
     system = MDSystem(sysdir, sysname)
     mdrun = MDRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / "mdrun"
+    mdrun.rundir = mdrun.root / runname
     logger.info(f"WDIR: %s", mdrun.rundir)
     # INPUT
     top = mdrun.rundir / "md.pdb"
@@ -239,5 +240,6 @@ def _get_reporters(mdrun, append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    process_ligand(sysdir, sysname, ligand_name)
-    md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
+    # process_ligand(sysdir, sysname, ligand_name)
+    # md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
+    trjconv(sysdir, sysname, runname)
