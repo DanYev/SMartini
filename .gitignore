@@ -2,6 +2,7 @@ ligands/
 output/
 slurm*
 systems/
+tmp/
 Automartini_M3/
 *.log
 *.tmp
