@@ -7,7 +7,7 @@ from MDAnalysis import Universe
 logger = logging.getLogger(__name__)
 
 
-def read_cog_trajectory(in_pdb, in_xtc, partitioning, trim_frames=0):
+def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
     """Read AA trajectory and calculate COG trajectory for CG beads.
 
     Parameters
@@ -18,8 +18,8 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, trim_frames=0):
         Path to atomistic XTC trajectory
     partitioning : dict
         Mapping of atom indices to bead indices {atom_idx: bead_idx}
-    trim_frames : int
-        Number of frames to trim from the end of the trajectory
+    stop : int
+        Number of frames to read from the trajectory
 
     Returns
     -------
@@ -45,14 +45,14 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, trim_frames=0):
                 positions = u.atoms[atom_indices].positions
                 cg_trajectory[frame_idx, bead_idx] = positions.mean(axis=0) / 10.0
 
-    if trim_frames and trim_frames > 0:
-        cg_trajectory = cg_trajectory[:-trim_frames, :n_beads, :]
+    if stop and stop > 0:
+        cg_trajectory = cg_trajectory[:stop, :n_beads, :]
 
     logger.info("COG trajectory computed: %s frames, %s beads", cg_trajectory.shape[0], n_beads)
     return cg_trajectory
 
 
-def read_cg_trajectory(in_pdb, in_xtc):
+def read_cg_trajectory(in_pdb, in_xtc, stop=5000):
     """Read CG trajectory and return positions in nm.
 
     Parameters
@@ -75,6 +75,9 @@ def read_cg_trajectory(in_pdb, in_xtc):
 
     for frame_idx, _ in enumerate(u.trajectory):
         cg_trajectory[frame_idx] = u.atoms.positions / 10.0
+
+    if stop and stop > 0:
+        cg_trajectory = cg_trajectory[:stop, :n_beads, :]
 
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory

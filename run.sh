@@ -63,7 +63,7 @@ fi
 echo "----------------------------------------" >&2
 
 # Run the Python script
-python 4_cg_md.py 
+python "$PYSCRIPT" "$@"
 
 # Clean up MPS
 if [[ "$MPS_ENABLED" -eq 1 ]]; then

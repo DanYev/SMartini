@@ -121,7 +121,13 @@ def _plot_angles(angles_data, topo, output_file):
         ax = axes[idx]
         i, j, k, angle_type = key
 
-        ax.hist(angles, bins=30, alpha=0.7, edgecolor="black")
+        vmin = float(np.min(angles))
+        vmax = float(np.max(angles))
+        if vmin == vmax:
+            vmin -= 1e-3
+            vmax += 1e-3
+
+        ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black")
 
         if (i, j, k) in angle_ref:
             ref_angle = angle_ref[(i, j, k)]
@@ -132,6 +138,7 @@ def _plot_angles(angles_data, topo, output_file):
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
+        ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         theta0_calc, k_calc = boltzmann_inversion_angle(angles)
@@ -355,6 +362,7 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
         i, j, k, angle_type = key
         aa_vals = angles_aa.get(key)
         cg_vals = angles_cg.get(key)
+
         bins = _common_bins(aa_vals, cg_vals, bins=30)
         hist_range = _preferred_range(aa_vals, cg_vals)
 
@@ -426,7 +434,7 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral")
+        _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral", dihedral_center=circ_mean)
         ax.legend(fontsize=8)
 
     for idx in range(n_plots, len(axes)):
@@ -479,29 +487,37 @@ def _plot_hist_pair(ax, aa_vals, cg_vals, bins=30, hist_range=None):
 
 
 def _preferred_range(aa_vals, cg_vals):
+    all_vals = []
     if aa_vals is not None and len(aa_vals) > 0:
-        values = aa_vals
-    elif cg_vals is not None and len(cg_vals) > 0:
-        values = cg_vals
-    else:
+        all_vals.append(aa_vals)
+    if cg_vals is not None and len(cg_vals) > 0:
+        all_vals.append(cg_vals)
+    if not all_vals:
         return None
+    combined = np.concatenate(all_vals)
 
-    vmin = float(np.min(values))
-    vmax = float(np.max(values))
+    vmin = float(np.min(combined))
+    vmax = float(np.max(combined))
     if vmin == vmax:
         vmin -= 1e-3
         vmax += 1e-3
     return (vmin, vmax)
 
 
-def _add_stats_box(ax, aa_vals, cg_vals, value_type):
+def _add_stats_box(ax, aa_vals, cg_vals, value_type, dihedral_center=None):
     lines = []
     if aa_vals is not None:
-        mu, sigma = _compute_stats(aa_vals, value_type)
-        lines.append(f"AA mu={mu:.3f} sigma={sigma:.3f}")
+        mu, sigma, mu_shifted = _compute_stats(aa_vals, value_type, dihedral_center=dihedral_center)
+        if value_type == "dihedral" and mu_shifted is not None:
+            lines.append(f"AA mu_shift={mu_shifted:.3f} sigma={sigma:.3f}")
+        else:
+            lines.append(f"AA mu={mu:.3f} sigma={sigma:.3f}")
     if cg_vals is not None:
-        mu, sigma = _compute_stats(cg_vals, value_type)
-        lines.append(f"CG mu={mu:.3f} sigma={sigma:.3f}")
+        mu, sigma, mu_shifted = _compute_stats(cg_vals, value_type, dihedral_center=dihedral_center)
+        if value_type == "dihedral" and mu_shifted is not None:
+            lines.append(f"CG mu_shift={mu_shifted:.3f} sigma={sigma:.3f}")
+        else:
+            lines.append(f"CG mu={mu:.3f} sigma={sigma:.3f}")
     if not lines:
         return
 
@@ -517,15 +533,18 @@ def _add_stats_box(ax, aa_vals, cg_vals, value_type):
     )
 
 
-def _compute_stats(values, value_type):
+def _compute_stats(values, value_type, dihedral_center=None):
+    mu_shifted = None
     if value_type == "dihedral":
         mean_val = circular_mean_deg(values)
         centered = wrap_to_180(values - mean_val)
-        std_val = np.std(centered)
+        std_val = float(np.std(centered))
+        if dihedral_center is not None:
+            mu_shifted = float(wrap_to_180(mean_val - dihedral_center))
     else:
         mean_val = float(np.mean(values))
         std_val = float(np.std(values))
-    return mean_val, std_val
+    return float(mean_val), std_val, mu_shifted
 
 
 def _reference_circ_mean(aa_vals, cg_vals):

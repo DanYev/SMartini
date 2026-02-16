@@ -437,6 +437,7 @@ class Topology:
                                 ].count([True]) >= 3:
                                     three_in_ring = True
                                     break
+
                             for b in constlist:
                                 if i in [b[0], b[1]] and j in [b[0], b[1]]:
                                     pass
@@ -456,12 +457,16 @@ class Topology:
                                 < disthres
                             ):
                                 close_enough = True
+                            if not close_enough:
+                                continue
 
-                            already_dih = False
+                            stop_iteration = False
                             for dih in dihed_list:
                                 if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
-                                    already_dih = True
+                                    stop_iteration = True
                                     break
+                            if stop_iteration:
+                                continue
 
                             # Check if all are bonded (for proper dihedral chains)
                             bondlist = self.bonds + self.constraints
@@ -471,7 +476,7 @@ class Topology:
                             ik_bonded = False
                             jl_bonded = False
                             il_bonded = False
-                            for b in bondlist + constlist:
+                            for b in bondlist:
                                 connectivity = [b[0], b[1]]
                                 if i in connectivity and j in connectivity:
                                     ij_bonded = True
@@ -489,61 +494,65 @@ class Topology:
                             # # Skip if any shortcut bonds exist (not a proper dihedral chain)
                             # if ik_bonded or jl_bonded or il_bonded:
                             #     continue
+                            if il_bonded:
+                                continue
                             # Skip if they do not form a chain (i-j-k-l)
                             if not (ij_bonded and jk_bonded and kl_bonded):
                                 continue
 
-                            if three_in_ring and close_enough and not already_dih:
-                                r1 = cgbead_coords[j] - cgbead_coords[i]
-                                r2 = cgbead_coords[k] - cgbead_coords[j]
-                                r3 = cgbead_coords[l] - cgbead_coords[k]
-                                p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-                                p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-                                r2 /= np.linalg.norm(r2)
-                                cosphi = np.dot(p1, p2)
-                                sinphi = np.dot(r2, np.cross(p1, p2))
-                                angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-                                r1_1 = cgbead_coords[i] - cgbead_coords[j]
-                                r2_2 = cgbead_coords[j] - cgbead_coords[k]
-                                angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
-                                angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
-                                
-                                # Create beadlist for read_params
-                                beadlist = []
-                                for bead in self.beadtypes:
-                                    if not bead.startswith('T') and not bead.startswith('S'):
-                                        beadlist.append('R')
-                                    else:
-                                        beadlist.append(bead[0])
-                                
-                                # Compute force constant from database or default
-                                bead_in_ring_coords = {}
-                                for nb, bead_nb in enumerate(cgbeads):
-                                    for ring in ringatoms:
-                                        if bead_nb in ring:
-                                            bead_in_ring_coords[nb] = cgbead_coords[nb]
-                                
-                                forc_const = 10.0
-                                if len(beadlist) > max(i, j, k, l):
-                                    db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k] + "-" + beadlist[l])
-                                    if db_force is not None:
-                                        forc_const = db_force
-                                        # Adjust for non-ring beads
-                                        if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
-                                                           k not in bead_in_ring_coords or l not in bead_in_ring_coords):
-                                            forc_const = forc_const / 2
-                                
-                                if angle_ijk < 145.0 and angle_jkl < 145.0:
-                                    dihed_list.append([i, j, k, l, 2, angle, forc_const])
+                            # Measure dihedral angle between i, j, k, and l.    
+                            r1 = cgbead_coords[j] - cgbead_coords[i]
+                            r2 = cgbead_coords[k] - cgbead_coords[j]
+                            r3 = cgbead_coords[l] - cgbead_coords[k]
+                            p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                            p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
+                            r2 /= np.linalg.norm(r2)
+                            cosphi = np.dot(p1, p2)
+                            sinphi = np.dot(r2, np.cross(p1, p2))
+                            angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
+                            r1_1 = cgbead_coords[i] - cgbead_coords[j]
+                            r2_2 = cgbead_coords[j] - cgbead_coords[k]
+                            angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
+                            angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
+                            
+                            # Create beadlist for read_params
+                            beadlist = []
+                            for bead in self.beadtypes:
+                                if not bead.startswith('T') and not bead.startswith('S'):
+                                    beadlist.append('R')
+                                else:
+                                    beadlist.append(bead[0])
+                            
+                            # Compute force constant from database or default
+                            bead_in_ring_coords = {}
+                            for nb, bead_nb in enumerate(cgbeads):
+                                for ring in ringatoms:
+                                    if bead_nb in ring:
+                                        bead_in_ring_coords[nb] = cgbead_coords[nb]
+                            
+                            forc_const = 10.0
+                            if len(beadlist) > max(i, j, k, l):
+                                db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k] + "-" + beadlist[l])
+                                if db_force is not None:
+                                    forc_const = db_force
+                                    # Adjust for non-ring beads
+                                    if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
+                                                        k not in bead_in_ring_coords or l not in bead_in_ring_coords):
+                                        forc_const = forc_const / 2
 
-        if len(dihed_list) > 0:
-            for dl in dihed_list:
-                for di in dihed_list[1:]:
-                    if dl != di:
-                        # Check if beads are repeating
-                        if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]):
-                            if di in dihed_list:
-                                dihed_list.remove(di)
+                            dihed_list.append([i, j, k, l, 2, angle, forc_const])
+                            
+                            # if angle_ijk < 145.0 and angle_jkl < 145.0:
+                            #     dihed_list.append([i, j, k, l, 2, angle, forc_const])
+
+        # if len(dihed_list) > 0:
+        #     for dl in dihed_list:
+        #         for di in dihed_list[1:]:
+        #             if dl != di:
+        #                 # Check if beads are repeating
+        #                 if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]):
+        #                     if di in dihed_list:
+        #                         dihed_list.remove(di)
         
         self.dihedrals = dihed_list
         self.num_ar = num_ar
