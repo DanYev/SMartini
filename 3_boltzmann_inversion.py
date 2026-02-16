@@ -380,14 +380,14 @@ if __name__ == "__main__":
     )
 
     # Filter out potentially unstable dihedrals based on topology-only criteria
-    updated_topo = filter_unstable_dihedrals_from_topology(
+    filtered_topo = filter_unstable_dihedrals_from_topology(
         updated_topo,
-        angle_linear_cutoff_deg=170.0,
+        angle_linear_cutoff_deg=165.0,
         drop_if_undefined=True,
     )
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
-    itp_content = updated_topo.to_itp(out_file=output_itp)
+    itp_content = filtered_topo.to_itp(out_file=out_itp)
 
     logger.info(f"Analysis complete!")
     logger.info(f"Updated ITP file written to: {out_itp}")

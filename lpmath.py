@@ -7,7 +7,7 @@ from MDAnalysis import Universe
 logger = logging.getLogger(__name__)
 
 
-def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
+def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=5000):
     """Read AA trajectory and calculate COG trajectory for CG beads.
 
     Parameters
@@ -18,8 +18,10 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
         Path to atomistic XTC trajectory
     partitioning : dict
         Mapping of atom indices to bead indices {atom_idx: bead_idx}
+    start : int
+        Starting frame index to read from the trajectory
     stop : int
-        Number of frames to read from the trajectory
+        Ending frame index to read from the trajectory
 
     Returns
     -------
@@ -29,7 +31,7 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
     logger.info("Reading AA trajectory: %s, %s", in_pdb, in_xtc)
 
     u = Universe(str(in_pdb), str(in_xtc))
-    n_frames = len(u.trajectory)
+    n_frames = stop - start
 
     n_beads = max(partitioning.values()) + 1
     bead_to_atoms = {i: [] for i in range(n_beads)}
@@ -38,7 +40,7 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
 
     cg_trajectory = np.zeros((n_frames, n_beads, 3))
 
-    for frame_idx, _ in enumerate(u.trajectory[:stop]):
+    for frame_idx, _ in enumerate(u.trajectory[start:stop]):
         for bead_idx in range(n_beads):
             atom_indices = bead_to_atoms[bead_idx]
             if atom_indices:
@@ -49,7 +51,7 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
     return cg_trajectory
 
 
-def read_cg_trajectory(in_pdb, in_xtc, stop=5000):
+def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000):
     """Read CG trajectory and return positions in nm.
 
     Parameters
@@ -66,11 +68,11 @@ def read_cg_trajectory(in_pdb, in_xtc, stop=5000):
     """
     logger.info("Reading CG trajectory: %s, %s", in_pdb, in_xtc)
     u = Universe(str(in_pdb), str(in_xtc))
-    n_frames = len(u.trajectory)
+    n_frames = stop - start
     n_beads = len(u.atoms)
     cg_trajectory = np.zeros((n_frames, n_beads, 3))
 
-    for frame_idx, _ in enumerate(u.trajectory[:stop]):
+    for frame_idx, _ in enumerate(u.trajectory[start:stop]):
         cg_trajectory[frame_idx] = u.atoms.positions / 10.0
 
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
