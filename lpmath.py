@@ -143,64 +143,47 @@ def calculate_internal_coordinates(cg_trajectory, topo):
 
 
 def boltzmann_inversion_bond(distances, temperature=300.0):
-    """Calculate spring constant for bonds using Boltzmann inversion."""
+    """Estimate harmonic bond parameters from samples.
+
+    This is a *mean-based harmonic approximation* (not PMF-minimum based):
+    - Equilibrium value r0 is the sample mean.
+    - Force constant k is computed from fluctuations: k = kT / var(r).
+    """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    hist, bin_edges = np.histogram(distances, bins=50, density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+    distances = np.asarray(distances, dtype=float)
+    r0 = float(np.mean(distances))
 
-    nonzero_mask = hist > 0
-    hist = hist[nonzero_mask]
-    bin_centers = bin_centers[nonzero_mask]
-
-    pmf = -kT * np.log(hist)
-    pmf = pmf - np.min(pmf)
-
-    r0 = bin_centers[np.argmin(pmf)]
-
-    fit_mask = np.abs(bin_centers - r0) < 0.05
-    if np.sum(fit_mask) >= 3:
-        r_fit = bin_centers[fit_mask]
-        pmf_fit = pmf[fit_mask]
-        coeffs = np.polyfit(r_fit - r0, pmf_fit, 2)
-        k = 2.0 * coeffs[0]
+    variance = float(np.var(distances))
+    if not np.isfinite(variance) or variance <= 0:
+        k = float("inf")
     else:
-        pass
-    variance = np.var(distances)
-    k = kT / variance
+        k = float(kT / variance)
 
     return r0, k
 
 
 def boltzmann_inversion_angle(angles, temperature=300.0):
-    """Calculate spring constant for angles using Boltzmann inversion."""
+    """Estimate harmonic angle parameters from samples.
+
+    Mean-based harmonic approximation:
+    - Equilibrium value theta0 is the sample mean (degrees).
+    - Force constant k is computed from fluctuations in radians:
+      k = kT / var(theta_rad).
+    """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    hist, bin_edges = np.histogram(angles, bins=50, density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+    angles = np.asarray(angles, dtype=float)
+    theta0 = float(np.mean(angles))
 
-    nonzero_mask = hist > 0
-    hist = hist[nonzero_mask]
-    bin_centers = bin_centers[nonzero_mask]
-
-    pmf = -kT * np.log(hist)
-    pmf = pmf - np.min(pmf)
-
-    theta0 = bin_centers[np.argmin(pmf)]
-
-    fit_mask = np.abs(bin_centers - theta0) < 5.0
-    if np.sum(fit_mask) >= 3:
-        theta_fit = bin_centers[fit_mask]
-        pmf_fit = pmf[fit_mask]
-        theta_fit_rad = np.deg2rad(theta_fit - theta0)
-        coeffs = np.polyfit(theta_fit_rad, pmf_fit, 2)
-        k = 2.0 * coeffs[0]
+    residual_rad = np.deg2rad(angles - theta0)
+    variance_rad = float(np.var(residual_rad))
+    if not np.isfinite(variance_rad) or variance_rad <= 0:
+        k = float("inf")
     else:
-        pass
-    variance_rad = np.var(np.deg2rad(angles))
-    k = kT / variance_rad
+        k = float(kT / variance_rad)
 
     return theta0, k
 
@@ -220,36 +203,25 @@ def wrap_to_180(angles):
 
 
 def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
-    """Calculate spring constant for dihedrals using Boltzmann inversion."""
+    """Estimate harmonic dihedral parameters from samples.
+
+    Mean-based harmonic approximation for periodic angles:
+    - Equilibrium value phi0 is the circular mean (degrees, wrapped to [-180, 180]).
+    - Force constant k is computed from wrapped residual fluctuations in radians:
+      k = kT / var(phi_rad).
+    """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    circ_mean = circular_mean_deg(dihedrals)
-    dihedrals_shifted = wrap_to_180(dihedrals - circ_mean)
+    dihedrals = np.asarray(dihedrals, dtype=float)
+    phi0 = float(wrap_to_180(circular_mean_deg(dihedrals)))
 
-    hist, bin_edges = np.histogram(dihedrals_shifted, bins=50, range=(-180, 180), density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
-
-    nonzero_mask = hist > 0
-    hist = hist[nonzero_mask]
-    bin_centers = bin_centers[nonzero_mask]
-
-    pmf = -kT * np.log(hist)
-    pmf = pmf - np.min(pmf)
-
-    phi0_shifted = bin_centers[np.argmin(pmf)]
-    phi0 = wrap_to_180(phi0_shifted + circ_mean)
-
-    fit_mask = np.abs(bin_centers - phi0_shifted) < 10.0
-    if np.sum(fit_mask) >= 3:
-        phi_fit = bin_centers[fit_mask]
-        pmf_fit = pmf[fit_mask]
-        phi_fit_rad = np.deg2rad(phi_fit - phi0_shifted)
-        coeffs = np.polyfit(phi_fit_rad, pmf_fit, 2)
-        k = 2.0 * coeffs[0]
+    residual_deg = wrap_to_180(dihedrals - phi0)
+    residual_rad = np.deg2rad(residual_deg)
+    variance_rad = float(np.var(residual_rad))
+    if not np.isfinite(variance_rad) or variance_rad <= 0:
+        k = float("inf")
     else:
-        pass
-    variance_rad = np.var(np.deg2rad(dihedrals_shifted))
-    k = kT / variance_rad
+        k = float(kT / variance_rad)
 
     return phi0, k

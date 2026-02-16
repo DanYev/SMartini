@@ -66,7 +66,7 @@ def _plot_bonds(bonds_data, topo, output_file):
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+        _, k_calc = boltzmann_inversion_bond(distances)
 
         ref_fc = None
         if bond_type == "bond":
@@ -79,7 +79,7 @@ def _plot_bonds(bonds_data, topo, output_file):
         std_dist = np.std(distances)
         k_rounded = round(k_calc / 1000) * 1000
         stats_text = f"mu={mean_dist:.3f}\nsigma={std_dist:.3f}\n"
-        stats_text += f"r0={r0_calc:.3f}\nk={int(k_rounded/1000)}e3"
+        stats_text += f"k={int(k_rounded/1000)}e3"
         if ref_fc is not None:
             ref_k_rounded = round(ref_fc / 1000) * 1000
             stats_text += f"\nITP k={int(ref_k_rounded/1000)}e3"
@@ -141,7 +141,7 @@ def _plot_angles(angles_data, topo, output_file):
         ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        theta0_calc, k_calc = boltzmann_inversion_angle(angles)
+        _, k_calc = boltzmann_inversion_angle(angles)
 
         ref_fc = None
         for angle in topo.angles:
@@ -153,7 +153,7 @@ def _plot_angles(angles_data, topo, output_file):
         std_angle = np.std(angles)
         k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_angle:.1f} deg\nsigma={std_angle:.1f} deg\n"
-        stats_text += f"theta0={theta0_calc:.1f} deg\nk={int(k_rounded)}"
+        stats_text += f"k={int(k_rounded)}"
         if ref_fc is not None:
             ref_k_rounded = round(ref_fc / 10) * 10
             stats_text += f"\nITP k={int(ref_k_rounded)}"
@@ -212,9 +212,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         ax.set_xlim(-180, 180)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        phi0_calc, k_calc = boltzmann_inversion_dihedral(dihedrals)
-        phi0_shifted = wrap_to_180(phi0_calc - circ_mean)
-        ax.axvline(phi0_shifted, color="green", linestyle=":", linewidth=2, label=f"phi0: {phi0_calc:.1f} deg")
+        _, k_calc = boltzmann_inversion_dihedral(dihedrals)
 
         ax.legend(fontsize=8)
 
@@ -229,7 +227,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         std_dihedral = np.std(dihedrals_centered)
         k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_dihedral:.1f} deg\nsigma={std_dihedral:.1f} deg\n"
-        stats_text += f"phi0={phi0_calc:.1f} deg\nk={int(k_rounded)}"
+        stats_text += f"k={int(k_rounded)}"
         if ref_fc is not None:
             ref_k_rounded = round(ref_fc / 10) * 10
             stats_text += f"\nITP k={int(ref_k_rounded)}"
