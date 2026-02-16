@@ -15,7 +15,7 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 if __name__ == "__main__":
     molname = "ANP"
-    n_beads = 11
+    n_beads = 10
     wdir = Path("systems") / molname
     outdir = wdir / "mapping"
     outdir.mkdir(parents=True, exist_ok=True)

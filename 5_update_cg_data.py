@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-	molname = "FTA"
+	molname = "ANP"
 	wdir = Path("systems") / molname
 
 	itp_updated = wdir / "mapping" / f"{molname}_updated.itp"
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 	aa_internal = calculate_internal_coordinates(aa_traj, topo)
 
 	logger.info("Reading CG trajectory from %s", cg_dir)
-	cg_traj = read_cg_trajectory(cg_pdb, cg_xtc)
+	cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=2000) # start and step can be adjusted to speed up processing for long trajectories
 	cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
 	plot_internal_coordinates_overlay(
@@ -53,4 +53,4 @@ if __name__ == "__main__":
 	# Writes a new file and leaves the original ITP unchanged.
 	# out_refined_itp = wdir / "mapping" / f"{molname}_cgrefined.itp"
 	out_refined_itp = itp_updated
-	refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+	# refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

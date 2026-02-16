@@ -374,12 +374,14 @@ if __name__ == "__main__":
         topo,
         internal_coords,
         constraint_k_cutoff=20000,
+        angle_k_cutoff=25,
+        dihedral_k_cutoff=10,
     )
 
     # Filter out potentially unstable dihedrals based on topology-only criteria
     filtered_topo = filter_unstable_dihedrals_from_topology(
         updated_topo,
-        angle_linear_cutoff_deg=165.0,
+        angle_linear_cutoff_deg=160.0,
         drop_if_undefined=True,
     )
 

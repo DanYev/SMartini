@@ -29,9 +29,9 @@ def setup_martini(sysdir, sysname):
     # LIGANDS 
     pdb_file = Path(sysdir) / "mapping" / f"{ligand}.pdb"
     itp_file = Path(sysdir) / "mapping" / f"{ligand}_updated.itp"
+    shutil.copy(itp_file, mdsys.topdir / f"ligand_{ligand}.itp") # copy .itp to mdsys.itpdir so it can be included in the system topology
     shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
     shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure
-    shutil.copy(itp_file, mdsys.topdir / f"ligand_{ligand}.itp") # copy .itp to mdsys.itpdir so it can be included in the system topology
 
     mdsys.molecules[f"ligand_{ligand}"] = 1
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file

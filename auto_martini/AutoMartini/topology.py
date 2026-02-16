@@ -64,7 +64,7 @@ class Topology:
     # Angles data: list of [i, j, k, funct, angle, force_const]
     angles: list = field(default_factory=list)
     
-    # Dihedrals data: list of [i, j, k, l, funct, angle, force_const]
+    # Dihedrals data: list of [i, j, k, l, funct, angle, force_const, multiplicity]
     dihedrals: list = field(default_factory=list)
     
     # Virtual sites (if any)
@@ -78,6 +78,7 @@ class Topology:
     
     # Store context for formatting (needed by to_itp)
     num_ar: int = 0
+    ringatoms: list = field(default_factory=list)
     cgbeads: list = field(default_factory=list)
     ringbeads: list = field(default_factory=list)
     cgbead_coords: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -94,8 +95,16 @@ class Topology:
         self.mapping = mapping
         self.partitioning = partitioning
         self.cgbeads = cgbeads
-        print(self.cgbeads)
-        exit()
+        self.ringatoms = ringatoms
+        
+        # Identify which beads are in rings and store them in self.ringbeads
+        for ring in ringatoms:
+            bead_ring = []
+            for atom_idx in ring:
+                for bead_idx, atom_indices in mapping.items():
+                    if atom_idx in atom_indices:
+                        bead_ring.append(bead_idx)
+            self.ringbeads.append(list(set(bead_ring)))
         
         # Create global atom name map (PDB-style: N1, C1, C2, etc.)
         atom_name_map = {}
@@ -179,11 +188,6 @@ class Topology:
         if ringatoms != []:
             cpt_ringatoms = len(sum(ringatoms, []))
         
-        print(mapping)
-        print(ha_neighbors)
-        print(cgbead_coords)
-        print(ringatoms)
-
         # First make list of bonds based on connectivity of the original molecule
         for i in range(nbeads):
             for j in range(i + 1, nbeads):
@@ -192,7 +196,7 @@ class Topology:
                     for at_j in mapping[j]:
                         if at_j in ha_neighbors[at_i]:
                             dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                            self.bonds.append([i, j, 1, dist, cutoff])
+                            self.constraints.append([i, j, 1, dist])
                             found_connection = True
                             break
                     if found_connection:
@@ -209,6 +213,24 @@ class Topology:
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 
         # This is to help maintain ring structure during simulations.
+        for ring in self.ringbeads:
+            if len(ring) == 4:
+                # Add constraint between the two non-bonded beads in the ring with the shortest distance
+                min_dist = float('inf')
+                min_pair = None
+                n_bonds = 0
+                for i in range(len(ring)):
+                    for j in range(i + 1, len(ring)):
+                        pair = (ring[i], ring[j])
+                        if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
+                            n_bonds += 1
+                            continue
+                        dist = np.linalg.norm(cgbead_coords[pair[0]] - cgbead_coords[pair[1]]) * 0.1
+                        if dist < min_dist:
+                            min_dist = dist
+                            min_pair = pair
+                if n_bonds == 4: 
+                    self.constraints.append([min_pair[0], min_pair[1], 1, min_dist])
 
             # added_to_constraints = False
             # for ring in ringatoms:
@@ -545,8 +567,8 @@ class Topology:
                                     if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
                                                         k not in bead_in_ring_coords or l not in bead_in_ring_coords):
                                         forc_const = forc_const / 2
-
-                            dihed_list.append([i, j, k, l, 2, angle, forc_const])
+                            angle = (180 - angle) % 360
+                            dihed_list.append([i, j, k, l, 9, angle, forc_const, 1])
                             
                             # if angle_ijk < 145.0 and angle_jkl < 145.0:
                             #     dihed_list.append([i, j, k, l, 2, angle, forc_const])
@@ -741,13 +763,13 @@ class Topology:
         text = ""
         if len(self.dihedrals) > 0:
             text = text + "\n[dihedrals]\n"
-            text = text + ";  i  j  k  l  funct  angle  force.c.\n"
+            text = text + ";  i  j  k  l  funct  angle  force.c.  multiplicity\n"
             for d in self.dihedrals:
-                # Dihedral data is [i, j, k, l, funct, angle, force_const]
+                # Dihedral data is [i, j, k, l, funct, angle, force_const, multiplicity]
                 text = (
                     text
-                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6]
+                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}\n".format(
+                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6], d[7],
                     )
                 )
         return text
@@ -882,11 +904,9 @@ class Topology:
         text += self.format_bonds() + "\n"
         text += self.format_angles() + "\n"
         text += self.format_dihedrals() + "\n"
-        text += self.format_virtual_sites()
-        
+        # text += self.format_virtual_sites()
         if write_exclusions:
             text += self.format_exclusions()
-        
         if write_posres:
             text += self.format_position_restraints()
         if out_file:
