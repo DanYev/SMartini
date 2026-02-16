@@ -567,8 +567,9 @@ class Topology:
                                     if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
                                                         k not in bead_in_ring_coords or l not in bead_in_ring_coords):
                                         forc_const = forc_const / 2
-                            angle = (180 - angle) % 360
-                            dihed_list.append([i, j, k, l, 9, angle, forc_const, 1])
+                            angle = (180 + angle) % 360
+                            multiplicity = 1  # Default multiplicity
+                            dihed_list.append([i, j, k, l, 9, angle, forc_const, multiplicity])
                             
                             # if angle_ijk < 145.0 and angle_jkl < 145.0:
                             #     dihed_list.append([i, j, k, l, 2, angle, forc_const])

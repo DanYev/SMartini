@@ -221,3 +221,49 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
         k = float(kT / variance_rad)
 
     return phi0, k
+
+
+def fit_type9_dihedral(
+    dihedrals,
+    temperature=300.0,
+    max_n=6,
+    bins=72,
+    min_prob=1e-6,
+):
+    """Fit Gromacs type-9 dihedral terms from a distribution.
+
+    We estimate a PMF from the histogram and fit a Fourier series:
+        U(phi) = sum_{n=1..N} k_n * (1 + cos(n * phi))
+
+    Returns a list of (multiplicity, k) terms.
+    """
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * temperature
+
+    values = np.asarray(dihedrals, dtype=float)
+    if values.size == 0:
+        return []
+
+    hist, edges = np.histogram(values, bins=bins, range=(-180.0, 180.0), density=True)
+    hist = np.clip(hist, min_prob, None)
+
+    phi_centers = 0.5 * (edges[:-1] + edges[1:])
+    phi_rad = np.deg2rad(phi_centers)
+
+    pmf = -kT * np.log(hist)
+    pmf = pmf - float(np.min(pmf))
+
+    design = []
+    for n in range(1, max_n + 1):
+        design.append(1.0 + np.cos(n * phi_rad))
+    A = np.vstack(design).T
+
+    weights = np.sqrt(hist)
+    Aw = A * weights[:, None]
+    bw = pmf * weights
+
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    terms = []
+    for idx, k in enumerate(coeffs, start=1):
+        terms.append((idx, float(k)))
+    return terms

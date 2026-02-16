@@ -11,7 +11,7 @@ from lpmath import (
     calculate_internal_coordinates,
     boltzmann_inversion_bond,
     boltzmann_inversion_angle,
-    boltzmann_inversion_dihedral,
+    fit_type9_dihedral,
 )
 from plots import plot_internal_coordinates
 
@@ -160,6 +160,7 @@ def update_topology_with_boltzmann(
     constraint_k_cutoff=20000,
     angle_k_cutoff=25,
     dihedral_k_cutoff=5,
+    max_multiplicity=3,
 ):
     """Update topology with Boltzmann-inverted parameters and write new ITP.
     
@@ -265,49 +266,58 @@ def update_topology_with_boltzmann(
         angle_k_cutoff,
     )
     
-    # Update dihedrals with Boltzmann-inverted values
+    # Update dihedrals with Boltzmann-inverted values (type-9 Fourier terms)
     n_dihedrals_updated = 0
     n_dihedrals_removed = 0
     new_dihedrals = []
+
+    dihedrals_by_key = {}
     for dihedral in updated_topo.dihedrals:
-        i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
-        multiplicity = int(dihedral[7]) if len(dihedral) >= 8 else None
-        
-        # Find corresponding dihedrals
-        if (i, j, k, l, 'dihedral') in internal_coords:
-            dihedrals = internal_coords[(i, j, k, l, 'dihedral')]
-            phi0_calc, k_calc = boltzmann_inversion_dihedral(dihedrals)
+        key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
+        dihedrals_by_key.setdefault(key, []).append(dihedral)
 
-            if dihedral_k_cutoff is not None and k_calc < dihedral_k_cutoff:
+    for (i, j, k, l), terms in dihedrals_by_key.items():
+        data = internal_coords.get((i, j, k, l, "dihedral"))
+        if data is None:
+            for term in terms:
+                existing_k = float(term[6]) if len(term) >= 7 else None
+                if dihedral_k_cutoff is not None and existing_k is not None and abs(existing_k) < dihedral_k_cutoff:
+                    n_dihedrals_removed += 1
+                    continue
+                new_dihedrals.append(term)
+            continue
+
+        fit_terms = fit_type9_dihedral(data, max_n=max_multiplicity)
+        kept_terms = []
+        for mult, k_term in fit_terms:
+            if dihedral_k_cutoff is not None and abs(k_term) < dihedral_k_cutoff:
                 n_dihedrals_removed += 1
                 continue
+            kept_terms.append([i, j, k, l, 9, 0.0, k_term, int(mult)])
 
-            # Round k to nearest 10
-            # k_rounded = round(k_calc / 10) * 10
-            k_rounded = k_calc 
+        if not kept_terms and fit_terms:
+            best_mult, best_k = max(fit_terms, key=lambda t: abs(t[1]))
+            kept_terms.append([i, j, k, l, 9, 0.0, best_k, int(best_mult)])
 
-            # Update dihedral: [i, j, k, l, funct, angle, force_const]
-            mult_label = f" (n={multiplicity})" if multiplicity is not None else ""
+        for term in kept_terms:
+            mult = term[7]
             logger.info(
-                f"Dihedral {i+1}-{j+1}-{k+1}-{l+1}{mult_label}: φ0 {dihedral[5]:.2f} -> {phi0_calc:.2f} deg, k -> {int(k_rounded)}"
+                "Dihedral %s-%s-%s-%s (n=%s): k=%0.3f",
+                i + 1,
+                j + 1,
+                k + 1,
+                l + 1,
+                mult,
+                term[6],
             )
-            updated_entry = [i, j, k, l, dihedral[4], phi0_calc, k_rounded]
-            if multiplicity is not None:
-                updated_entry.append(multiplicity)
-            new_dihedrals.append(updated_entry)
-            n_dihedrals_updated += 1
-        else:
-            # No trajectory data for this dihedral: optionally filter based on existing force constant
-            existing_k = float(dihedral[6]) if len(dihedral) >= 7 else None
-            if dihedral_k_cutoff is not None and existing_k is not None and existing_k < dihedral_k_cutoff:
-                n_dihedrals_removed += 1
-                continue
-            new_dihedrals.append(dihedral)
+
+        new_dihedrals.extend(kept_terms)
+        n_dihedrals_updated += len(kept_terms)
 
     updated_topo.dihedrals = new_dihedrals
 
     logger.info(
-        "Updated %s dihedrals with Boltzmann-inverted parameters (removed %s with k < %s)",
+        "Updated %s dihedral terms with type-9 fits (removed %s with |k| < %s)",
         n_dihedrals_updated,
         n_dihedrals_removed,
         dihedral_k_cutoff,

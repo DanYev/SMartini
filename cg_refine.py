@@ -5,7 +5,7 @@ from typing import Dict, Tuple, Optional
 
 import numpy as np
 
-from lpmath import circular_mean_deg, wrap_to_180
+from lpmath import circular_mean_deg, wrap_to_180, fit_type9_dihedral
 
 logger = logging.getLogger(__name__)
 
@@ -190,50 +190,49 @@ def refine_topology_from_cg_vs_aa(
 
     updated.angles = new_angles
 
-    # Dihedrals
+    # Dihedrals (type-9 Fourier terms)
     new_dihedrals = []
+    dihedrals_by_key = {}
     for dihedral in updated.dihedrals:
-        i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
+        key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
+        dihedrals_by_key.setdefault(key, []).append(dihedral)
+
+    for (i, j, k, l), terms in dihedrals_by_key.items():
         key = (i, j, k, l, "dihedral")
         aa_vals = aa_internal.get(key)
-        cg_vals = cg_internal.get(key)
-        if aa_vals is None or cg_vals is None:
-            if settings.dihedral_k_min is not None and len(dihedral) >= 7 and float(dihedral[6]) < settings.dihedral_k_min:
+        if aa_vals is None:
+            for term in terms:
+                if settings.dihedral_k_min is not None and len(term) >= 7 and abs(float(term[6])) < settings.dihedral_k_min:
+                    n_dihedrals_removed += 1
+                    continue
+                new_dihedrals.append(term)
+            continue
+
+        fit_terms = fit_type9_dihedral(aa_vals, max_n=3)
+        old_k_max = None
+        if terms:
+            old_k_vals = [abs(float(t[6])) for t in terms if len(t) >= 7]
+            if old_k_vals:
+                old_k_max = max(old_k_vals)
+
+        kept_terms = []
+        for mult, k_term in fit_terms:
+            k_new = float(k_term)
+            if old_k_max is not None and old_k_max > 0:
+                k_new = float(np.clip(k_new, -settings.max_k_scale * old_k_max, settings.max_k_scale * old_k_max))
+
+            if settings.dihedral_k_min is not None and abs(k_new) < settings.dihedral_k_min:
                 n_dihedrals_removed += 1
                 continue
-            new_dihedrals.append(dihedral)
-            continue
 
-        phi0_old = float(dihedral[5])
-        k_old = float(dihedral[6])
-        multiplicity = int(dihedral[7])
+            kept_terms.append([i, j, k, l, 9, 0.0, k_new, int(mult)])
 
-        # Mean-based harmonic update, but compute the shift as a difference of
-        # AA/CG offsets relative to the *current* reference phi0_old.
-        #
-        # This avoids ambiguity when mu sits near the +/-180 boundary: two means
-        # can differ by ~360 even though the physical shift is small.
-        aa_res = wrap_to_180(aa_vals - phi0_old)
-        cg_res = wrap_to_180(cg_vals - phi0_old)
+        if not kept_terms and fit_terms:
+            best_mult, best_k = max(fit_terms, key=lambda t: abs(t[1]))
+            kept_terms.append([i, j, k, l, 9, 0.0, float(best_k), int(best_mult)])
 
-        aa_off = float(wrap_to_180(circular_mean_deg(aa_res)))
-        cg_off = float(wrap_to_180(circular_mean_deg(cg_res)))
-
-        delta = float(wrap_to_180(aa_off - cg_off))
-        delta *= float(settings.dihedral_shift_scale)
-        # phi0_new = float(wrap_to_180(phi0_old + delta))
-        phi0_new = phi0_old - delta
-
-        sigma_aa = float(np.std(wrap_to_180(aa_res - aa_off)))
-        sigma_cg = float(np.std(wrap_to_180(cg_res - cg_off)))
-
-        k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
-        if settings.dihedral_k_min is not None and k_new < settings.dihedral_k_min:
-            n_dihedrals_removed += 1
-            continue
-        new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new, k_new, multiplicity])
-
-        n_dihedrals_updated += 1
+        new_dihedrals.extend(kept_terms)
+        n_dihedrals_updated += len(kept_terms)
 
     updated.dihedrals = new_dihedrals
 
