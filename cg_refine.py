@@ -26,6 +26,9 @@ class RefineSettings:
     # Optional guards against extreme updates
     max_k_scale: float = 25.0
 
+    # Under-relaxation for dihedral equilibrium updates (helps stability)
+    dihedral_shift_scale: float = 1.0
+
 
 def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
     if value_type == "dihedral":
@@ -210,16 +213,24 @@ def refine_topology_from_cg_vs_aa(
 
         phi0_old = float(dihedral[5])
 
-        # Use a mode estimate anchored at the current phi0 to avoid circular-mean
-        # pathologies (bimodal distributions, values near the +/-180 boundary).
-        aa_loc = _dihedral_mode_deg(aa_vals, center_deg=phi0_old)
-        cg_loc = _dihedral_mode_deg(cg_vals, center_deg=phi0_old)
-        delta = float(wrap_to_180(aa_loc - cg_loc))
+        # Mean-based harmonic update, but compute the shift as a difference of
+        # AA/CG offsets relative to the *current* reference phi0_old.
+        #
+        # This avoids ambiguity when mu sits near the +/-180 boundary: two means
+        # can differ by ~360 even though the physical shift is small.
+        aa_res = wrap_to_180(aa_vals - phi0_old)
+        cg_res = wrap_to_180(cg_vals - phi0_old)
 
-        phi0_new = float(wrap_to_180(phi0_old + delta))
+        aa_off = float(wrap_to_180(circular_mean_deg(aa_res)))
+        cg_off = float(wrap_to_180(circular_mean_deg(cg_res)))
 
-        sigma_aa = float(np.std(wrap_to_180(aa_vals - aa_loc)))
-        sigma_cg = float(np.std(wrap_to_180(cg_vals - cg_loc)))
+        delta = float(wrap_to_180(aa_off - cg_off))
+        delta *= float(settings.dihedral_shift_scale)
+        # phi0_new = float(wrap_to_180(phi0_old + delta))
+        phi0_new = phi0_old - delta
+
+        sigma_aa = float(np.std(wrap_to_180(aa_res - aa_off)))
+        sigma_cg = float(np.std(wrap_to_180(cg_res - cg_off)))
 
         k_old = float(dihedral[6]) if len(dihedral) >= 7 else None
         if k_old is not None:
