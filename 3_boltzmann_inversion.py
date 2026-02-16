@@ -25,10 +25,136 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def _pair_key(i: int, j: int):
+    return (int(i), int(j)) if int(i) <= int(j) else (int(j), int(i))
+
+
+def _build_length_lookup(topo):
+    """Return map (i,j)->length (nm) using bonds and constraints."""
+    length = {}
+    for bond in getattr(topo, "bonds", []):
+        if len(bond) >= 4:
+            i, j = int(bond[0]), int(bond[1])
+            length[_pair_key(i, j)] = float(bond[3])
+    for constraint in getattr(topo, "constraints", []):
+        if len(constraint) >= 4:
+            i, j = int(constraint[0]), int(constraint[1])
+            length[_pair_key(i, j)] = float(constraint[3])
+    return length
+
+
+def _build_angle_lookup(topo):
+    """Return map (i,j,k)->theta0 in degrees (symmetric in i/k)."""
+    angle = {}
+    for a in getattr(topo, "angles", []):
+        if len(a) >= 5:
+            i, j, k = int(a[0]), int(a[1]), int(a[2])
+            theta0 = float(a[4])
+            angle[(i, j, k)] = theta0
+            angle[(k, j, i)] = theta0
+    return angle
+
+
+def _angle_from_triangle(length_lookup, i: int, j: int, k: int):
+    """Infer angle i-j-k from triangle side lengths, if available.
+
+    Uses the cosine law with:
+    a = |i-j|, b = |j-k|, c = |i-k|
+    angle at vertex j is arccos((a^2 + b^2 - c^2) / (2ab)).
+    """
+    a = length_lookup.get(_pair_key(i, j))
+    b = length_lookup.get(_pair_key(j, k))
+    c = length_lookup.get(_pair_key(i, k))
+    if a is None or b is None or c is None:
+        return None
+    if a <= 0 or b <= 0:
+        return None
+    cos_theta = (a * a + b * b - c * c) / (2.0 * a * b)
+    cos_theta = float(np.clip(cos_theta, -1.0, 1.0))
+    return float(np.degrees(np.arccos(cos_theta)))
+
+
+def get_equilibrium_angle_deg(topo, i: int, j: int, k: int):
+    """Get equilibrium angle (deg) from topology.
+
+    Priority:
+    1) explicit [angles] entry
+    2) infer from triangle of bonds/constraints (i-j, j-k, i-k)
+    """
+    angle_lookup = _build_angle_lookup(topo)
+    if (i, j, k) in angle_lookup:
+        return angle_lookup[(i, j, k)]
+
+    length_lookup = _build_length_lookup(topo)
+    return _angle_from_triangle(length_lookup, i, j, k)
+
+
+def filter_unstable_dihedrals_from_topology(
+    topo,
+    *,
+    angle_linear_cutoff_deg: float = 170.0,
+    drop_if_undefined: bool = True,
+):
+    """Remove dihedrals that are ill-defined due to near-linear adjacent angles.
+
+    A dihedral i-j-k-l becomes numerically unstable when either adjacent angle
+    (i-j-k or j-k-l) is close to 180 degrees.
+
+    This filter is topology-only: it uses explicit angles, or infers angles from
+    bond/constraint triangles (i-k or j-l third side) when an angle term is not
+    present.
+    """
+    updated = copy.deepcopy(topo)
+
+    # Build lookups once for speed
+    angle_lookup = _build_angle_lookup(updated)
+    length_lookup = _build_length_lookup(updated)
+
+    def _eq_angle(i, j, k):
+        if (i, j, k) in angle_lookup:
+            return angle_lookup[(i, j, k)]
+        return _angle_from_triangle(length_lookup, i, j, k)
+
+    kept = []
+    removed_linear = 0
+    removed_undefined = 0
+
+    for d in getattr(updated, "dihedrals", []):
+        if len(d) < 6:
+            kept.append(d)
+            continue
+        i, j, k, l = int(d[0]), int(d[1]), int(d[2]), int(d[3])
+
+        a1 = _eq_angle(i, j, k)
+        a2 = _eq_angle(j, k, l)
+
+        if a1 is None or a2 is None:
+            if drop_if_undefined:
+                removed_undefined += 1
+                continue
+            kept.append(d)
+            continue
+
+        if a1 >= angle_linear_cutoff_deg or a2 >= angle_linear_cutoff_deg:
+            removed_linear += 1
+            continue
+
+        kept.append(d)
+
+    updated.dihedrals = kept
+    logger.info(
+        "Filtered dihedrals: kept=%s, removed_linear=%s (>%s deg), removed_undefined=%s",
+        len(kept),
+        removed_linear,
+        angle_linear_cutoff_deg,
+        removed_undefined,
+    )
+    return updated
+
+
 def update_topology_with_boltzmann(
     topo,
     internal_coords,
-    output_itp,
     constraint_k_cutoff=20000,
     angle_k_cutoff=25,
     dihedral_k_cutoff=5,
@@ -215,7 +341,6 @@ def update_topology_with_boltzmann(
 
     # Write updated topology to ITP file using built-in method
     logger.info(f"Generating updated ITP file")
-    itp_content = updated_topo.to_itp(out_file=output_itp)
 
     return updated_topo
 
@@ -248,13 +373,21 @@ if __name__ == "__main__":
     plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
     
     # Update topology with Boltzmann-inverted parameters
-    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     updated_topo = update_topology_with_boltzmann(
         topo,
         internal_coords,
-        out_itp,
         constraint_k_cutoff=20000,
     )
-    
+
+    # Filter out potentially unstable dihedrals based on topology-only criteria
+    updated_topo = filter_unstable_dihedrals_from_topology(
+        updated_topo,
+        angle_linear_cutoff_deg=170.0,
+        drop_if_undefined=True,
+    )
+
+    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
+    itp_content = updated_topo.to_itp(out_file=output_itp)
+
     logger.info(f"Analysis complete!")
     logger.info(f"Updated ITP file written to: {out_itp}")

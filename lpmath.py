@@ -38,15 +38,12 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, stop=5000):
 
     cg_trajectory = np.zeros((n_frames, n_beads, 3))
 
-    for frame_idx, _ in enumerate(u.trajectory):
+    for frame_idx, _ in enumerate(u.trajectory[:stop]):
         for bead_idx in range(n_beads):
             atom_indices = bead_to_atoms[bead_idx]
             if atom_indices:
                 positions = u.atoms[atom_indices].positions
                 cg_trajectory[frame_idx, bead_idx] = positions.mean(axis=0) / 10.0
-
-    if stop and stop > 0:
-        cg_trajectory = cg_trajectory[:stop, :n_beads, :]
 
     logger.info("COG trajectory computed: %s frames, %s beads", cg_trajectory.shape[0], n_beads)
     return cg_trajectory
@@ -73,11 +70,8 @@ def read_cg_trajectory(in_pdb, in_xtc, stop=5000):
     n_beads = len(u.atoms)
     cg_trajectory = np.zeros((n_frames, n_beads, 3))
 
-    for frame_idx, _ in enumerate(u.trajectory):
+    for frame_idx, _ in enumerate(u.trajectory[:stop]):
         cg_trajectory[frame_idx] = u.atoms.positions / 10.0
-
-    if stop and stop > 0:
-        cg_trajectory = cg_trajectory[:stop, :n_beads, :]
 
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
