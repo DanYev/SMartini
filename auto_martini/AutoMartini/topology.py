@@ -1073,7 +1073,8 @@ def read_itp(itp_file):
         
         elif current_section == 'dihedrals':
             parts = stripped.split()
-            if len(parts) >= 6 and parts[0].isdigit():
+            # proper dihedral
+            if len(parts) >= 7 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
                 j = int(parts[1]) - 1
                 k = int(parts[2]) - 1
@@ -1081,8 +1082,9 @@ def read_itp(itp_file):
                 funct = int(parts[4])
                 angle = float(parts[5])
                 force_const = float(parts[6]) if len(parts) >= 7 else 0.0
-                # Store as [i, j, k, l, funct, angle, force_const]
-                topo.dihedrals.append([i, j, k, l, funct, angle, force_const])
+                multiplicity = int(parts[7]) if len(parts) >= 8 else 1
+                # Store as [i, j, k, l, funct, angle, force_const, multiplicity]
+                topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity])
         
         elif current_section == 'virtual_sitesn':
             parts = stripped.split()

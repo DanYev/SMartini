@@ -271,6 +271,7 @@ def update_topology_with_boltzmann(
     new_dihedrals = []
     for dihedral in updated_topo.dihedrals:
         i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
+        multiplicity = int(dihedral[7]) if len(dihedral) >= 8 else None
         
         # Find corresponding dihedrals
         if (i, j, k, l, 'dihedral') in internal_coords:
@@ -286,10 +287,14 @@ def update_topology_with_boltzmann(
             k_rounded = k_calc 
 
             # Update dihedral: [i, j, k, l, funct, angle, force_const]
+            mult_label = f" (n={multiplicity})" if multiplicity is not None else ""
             logger.info(
-                f"Dihedral {i+1}-{j+1}-{k+1}-{l+1}: φ0 {dihedral[5]:.2f} -> {phi0_calc:.2f} deg, k -> {int(k_rounded)}"
+                f"Dihedral {i+1}-{j+1}-{k+1}-{l+1}{mult_label}: φ0 {dihedral[5]:.2f} -> {phi0_calc:.2f} deg, k -> {int(k_rounded)}"
             )
-            new_dihedrals.append([i, j, k, l, dihedral[4], phi0_calc, k_rounded])
+            updated_entry = [i, j, k, l, dihedral[4], phi0_calc, k_rounded]
+            if multiplicity is not None:
+                updated_entry.append(multiplicity)
+            new_dihedrals.append(updated_entry)
             n_dihedrals_updated += 1
         else:
             # No trajectory data for this dihedral: optionally filter based on existing force constant

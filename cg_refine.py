@@ -205,6 +205,8 @@ def refine_topology_from_cg_vs_aa(
             continue
 
         phi0_old = float(dihedral[5])
+        k_old = float(dihedral[6])
+        multiplicity = int(dihedral[7])
 
         # Mean-based harmonic update, but compute the shift as a difference of
         # AA/CG offsets relative to the *current* reference phi0_old.
@@ -225,15 +227,11 @@ def refine_topology_from_cg_vs_aa(
         sigma_aa = float(np.std(wrap_to_180(aa_res - aa_off)))
         sigma_cg = float(np.std(wrap_to_180(cg_res - cg_off)))
 
-        k_old = float(dihedral[6]) if len(dihedral) >= 7 else None
-        if k_old is not None:
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
-            if settings.dihedral_k_min is not None and k_new < settings.dihedral_k_min:
-                n_dihedrals_removed += 1
-                continue
-            new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new, k_new])
-        else:
-            new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new])
+        k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
+        if settings.dihedral_k_min is not None and k_new < settings.dihedral_k_min:
+            n_dihedrals_removed += 1
+            continue
+        new_dihedrals.append([i, j, k, l, dihedral[4], phi0_new, k_new, multiplicity])
 
         n_dihedrals_updated += 1
 

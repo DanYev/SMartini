@@ -30,6 +30,19 @@ def plot_internal_coordinates(internal_coords, topo, output_file=None):
         _plot_dihedrals(dihedrals_data, topo, output_file)
 
 
+def _dihedral_terms(topo):
+    terms = {}
+    for d in topo.dihedrals:
+        if len(d) < 6:
+            continue
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        phi0 = float(d[5]) if len(d) >= 6 else None
+        k = float(d[6]) if len(d) >= 7 else None
+        mult = int(d[7]) if len(d) >= 8 else None
+        terms.setdefault(key, []).append({"phi0": phi0, "k": k, "mult": mult})
+    return terms
+
+
 def _plot_bonds(bonds_data, topo, output_file):
     logger.info("Plotting %s bonds/constraints", len(bonds_data))
 
@@ -179,7 +192,7 @@ def _plot_angles(angles_data, topo, output_file):
 def _plot_dihedrals(dihedrals_data, topo, output_file):
     logger.info("Plotting %s dihedrals", len(dihedrals_data))
 
-    dihedral_ref = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])): d[5] for d in topo.dihedrals}
+    dihedral_terms = _dihedral_terms(topo)
 
     n_plots = len(dihedrals_data)
     n_cols = min(4, n_plots)
@@ -200,10 +213,21 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
 
         ax.hist(dihedrals_shifted, bins=30, range=(-180, 180), alpha=0.7, edgecolor="black")
 
-        if (i, j, k, l) in dihedral_ref:
-            ref_dihedral = dihedral_ref[(i, j, k, l)]
+        terms = dihedral_terms.get((i, j, k, l), [])
+        for term in terms:
+            if term["phi0"] is None:
+                continue
+            ref_dihedral = term["phi0"]
             ref_dihedral_shifted = wrap_to_180(ref_dihedral - circ_mean)
-            ax.axvline(ref_dihedral_shifted, color="red", linestyle="--", linewidth=1.5, label=f"ITP: {ref_dihedral:.1f} deg")
+            mult = term["mult"]
+            mult_label = f" (n={mult})" if mult is not None else ""
+            ax.axvline(
+                ref_dihedral_shifted,
+                color="red",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"ITP: {ref_dihedral:.1f} deg{mult_label}",
+            )
 
         ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
@@ -217,10 +241,8 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         ax.legend(fontsize=8)
 
         ref_fc = None
-        for dihedral in topo.dihedrals:
-            if int(dihedral[0]) == i and int(dihedral[1]) == j and int(dihedral[2]) == k and int(dihedral[3]) == l and len(dihedral) >= 7:
-                ref_fc = dihedral[6]
-                break
+        if len(terms) == 1:
+            ref_fc = terms[0].get("k")
 
         mean_dihedral = circular_mean_deg(dihedrals)
         dihedrals_centered = wrap_to_180(dihedrals - mean_dihedral)
@@ -231,6 +253,8 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         if ref_fc is not None:
             ref_k_rounded = round(ref_fc / 10) * 10
             stats_text += f"\nITP k={int(ref_k_rounded)}"
+        elif len(terms) > 1:
+            stats_text += f"\nITP terms={len(terms)}"
 
         ax.text(
             0.98,
@@ -391,7 +415,7 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
 def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
     logger.info("Plotting %s dihedrals", len(set(dihedrals_aa) | set(dihedrals_cg)))
 
-    dihedral_ref = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])): d[5] for d in topo.dihedrals}
+    dihedral_terms = _dihedral_terms(topo)
     keys = [(int(d[0]), int(d[1]), int(d[2]), int(d[3]), "dihedral") for d in topo.dihedrals]
     if not keys:
         keys = list(set(dihedrals_aa.keys()) | set(dihedrals_cg.keys()))
@@ -421,10 +445,21 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
 
         _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=30)
 
-        if (i, j, k, l) in dihedral_ref:
-            ref_dihedral = dihedral_ref[(i, j, k, l)]
+        terms = dihedral_terms.get((i, j, k, l), [])
+        for term in terms:
+            if term["phi0"] is None:
+                continue
+            ref_dihedral = term["phi0"]
             ref_shifted = wrap_to_180(ref_dihedral - circ_mean)
-            ax.axvline(ref_shifted, color="red", linestyle="--", linewidth=1.5, label=f"ITP: {ref_dihedral:.1f} deg")
+            mult = term["mult"]
+            mult_label = f" (n={mult})" if mult is not None else ""
+            ax.axvline(
+                ref_shifted,
+                color="red",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"ITP: {ref_dihedral:.1f} deg{mult_label}",
+            )
 
         ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)

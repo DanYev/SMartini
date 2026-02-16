@@ -25,6 +25,12 @@ if __name__ == "__main__":
 	in_itp = itp_updated if itp_updated.exists() else itp_default
 	logger.info("Reading topology from %s", in_itp)
 	topo = am.topology.read_itp(str(in_itp))
+	unique_dihedrals = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])) for d in topo.dihedrals}
+	logger.info(
+		"Loaded %s dihedral terms across %s unique torsions",
+		len(topo.dihedrals),
+		len(unique_dihedrals),
+	)
 
 	aa_dir = wdir / "aa_md"
 	aa_pdb = aa_dir / "md.pdb"
@@ -53,4 +59,4 @@ if __name__ == "__main__":
 	# Writes a new file and leaves the original ITP unchanged.
 	# out_refined_itp = wdir / "mapping" / f"{molname}_cgrefined.itp"
 	out_refined_itp = itp_updated
-	# refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+	refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
