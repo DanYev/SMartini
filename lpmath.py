@@ -218,7 +218,7 @@ def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=3,
-    bins=180,
+    bins=360,
     min_prob=1e-6,
     fit_mode="sum",
 ):
@@ -248,10 +248,6 @@ def fit_type9_dihedral(
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    # values = np.asarray(dihedrals, dtype=float)
-    # if values.size == 0:
-    #     return []
-
     values = dihedrals
     shift = circular_mean_deg(values)
     values -= shift
@@ -259,7 +255,8 @@ def fit_type9_dihedral(
     min_val = np.min(values)
     max_val = np.max(values)
 
-    hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
+    # hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
+    hist, edges = np.histogram(values, bins=bins, range=(-180, 180), density=True)
     hist = np.clip(hist, min_prob, None)
 
     phi_centers = 0.5 * (edges[:-1] + edges[1:])
