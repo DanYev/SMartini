@@ -152,10 +152,7 @@ def boltzmann_inversion_bond(distances, temperature=300.0):
     r0 = float(np.mean(distances))
 
     variance = float(np.var(distances))
-    if not np.isfinite(variance) or variance <= 0:
-        k = float("inf")
-    else:
-        k = float(kT / variance)
+    k = float(kT / variance)
 
     return r0, k
 
@@ -176,10 +173,7 @@ def boltzmann_inversion_angle(angles, temperature=300.0):
 
     residual_rad = np.deg2rad(angles - theta0)
     variance_rad = float(np.var(residual_rad))
-    if not np.isfinite(variance_rad) or variance_rad <= 0:
-        k = float("inf")
-    else:
-        k = float(kT / variance_rad)
+    k = float(kT / variance_rad)
 
     return theta0, k
 
@@ -195,7 +189,7 @@ def circular_mean_deg(angles):
 
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
-    return (angles + 180) % 360 - 180
+    return (angles + 180) % 360 - 180 
 
 
 def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
@@ -215,10 +209,7 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
     residual_deg = wrap_to_180(dihedrals - phi0)
     residual_rad = np.deg2rad(residual_deg)
     variance_rad = float(np.var(residual_rad))
-    if not np.isfinite(variance_rad) or variance_rad <= 0:
-        k = float("inf")
-    else:
-        k = float(kT / variance_rad)
+    k = float(kT / variance_rad)
 
     return phi0, k
 
@@ -226,23 +217,46 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
 def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
-    max_n=6,
-    bins=72,
+    max_n=3,
+    bins=180,
     min_prob=1e-6,
+    fit_mode="best1",
 ):
-    """Fit Gromacs type-9 dihedral terms from a distribution.
+    r"""Fit Gromacs type-9 dihedral terms from a distribution.
 
-    We estimate a PMF from the histogram and fit a Fourier series:
-        U(phi) = sum_{n=1..N} k_n * (1 + cos(n * phi))
+    We estimate a PMF from the histogram and fit Fourier terms of the form:
 
-    Returns a list of (multiplicity, k) terms.
+        U(\phi) = \sum_n k_n \left(1 + \cos(n\phi - \phi_n)\right)
+
+    Since
+        k\cos(n\phi-\phi_n) = (k\cos\phi_n)\cos(n\phi) + (k\sin\phi_n)\sin(n\phi),
+    we can fit this robustly via (weighted) linear least squares in the basis
+    \{1, \cos(n\phi), \sin(n\phi)\}.
+
+    Parameters
+    ----------
+    fit_mode : {"sum", "best1"}
+        - "sum": fit all harmonics 1..max_n at once and return all terms.
+        - "best1": fit each harmonic individually and return the single best n.
+
+    Returns
+    -------
+    list[tuple[int, float, float]]
+        List of (multiplicity n, k_n, phi_n_deg) terms.
+        The phase angle is in degrees (wrapped to [-180, 180]).
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    values = np.asarray(dihedrals, dtype=float)
-    if values.size == 0:
-        return []
+    # values = np.asarray(dihedrals, dtype=float)
+    # if values.size == 0:
+    #     return []
+
+    values = dihedrals
+    shift = circular_mean_deg(values)
+    values -= shift
+    values = wrap_to_180(values)
+    print(shift, np.min(values), np.max(values))
 
     hist, edges = np.histogram(values, bins=bins, range=(-180.0, 180.0), density=True)
     hist = np.clip(hist, min_prob, None)
@@ -253,17 +267,76 @@ def fit_type9_dihedral(
     pmf = -kT * np.log(hist)
     pmf = pmf - float(np.min(pmf))
 
-    design = []
-    for n in range(1, max_n + 1):
-        design.append(1.0 + np.cos(n * phi_rad))
-    A = np.vstack(design).T
+    if max_n <= 0:
+        return []
 
     weights = np.sqrt(hist)
-    Aw = A * weights[:, None]
-    bw = pmf * weights
+    weights = np.ones_like(hist)
 
-    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    def _solve_weighted(A, y):
+        Aw = A * weights[:, None]
+        yw = y * weights
+        coeffs, _, _, _ = np.linalg.lstsq(Aw, yw, rcond=None)
+        return coeffs
+
+    def _k_phi_from_ab(a, b):
+        k = float(np.hypot(a, b))
+        if k < 1e-12:
+            return 0.0, 0.0
+        phi = float(np.rad2deg(np.arctan2(b, a)))
+        # phi = float(wrap_to_180(phi))
+        print(phi)
+        return k, phi
+
+    fit_mode = str(fit_mode).lower().strip()
+    if fit_mode not in {"sum", "best1"}:
+        raise ValueError(f"fit_mode must be 'sum' or 'best1' (got {fit_mode!r})")
+
+    if fit_mode == "best1":
+        best = None
+        for n in range(1, max_n + 1):
+            A = np.column_stack(
+                [
+                    np.ones_like(phi_rad),
+                    np.cos(n * phi_rad),
+                    np.sin(n * phi_rad),
+                ]
+            )
+            c0, a, b = _solve_weighted(A, pmf)
+            pred = A @ np.array([c0, a, b])
+            resid = pmf - pred
+            sse = float(np.sum((resid * weights) ** 2))
+
+            k, phi = _k_phi_from_ab(a, b)
+            candidate = (sse, n, k, phi)
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+
+        if best is None:
+            return []
+
+        _, n, k, phi = best
+        phi += shift
+        phi = (360 - phi) % 360
+        phi = float(wrap_to_180(phi))
+        return [(int(n), float(k), float(phi))]
+
+    # fit_mode == "sum": all harmonics in one linear solve
+    cols = [np.ones_like(phi_rad)]
+    for n in range(1, max_n + 1):
+        cols.append(np.cos(n * phi_rad))
+        cols.append(np.sin(n * phi_rad))
+    A = np.column_stack(cols)
+    coeffs = _solve_weighted(A, pmf)
+
     terms = []
-    for idx, k in enumerate(coeffs, start=1):
-        terms.append((idx, float(k)))
+    for n in range(1, max_n + 1):
+        a = float(coeffs[1 + 2 * (n - 1)])
+        b = float(coeffs[1 + 2 * (n - 1) + 1])
+        k, phi = _k_phi_from_ab(a, b)
+        phi += shift
+        phi = (360 - phi) % 360
+        phi = float(wrap_to_180(phi))
+        terms.append((int(n), float(k), float(phi)))
+
     return terms

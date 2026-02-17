@@ -216,7 +216,13 @@ def refine_topology_from_cg_vs_aa(
                 old_k_max = max(old_k_vals)
 
         kept_terms = []
-        for mult, k_term in fit_terms:
+        for term in fit_terms:
+            if len(term) == 2:
+                mult, k_term = term
+                phi0 = 0.0
+            else:
+                mult, k_term, phi0 = term
+
             k_new = float(k_term)
             if old_k_max is not None and old_k_max > 0:
                 k_new = float(np.clip(k_new, -settings.max_k_scale * old_k_max, settings.max_k_scale * old_k_max))
@@ -225,11 +231,16 @@ def refine_topology_from_cg_vs_aa(
                 n_dihedrals_removed += 1
                 continue
 
-            kept_terms.append([i, j, k, l, 9, 0.0, k_new, int(mult)])
+            kept_terms.append([i, j, k, l, 9, float(phi0), k_new, int(mult)])
 
         if not kept_terms and fit_terms:
-            best_mult, best_k = max(fit_terms, key=lambda t: abs(t[1]))
-            kept_terms.append([i, j, k, l, 9, 0.0, float(best_k), int(best_mult)])
+            best = max(fit_terms, key=lambda t: abs(t[1]))
+            if len(best) == 2:
+                best_mult, best_k = best
+                best_phi0 = 0.0
+            else:
+                best_mult, best_k, best_phi0 = best
+            kept_terms.append([i, j, k, l, 9, float(best_phi0), float(best_k), int(best_mult)])
 
         new_dihedrals.extend(kept_terms)
         n_dihedrals_updated += len(kept_terms)

@@ -59,4 +59,4 @@ if __name__ == "__main__":
 	# Writes a new file and leaves the original ITP unchanged.
 	# out_refined_itp = wdir / "mapping" / f"{molname}_cgrefined.itp"
 	out_refined_itp = itp_updated
-	refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+	# refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
