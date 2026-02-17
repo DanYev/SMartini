@@ -5,6 +5,8 @@ import AutoMartini as am
 import rdkit
 from rdkit import Chem
 
+from ligpar_config import CFG
+
 logging.basicConfig(
     level=logging.WARNING,
     format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
@@ -14,9 +16,9 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 
 if __name__ == "__main__":
-    molname = "ANP"
-    n_beads = 10
-    wdir = Path("systems") / molname
+    molname = CFG.molname
+    n_beads = CFG.n_beads
+    wdir = CFG.wdir()
     outdir = wdir / "mapping"
     outdir.mkdir(parents=True, exist_ok=True)
 

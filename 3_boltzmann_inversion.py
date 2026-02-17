@@ -1,19 +1,20 @@
+import copy
 import logging
 from pathlib import Path
-import copy
-import numpy as np
-import AutoMartini as am
-import rdkit
-from rdkit import Chem
 
+import AutoMartini as am
+import numpy as np
+
+from ligpar_config import CFG
 from lpmath import (
-    read_cog_trajectory,
-    calculate_internal_coordinates,
-    boltzmann_inversion_bond,
     boltzmann_inversion_angle,
+    boltzmann_inversion_bond,
+    calculate_internal_coordinates,
     fit_type9_dihedral,
+    read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
+
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -24,7 +25,8 @@ logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MOLNAME = "ANP"
+
+MOLNAME = CFG.molname
 
 
 def _pair_key(i: int, j: int):
@@ -58,12 +60,7 @@ def _build_angle_lookup(topo):
 
 
 def _angle_from_triangle(length_lookup, i: int, j: int, k: int):
-    """Infer angle i-j-k from triangle side lengths, if available.
-
-    Uses the cosine law with:
-    a = |i-j|, b = |j-k|, c = |i-k|
-    angle at vertex j is arccos((a^2 + b^2 - c^2) / (2ab)).
-    """
+    """Infer angle i-j-k from triangle side lengths, if available."""
     a = length_lookup.get(_pair_key(i, j))
     b = length_lookup.get(_pair_key(j, k))
     c = length_lookup.get(_pair_key(i, k))
@@ -76,39 +73,15 @@ def _angle_from_triangle(length_lookup, i: int, j: int, k: int):
     return float(np.degrees(np.arccos(cos_theta)))
 
 
-def get_equilibrium_angle_deg(topo, i: int, j: int, k: int):
-    """Get equilibrium angle (deg) from topology.
-
-    Priority:
-    1) explicit [angles] entry
-    2) infer from triangle of bonds/constraints (i-j, j-k, i-k)
-    """
-    angle_lookup = _build_angle_lookup(topo)
-    if (i, j, k) in angle_lookup:
-        return angle_lookup[(i, j, k)]
-
-    length_lookup = _build_length_lookup(topo)
-    return _angle_from_triangle(length_lookup, i, j, k)
-
-
 def remove_unstable_dihedrals(
     topo,
     *,
     angle_linear_cutoff_deg: float = 170.0,
     drop_if_undefined: bool = True,
 ):
-    """Remove dihedrals that are ill-defined due to near-linear adjacent angles.
-
-    A dihedral i-j-k-l becomes numerically unstable when either adjacent angle
-    (i-j-k or j-k-l) is close to 180 degrees.
-
-    This filter is topology-only: it uses explicit angles, or infers angles from
-    bond/constraint triangles (i-k or j-l third side) when an angle term is not
-    present.
-    """
+    """Remove dihedrals ill-defined due to near-linear adjacent angles."""
     updated = copy.deepcopy(topo)
 
-    # Build lookups once for speed
     angle_lookup = _build_angle_lookup(updated)
     length_lookup = _build_length_lookup(updated)
 
@@ -126,7 +99,6 @@ def remove_unstable_dihedrals(
             kept.append(d)
             continue
         i, j, k, l = int(d[0]), int(d[1]), int(d[2]), int(d[3])
-
         a1 = _eq_angle(i, j, k)
         a2 = _eq_angle(j, k, l)
 
@@ -160,70 +132,59 @@ def boltzmann_invert_topology(
     *,
     max_multiplicity: int = 3,
 ):
-    """Compute Boltzmann-inverted bonded parameters from internal coordinate samples.
-
-    This step *only* updates parameters when trajectory data is available.
-    It does not remove terms by cutoffs and does not move bonds to constraints.
-    """
-    logger.info("Boltzmann inversion: estimating bonded parameters")
-
+    """Compute Boltzmann-inverted bonded parameters from internal coordinate samples."""
     updated_topo = copy.deepcopy(topo)
 
     # Bonds
-    n_bonds_updated = 0
     for idx, bond in enumerate(getattr(updated_topo, "bonds", [])):
         i, j = int(bond[0]), int(bond[1])
         if (i, j, "bond") not in internal_coords:
             continue
         distances = internal_coords[(i, j, "bond")]
         r0_calc, k_calc = boltzmann_inversion_bond(distances)
-        k_val = float(k_calc)
-        updated_topo.bonds[idx] = [i, j, bond[2], r0_calc, k_val]
-        n_bonds_updated += 1
-    logger.info("Boltzmann inversion: updated %s bonds", n_bonds_updated)
+        updated_topo.bonds[idx] = [i, j, bond[2], float(r0_calc), float(k_calc)]
 
     # Constraints (distance only)
-    n_constraints_updated = 0
     for idx, constraint in enumerate(getattr(updated_topo, "constraints", [])):
         i, j = int(constraint[0]), int(constraint[1])
         if (i, j, "constraint") not in internal_coords:
             continue
         distances = internal_coords[(i, j, "constraint")]
         r0_calc, _ = boltzmann_inversion_bond(distances)
-        updated_topo.constraints[idx] = [i, j, constraint[2], r0_calc]
-        n_constraints_updated += 1
-    logger.info("Boltzmann inversion: updated %s constraints", n_constraints_updated)
+        updated_topo.constraints[idx] = [i, j, constraint[2], float(r0_calc)]
 
     # Angles
-    n_angles_updated = 0
     for idx, angle in enumerate(getattr(updated_topo, "angles", [])):
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
         if (i, j, k, "angle") not in internal_coords:
             continue
         samples = internal_coords[(i, j, k, "angle")]
         theta0_calc, k_calc = boltzmann_inversion_angle(samples)
-        k_val = float(k_calc)
-        updated_topo.angles[idx] = [i, j, k, angle[3], theta0_calc, k_val]
-        n_angles_updated += 1
-    logger.info("Boltzmann inversion: updated %s angles", n_angles_updated)
+        updated_topo.angles[idx] = [i, j, k, angle[3], float(theta0_calc), float(k_calc)]
 
-    # Dihedrals (type-9 Fourier terms)
+    # Dihedrals (type-9 terms)
     dihedrals_by_key = {}
-    for dihedral in getattr(updated_topo, "dihedrals", []):
-        key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
-        dihedrals_by_key.setdefault(key, []).append(dihedral)
+    for d in getattr(updated_topo, "dihedrals", []):
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        dihedrals_by_key.setdefault(key, []).append(d)
 
     new_dihedrals = []
-    n_dihedral_sets_fit = 0
-    for (i, j, k, l), terms in dihedrals_by_key.items():
+    for (i, j, k, l), existing_terms in dihedrals_by_key.items():
         data = internal_coords.get((i, j, k, l, "dihedral"))
         if data is None:
-            new_dihedrals.extend(terms)
+            new_dihedrals.extend(existing_terms)
             continue
-        print((i, j, k, l))
-        fit_terms = fit_type9_dihedral(data, max_n=max_multiplicity)
+
+        fit_terms = fit_type9_dihedral(
+            data,
+            temperature=CFG.type9_temperature,
+            max_n=max_multiplicity,
+            bins=CFG.type9_bins,
+            min_prob=CFG.type9_min_prob,
+            fit_mode=CFG.type9_fit_mode,
+        )
         if not fit_terms:
-            new_dihedrals.extend(terms)
+            new_dihedrals.extend(existing_terms)
             continue
 
         for term in fit_terms:
@@ -234,10 +195,7 @@ def boltzmann_invert_topology(
                 mult, k_term, phi0 = term
             new_dihedrals.append([i, j, k, l, 9, float(phi0), float(k_term), int(mult)])
 
-        n_dihedral_sets_fit += 1
-
     updated_topo.dihedrals = new_dihedrals
-    logger.info("Boltzmann inversion: fit %s dihedral sets", n_dihedral_sets_fit)
     return updated_topo
 
 
@@ -249,90 +207,39 @@ def filter_topology(
     dihedral_k_cutoff=5,
     keep_best_dihedral_term: bool = True,
 ):
-    """Filter/post-process a topology after Boltzmann inversion.
-
-    - Drops weak angle terms (k < angle_k_cutoff)
-    - Drops weak dihedral terms (|k| < dihedral_k_cutoff), optionally keeping the
-      strongest term per dihedral if everything is filtered out
-    - Moves stiff bonds (k > constraint_k_cutoff) to constraints
-    """
+    """Filter/post-process a topology after Boltzmann inversion."""
     updated_topo = copy.deepcopy(topo)
 
-    # Filter angles
+    # Angles: drop weak k
     if angle_k_cutoff is not None:
         kept_angles = []
-        removed_angles = 0
         for angle in getattr(updated_topo, "angles", []):
             k_val = float(angle[5]) if len(angle) >= 6 else None
             if k_val is not None and k_val < angle_k_cutoff:
-                removed_angles += 1
                 continue
             kept_angles.append(angle)
         updated_topo.angles = kept_angles
-        logger.info(
-            "Filtering: kept %s angles (removed %s with k < %s)",
-            len(kept_angles),
-            removed_angles,
-            angle_k_cutoff,
-        )
 
-    # Filter dihedrals
+    # Dihedrals: drop weak |k|, optionally keep strongest
     if dihedral_k_cutoff is not None:
         dihedrals_by_key = {}
-        for dihedral in getattr(updated_topo, "dihedrals", []):
-            key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
-            dihedrals_by_key.setdefault(key, []).append(dihedral)
+        for d in getattr(updated_topo, "dihedrals", []):
+            key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+            dihedrals_by_key.setdefault(key, []).append(d)
 
         new_dihedrals = []
-        removed_terms = 0
-        kept_terms = 0
+        for key, terms in dihedrals_by_key.items():
+            eligible = [t for t in terms if len(t) >= 8]
+            ineligible = [t for t in terms if len(t) < 8]
 
-        for (i, j, k, l), terms in dihedrals_by_key.items():
-            # Only apply cutoff to terms that look like [i j k l 9 phi0 k mult]
-            eligible = []
-            ineligible = []
-            for t in terms:
-                if len(t) >= 8:
-                    eligible.append(t)
-                else:
-                    ineligible.append(t)
-
-            kept_for_key = []
-            for t in eligible:
-                k_val = float(t[6])
-                if abs(k_val) < dihedral_k_cutoff:
-                    removed_terms += 1
-                    continue
-                kept_for_key.append(t)
-
+            kept_for_key = [t for t in eligible if abs(float(t[6])) >= dihedral_k_cutoff]
             if not kept_for_key and eligible and keep_best_dihedral_term:
-                best = max(eligible, key=lambda t: abs(float(t[6])))
-                kept_for_key.append(best)
-
-            for t in kept_for_key:
-                mult = int(t[7]) if len(t) >= 8 else "?"
-                logger.info(
-                    "Dihedral %s-%s-%s-%s (n=%s): phi0=%0.1f deg, k=%0.3f",
-                    i + 1,
-                    j + 1,
-                    k + 1,
-                    l + 1,
-                    mult,
-                    float(t[5]) if len(t) >= 6 else 0.0,
-                    float(t[6]) if len(t) >= 7 else 0.0,
-                )
+                kept_for_key = [max(eligible, key=lambda t: abs(float(t[6])))]
 
             new_dihedrals.extend(ineligible)
             new_dihedrals.extend(kept_for_key)
-            kept_terms += len(kept_for_key)
 
         updated_topo.dihedrals = new_dihedrals
-        logger.info(
-            "Filtering: kept %s dihedral terms (removed %s with |k| < %s)",
-            kept_terms,
-            removed_terms,
-            dihedral_k_cutoff,
-        )
 
     # Move stiff bonds to constraints
     if constraint_k_cutoff is not None:
@@ -341,7 +248,6 @@ def filter_topology(
         existing_constraints = {
             (int(c[0]), int(c[1])) for c in getattr(updated_topo, "constraints", [])
         }
-        moved_count = 0
         for bond in getattr(updated_topo, "bonds", []):
             if len(bond) < 5:
                 new_bonds.append(bond)
@@ -353,66 +259,46 @@ def filter_topology(
                 if key not in existing_constraints and rev_key not in existing_constraints:
                     constraints_to_add.append([i, j, funct, dist])
                     existing_constraints.add(key)
-                moved_count += 1
             else:
                 new_bonds.append(bond)
 
-        if moved_count:
-            updated_topo.bonds = new_bonds
-            updated_topo.constraints.extend(constraints_to_add)
-            logger.info(
-                "Filtering: moved %s bonds to constraints (k > %s)",
-                moved_count,
-                constraint_k_cutoff,
-            )
+        updated_topo.bonds = new_bonds
+        updated_topo.constraints.extend(constraints_to_add)
 
     return updated_topo
 
 
 if __name__ == "__main__":
     molname = MOLNAME
-    logger.info(f"Starting analysis for molecule: {molname}")
-    
-    # CG topology from .itp file
-    wdir = Path("systems") / molname
-    in_itp = wdir / "mapping" / f"{molname}.itp"
-    logger.info(f"Reading topology from {in_itp}")
-    topo = am.topology.read_itp(str(in_itp))
-    logger.info(f"Loaded topology: {len(topo.atoms)} atoms, {len(topo.bonds)} bonds, "
-                f"{len(topo.constraints)} constraints, {len(topo.angles)} angles, "
-                f"{len(topo.dihedrals)} dihedrals")
+    wdir = CFG.wdir()
+    logger.info("Starting analysis for molecule: %s", molname)
 
-    # Trajectory
-    mddir = wdir / "aa_md" 
+    in_itp = wdir / "mapping" / f"{molname}.itp"
+    logger.info("Reading topology from %s", in_itp)
+    topo = am.topology.read_itp(str(in_itp))
+
+    mddir = CFG.aa_dir()
     in_pdb = mddir / "md.pdb"
     in_xtc = mddir / "md.xtc"
-    logger.info(f"Reading trajectory files from {mddir}")
+    logger.info("Reading trajectory files from %s", mddir)
+
     # cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning)
     # np.save("traj_coords.npy", cg_traj)
     cg_traj = np.load("traj_coords.npy")
-    # Calculate internal coordinates
+
     logger.info("Calculating internal coordinates from trajectory")
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
 
-    # # Plot all internal coordinates
     # plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
-    
-    # Boltzmann inversion (fit parameters from trajectory)
-    inverted_topo = boltzmann_invert_topology(
-        topo,
-        internal_coords,
-        max_multiplicity=2,
-    )
 
-    # Filtering/post-processing (cutoffs + move stiff bonds to constraints)
+    inverted_topo = boltzmann_invert_topology(topo, internal_coords, max_multiplicity=CFG.type9_max_n)
     updated_topo = filter_topology(
         inverted_topo,
-        constraint_k_cutoff=20000,
-        angle_k_cutoff=25,
-        dihedral_k_cutoff=5,
+        constraint_k_cutoff=CFG.constraint_k_cutoff,
+        angle_k_cutoff=CFG.angle_k_cutoff,
+        dihedral_k_cutoff=CFG.dihedral_k_cutoff,
     )
 
-    # Filter out potentially unstable dihedrals based on topology-only criteria
     filtered_topo = remove_unstable_dihedrals(
         updated_topo,
         angle_linear_cutoff_deg=160.0,
@@ -420,7 +306,5 @@ if __name__ == "__main__":
     )
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
-    itp_content = filtered_topo.to_itp(out_file=out_itp)
-
-    logger.info(f"Analysis complete!")
-    logger.info(f"Updated ITP file written to: {out_itp}")
+    filtered_topo.to_itp(out_file=out_itp)
+    logger.info("Updated ITP file written to: %s", out_itp)

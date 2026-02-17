@@ -6,6 +6,8 @@ from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
 from reforge.utils import clean_dir, get_logger
 from reforge.forge.topology import Topology
 
+from ligpar_config import CFG
+
 logger = get_logger()
 
 # Global settings
@@ -14,10 +16,10 @@ DT = 0.020  # Time step in picoseconds
 total_time = 1000  # Total simulation time in nanoseconds
 NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
 
-ligand = "ANP"
-sysdir = f"systems/{ligand}"
-sysname = "cg_md"
-runname = "mdrun"
+ligand = CFG.molname
+sysdir = str(CFG.wdir())
+sysname = CFG.cg_sysname
+runname = CFG.cg_runname
 
 
 def setup_martini(sysdir, sysname):

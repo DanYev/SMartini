@@ -17,6 +17,8 @@ from reforge.mdsystem.gmxmd import GmxSystem, GmxRun
 from reforge.mdsystem.mmmd import MmSystem, MmRun, MmReporter, convert_trajectories, get_platform_info
 from reforge.utils import clean_dir, get_logger
 
+from ligpar_config import CFG
+
 logger = get_logger()
 
 # Global settings
@@ -38,9 +40,9 @@ TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 SELECTION = OUT_SELECTION 
 #########
 
-ligand = "ANP"
-sysdir = f"systems/{ligand}"
-sysname = "aa_md"
+ligand = CFG.molname
+sysdir = str(CFG.wdir())
+sysname = CFG.aa_sysname
 runname = "."
 
 
@@ -51,7 +53,7 @@ def process_ligand(sysdir, sysname, ligand_name):
     wdir = Path("systems") / ligand_name
     wdir.mkdir(parents=True, exist_ok=True)
     logger.info("Ligand working directory: %s", wdir)
-    input_file = Path("ligands") / f"{ligand_name}.sdf"
+    input_file = CFG.ligands_dir / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
     ligand = Molecule.from_file(str(input_file))

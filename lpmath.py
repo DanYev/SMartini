@@ -220,7 +220,7 @@ def fit_type9_dihedral(
     max_n=3,
     bins=180,
     min_prob=1e-6,
-    fit_mode="best1",
+    fit_mode="sum",
 ):
     r"""Fit Gromacs type-9 dihedral terms from a distribution.
 
@@ -256,9 +256,10 @@ def fit_type9_dihedral(
     shift = circular_mean_deg(values)
     values -= shift
     values = wrap_to_180(values)
-    print(shift, np.min(values), np.max(values))
+    min_val = np.min(values)
+    max_val = np.max(values)
 
-    hist, edges = np.histogram(values, bins=bins, range=(-180.0, 180.0), density=True)
+    hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
     hist = np.clip(hist, min_prob, None)
 
     phi_centers = 0.5 * (edges[:-1] + edges[1:])
@@ -279,13 +280,16 @@ def fit_type9_dihedral(
         coeffs, _, _, _ = np.linalg.lstsq(Aw, yw, rcond=None)
         return coeffs
 
-    def _k_phi_from_ab(a, b):
+    def _k_phi_from_ab(a, b, n: int):
         k = float(np.hypot(a, b))
         if k < 1e-12:
             return 0.0, 0.0
         phi = float(np.rad2deg(np.arctan2(b, a)))
-        # phi = float(wrap_to_180(phi))
-        print(phi)
+        # We fitted on shifted angles: phi' = phi - shift.
+        # For k*cos(n*phi - phi_n), shifting phi by `shift` shifts the phase by n*shift.
+        phi += float(n) * float(shift)
+        phi = (360 - phi) % 360
+        phi = float(wrap_to_180(phi))
         return k, phi
 
     fit_mode = str(fit_mode).lower().strip()
@@ -307,7 +311,7 @@ def fit_type9_dihedral(
             resid = pmf - pred
             sse = float(np.sum((resid * weights) ** 2))
 
-            k, phi = _k_phi_from_ab(a, b)
+            k, phi = _k_phi_from_ab(a, b, n)
             candidate = (sse, n, k, phi)
             if best is None or candidate[0] < best[0]:
                 best = candidate
@@ -316,9 +320,7 @@ def fit_type9_dihedral(
             return []
 
         _, n, k, phi = best
-        phi += shift
-        phi = (360 - phi) % 360
-        phi = float(wrap_to_180(phi))
+        
         return [(int(n), float(k), float(phi))]
 
     # fit_mode == "sum": all harmonics in one linear solve
@@ -333,10 +335,7 @@ def fit_type9_dihedral(
     for n in range(1, max_n + 1):
         a = float(coeffs[1 + 2 * (n - 1)])
         b = float(coeffs[1 + 2 * (n - 1) + 1])
-        k, phi = _k_phi_from_ab(a, b)
-        phi += shift
-        phi = (360 - phi) % 360
-        phi = float(wrap_to_180(phi))
+        k, phi = _k_phi_from_ab(a, b, n)
         terms.append((int(n), float(k), float(phi)))
 
     return terms

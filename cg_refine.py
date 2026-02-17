@@ -6,6 +6,7 @@ from typing import Dict, Tuple, Optional
 import numpy as np
 
 from lpmath import circular_mean_deg, wrap_to_180, fit_type9_dihedral
+from ligpar_config import CFG
 
 logger = logging.getLogger(__name__)
 
@@ -15,14 +16,14 @@ InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
 @dataclass
 class RefineSettings:
-    angle_k_min: Optional[float] = 25.0
-    dihedral_k_min: Optional[float] = 5.0
+    angle_k_min: Optional[float] = CFG.angle_k_cutoff
+    dihedral_k_min: Optional[float] = CFG.dihedral_k_cutoff
 
     # Optional guards against extreme updates
-    max_k_scale: float = 25.0
+    max_k_scale: float = CFG.refine_max_k_scale
 
     # Under-relaxation for dihedral equilibrium updates (helps stability)
-    dihedral_shift_scale: float = 1.0
+    dihedral_shift_scale: float = CFG.refine_dihedral_shift_scale
 
 
 def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
@@ -208,12 +209,27 @@ def refine_topology_from_cg_vs_aa(
                 new_dihedrals.append(term)
             continue
 
-        fit_terms = fit_type9_dihedral(aa_vals, max_n=3)
-        old_k_max = None
-        if terms:
-            old_k_vals = [abs(float(t[6])) for t in terms if len(t) >= 7]
-            if old_k_vals:
-                old_k_max = max(old_k_vals)
+        fit_terms = fit_type9_dihedral(
+            aa_vals,
+            temperature=CFG.type9_temperature,
+            max_n=CFG.type9_max_n,
+            bins=CFG.type9_bins,
+            min_prob=CFG.type9_min_prob,
+            fit_mode=CFG.type9_fit_mode,
+        )
+        if not fit_terms:
+            # Mirror Boltzmann fitting behavior: if the fit fails/returns nothing,
+            # keep the existing terms (subject to the same |k| cutoff).
+            for term in terms:
+                if (
+                    settings.dihedral_k_min is not None
+                    and len(term) >= 7
+                    and abs(float(term[6])) < settings.dihedral_k_min
+                ):
+                    n_dihedrals_removed += 1
+                    continue
+                new_dihedrals.append(term)
+            continue
 
         kept_terms = []
         for term in fit_terms:
@@ -224,8 +240,6 @@ def refine_topology_from_cg_vs_aa(
                 mult, k_term, phi0 = term
 
             k_new = float(k_term)
-            if old_k_max is not None and old_k_max > 0:
-                k_new = float(np.clip(k_new, -settings.max_k_scale * old_k_max, settings.max_k_scale * old_k_max))
 
             if settings.dihedral_k_min is not None and abs(k_new) < settings.dihedral_k_min:
                 n_dihedrals_removed += 1

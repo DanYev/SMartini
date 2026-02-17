@@ -416,7 +416,16 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
     logger.info("Plotting %s dihedrals", len(set(dihedrals_aa) | set(dihedrals_cg)))
 
     dihedral_terms = _dihedral_terms(topo)
-    keys = [(int(d[0]), int(d[1]), int(d[2]), int(d[3]), "dihedral") for d in topo.dihedrals]
+    # topo.dihedrals may contain multiple terms per (i,j,k,l) (e.g., multiple multiplicities)
+    # but we want exactly one axis per dihedral definition.
+    keys = []
+    seen = set()
+    for d in topo.dihedrals:
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]), "dihedral")
+        if key in seen:
+            continue
+        seen.add(key)
+        keys.append(key)
     if not keys:
         keys = list(set(dihedrals_aa.keys()) | set(dihedrals_cg.keys()))
     keys = [k for k in keys if k in dihedrals_aa or k in dihedrals_cg]

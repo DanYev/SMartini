@@ -9,6 +9,8 @@ Automartini_M3/
 *.itp
 *.png
 *.txt
+*.npy
+*.npz
 
 # ---- Python ----
 __pycache__/
