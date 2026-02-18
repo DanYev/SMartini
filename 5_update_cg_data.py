@@ -15,7 +15,7 @@ from lpmath import (
     fit_type9_dihedral,
 )
 from plots import plot_internal_coordinates_overlay
-from ligpar_config import CFG, RefineSettings, get_logger
+from ligpar_config import CFG, get_logger
 
 logger = get_logger(__name__)
 
@@ -71,7 +71,6 @@ def refine_topology_from_cg_vs_aa(
     aa_internal: InternalCoords,
     cg_internal: InternalCoords,
     output_itp,
-    settings: Optional[RefineSettings] = None,
 ):
     """Refine an existing CG topology by matching CG distributions to AA ones.
 
@@ -86,9 +85,7 @@ def refine_topology_from_cg_vs_aa(
     - Dihedrals use circular mean + std of wrapped residuals.
     - Writes a NEW ITP and returns the updated topology.
     """
-
-    if settings is None:
-        settings = CFG.get_refine_settings()
+    settings = CFG.get_refine_settings()
 
     updated = copy.deepcopy(topo)
 
@@ -316,4 +313,4 @@ if __name__ == "__main__":
 	# Writes a new file and leaves the original ITP unchanged.
 	# out_refined_itp = wdir / "mapping" / f"{molname}_cgrefined.itp"
 	out_refined_itp = itp_updated
-	refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+	# refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

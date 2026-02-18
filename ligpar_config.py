@@ -6,15 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 
-@dataclass
-class RefineSettings:
-    """Settings for topology refinement."""
-    angle_k_min: Optional[float]
-    dihedral_k_min: Optional[float]
-    max_k_scale: float
-    dihedral_shift_scale: float
-
-
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
