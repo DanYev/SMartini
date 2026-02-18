@@ -12,7 +12,6 @@ from lpmath import (
     calculate_internal_coordinates,
     circular_mean_deg,
     wrap_to_180,
-    fit_type9_dihedral,
 )
 from plots import plot_internal_coordinates_overlay
 from ligpar_config import CFG, get_logger
@@ -66,39 +65,20 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float, max_scal
     return float(k_old * scale)
 
 
-def refine_topology_from_cg_vs_aa(
-    topo,
-    aa_internal: InternalCoords,
-    cg_internal: InternalCoords,
-    output_itp,
-):
-    """Refine an existing CG topology by matching CG distributions to AA ones.
-
+def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+    """Update bonds and constraints by adjusting equilibrium values and force constants.
+    
     Strategy
     --------
     - Equilibrium values: shift by (mu_AA - mu_CG)
     - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
-
-    Notes
-    -----
-    - Bonds/constraints use linear mean/std.
-    - Dihedrals use circular mean + std of wrapped residuals.
-    - Writes a NEW ITP and returns the updated topology.
     """
-    settings = CFG.get_refine_settings()
-
-    updated = copy.deepcopy(topo)
-
     n_bonds_updated = 0
     n_constraints_updated = 0
-    n_angles_updated = 0
-    n_angles_removed = 0
-    n_dihedrals_updated = 0
-    n_dihedrals_removed = 0
-
+    
     # Bonds
     new_bonds = []
-    for bond in updated.bonds:
+    for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
         key = (i, j, "bond")
         aa_vals = aa_internal.get(key)
@@ -123,11 +103,11 @@ def refine_topology_from_cg_vs_aa(
 
         n_bonds_updated += 1
 
-    updated.bonds = new_bonds
+    topo.bonds = new_bonds
 
     # Constraints (length only)
     new_constraints = []
-    for constraint in updated.constraints:
+    for constraint in topo.constraints:
         i, j = int(constraint[0]), int(constraint[1])
         key = (i, j, "constraint")
         aa_vals = aa_internal.get(key)
@@ -145,11 +125,25 @@ def refine_topology_from_cg_vs_aa(
         new_constraints.append([i, j, constraint[2], r0_new])
         n_constraints_updated += 1
 
-    updated.constraints = new_constraints
+    topo.constraints = new_constraints
+    
+    return n_bonds_updated, n_constraints_updated
 
-    # Angles
+
+def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+    """Update angles by adjusting equilibrium values and force constants.
+    
+    Strategy
+    --------
+    - Equilibrium values: shift by (mu_AA - mu_CG)
+    - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
+    - Optionally remove angles with force constants below threshold
+    """
+    n_angles_updated = 0
+    n_angles_removed = 0
+    
     new_angles = []
-    for angle in updated.angles:
+    for angle in topo.angles:
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
         key = (i, j, k, "angle")
         aa_vals = aa_internal.get(key)
@@ -182,77 +176,112 @@ def refine_topology_from_cg_vs_aa(
 
         n_angles_updated += 1
 
-    updated.angles = new_angles
+    topo.angles = new_angles
+    
+    return n_angles_updated, n_angles_removed
 
-    # Dihedrals (type-9 Fourier terms)
+
+def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+    """Update dihedrals by adjusting phi_0 and force constants.
+    
+    Strategy
+    --------
+    - Equilibrium angles: shift by (mu_AA - mu_CG) using circular statistics
+    - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
+    - Optionally remove dihedrals with force constants below threshold
+    
+    Notes
+    -----
+    - Uses circular mean + std of wrapped residuals for dihedrals
+    - Each dihedral term is adjusted independently
+    """
+    n_dihedrals_updated = 0
+    n_dihedrals_removed = 0
+    
     new_dihedrals = []
     dihedrals_by_key = {}
-    for dihedral in updated.dihedrals:
+    for dihedral in topo.dihedrals:
         key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
         dihedrals_by_key.setdefault(key, []).append(dihedral)
 
     for (i, j, k, l), terms in dihedrals_by_key.items():
         key = (i, j, k, l, "dihedral")
         aa_vals = aa_internal.get(key)
-        if aa_vals is None:
+        cg_vals = cg_internal.get(key)
+        
+        if aa_vals is None or cg_vals is None:
+            # No AA or CG data, keep existing terms (with optional pruning)
             for term in terms:
                 if settings.dihedral_k_min is not None and len(term) >= 7 and abs(float(term[6])) < settings.dihedral_k_min:
                     n_dihedrals_removed += 1
                     continue
                 new_dihedrals.append(term)
             continue
-
-        fit_terms = fit_type9_dihedral(
-            aa_vals,
-            temperature=CFG.type9_temperature,
-            max_n=CFG.type9_max_n,
-            bins=CFG.type9_bins,
-            min_prob=CFG.type9_min_prob,
-            fit_mode=CFG.type9_fit_mode,
-        )
-        if not fit_terms:
-            # Mirror Boltzmann fitting behavior: if the fit fails/returns nothing,
-            # keep the existing terms (subject to the same |k| cutoff).
-            for term in terms:
-                if (
-                    settings.dihedral_k_min is not None
-                    and len(term) >= 7
-                    and abs(float(term[6])) < settings.dihedral_k_min
-                ):
-                    n_dihedrals_removed += 1
-                    continue
+        
+        # Calculate circular statistics for AA and CG trajectories
+        mu_aa, sigma_aa = _stats(aa_vals, "dihedral")
+        mu_cg, sigma_cg = _stats(cg_vals, "dihedral")
+        delta = wrap_to_180(mu_aa - mu_cg)
+        
+        # Update each term for this dihedral
+        for term in terms:
+            if len(term) < 7:
+                # Unexpected format, keep as-is
                 new_dihedrals.append(term)
-            continue
-
-        kept_terms = []
-        for term in fit_terms:
-            if len(term) == 2:
-                mult, k_term = term
-                phi0 = 0.0
-            else:
-                mult, k_term, phi0 = term
-
-            k_new = float(k_term)
-
+                continue
+            
+            phi0_old = float(term[5])
+            k_old = float(term[6])
+            mult = int(term[7]) if len(term) >= 8 else 1
+            
+            # Adjust phi_0 by the circular mean difference
+            phi0_new = wrap_to_180(phi0_old + delta)
+            
+            # Rescale force constant based on sigma ratio
+            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
+            
+            # Optional pruning based on minimum k threshold
             if settings.dihedral_k_min is not None and abs(k_new) < settings.dihedral_k_min:
                 n_dihedrals_removed += 1
                 continue
+            
+            new_dihedrals.append([i, j, k, l, 9, float(phi0_new), k_new, mult])
+            n_dihedrals_updated += 1
 
-            kept_terms.append([i, j, k, l, 9, float(phi0), k_new, int(mult)])
+    topo.dihedrals = new_dihedrals
+    
+    return n_dihedrals_updated, n_dihedrals_removed
 
-        if not kept_terms and fit_terms:
-            best = max(fit_terms, key=lambda t: abs(t[1]))
-            if len(best) == 2:
-                best_mult, best_k = best
-                best_phi0 = 0.0
-            else:
-                best_mult, best_k, best_phi0 = best
-            kept_terms.append([i, j, k, l, 9, float(best_phi0), float(best_k), int(best_mult)])
 
-        new_dihedrals.extend(kept_terms)
-        n_dihedrals_updated += len(kept_terms)
+def refine_topology_from_cg_vs_aa(
+    topo,
+    aa_internal: InternalCoords,
+    cg_internal: InternalCoords,
+    output_itp,
+):
+    """Refine an existing CG topology by matching CG distributions to AA ones.
 
-    updated.dihedrals = new_dihedrals
+    Strategy
+    --------
+    - Equilibrium values: shift by (mu_AA - mu_CG)
+    - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
+
+    Notes
+    -----
+    - Bonds/constraints use linear mean/std.
+    - Dihedrals use circular mean + std of wrapped residuals.
+    - Writes a NEW ITP and returns the updated topology.
+    """
+    updated = copy.deepcopy(topo)
+
+    # Update bonds and constraints
+    n_bonds_updated, n_constraints_updated = update_bonds(updated, aa_internal, cg_internal, settings)
+    
+    # Update angles
+    n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal, settings)
+    
+    # Update dihedrals
+    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal, settings)
 
     logger.info(
         "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
@@ -313,4 +342,4 @@ if __name__ == "__main__":
 	# Writes a new file and leaves the original ITP unchanged.
 	# out_refined_itp = wdir / "mapping" / f"{molname}_cgrefined.itp"
 	out_refined_itp = itp_updated
-	# refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+	refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

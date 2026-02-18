@@ -52,15 +52,6 @@ class LigParConfig:
     def cg_dir(self) -> Path:
         return self.wdir() / self.cg_sysname
 
-    def get_refine_settings(self) -> RefineSettings:
-        """Get refinement settings from config."""
-        return RefineSettings(
-            angle_k_min=self.angle_k_cutoff,
-            dihedral_k_min=self.dihedral_k_cutoff,
-            max_k_scale=self.refine_max_k_scale,
-            dihedral_shift_scale=self.refine_dihedral_shift_scale,
-        )
-
 
 CFG = LigParConfig()
 
