@@ -5,7 +5,7 @@ from pathlib import Path
 import AutoMartini as am
 import numpy as np
 
-from ligpar_config import CFG
+from ligpar_config import CFG, get_logger
 from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
@@ -15,14 +15,8 @@ from lpmath import (
 )
 from plots import plot_internal_coordinates
 
-
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
-    force=True,  # override any prior logging config set by imported libs
-)
 logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 logger.setLevel(logging.INFO)
 
 

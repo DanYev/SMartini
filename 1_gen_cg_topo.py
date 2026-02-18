@@ -5,13 +5,8 @@ import AutoMartini as am
 import rdkit
 from rdkit import Chem
 
-from ligpar_config import CFG
+from ligpar_config import CFG, get_logger
 
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
-    force=True,  # override any prior logging config set by imported libs
-)
 logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 
 

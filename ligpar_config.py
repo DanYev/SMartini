@@ -1,7 +1,18 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class RefineSettings:
+    """Settings for topology refinement."""
+    angle_k_min: Optional[float]
+    dihedral_k_min: Optional[float]
+    max_k_scale: float
+    dihedral_shift_scale: float
 
 
 @dataclass(frozen=True)
@@ -50,5 +61,26 @@ class LigParConfig:
     def cg_dir(self) -> Path:
         return self.wdir() / self.cg_sysname
 
+    def get_refine_settings(self) -> RefineSettings:
+        """Get refinement settings from config."""
+        return RefineSettings(
+            angle_k_min=self.angle_k_cutoff,
+            dihedral_k_min=self.dihedral_k_cutoff,
+            max_k_scale=self.refine_max_k_scale,
+            dihedral_shift_scale=self.refine_dihedral_shift_scale,
+        )
+
 
 CFG = LigParConfig()
+
+# Configure logging once for all scripts
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
+    force=True,
+)
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a configured logger for a module."""
+    return logging.getLogger(name)
