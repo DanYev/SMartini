@@ -255,8 +255,8 @@ def fit_type9_dihedral(
     min_val = np.min(values)
     max_val = np.max(values)
 
-    # hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
-    hist, edges = np.histogram(values, bins=bins, range=(-180, 180), density=True)
+    hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
+    # hist, edges = np.histogram(values, bins=bins, range=(-180, 180), density=True)
     hist = np.clip(hist, min_prob, None)
 
     phi_centers = 0.5 * (edges[:-1] + edges[1:])
@@ -268,7 +268,7 @@ def fit_type9_dihedral(
     if max_n <= 0:
         return []
 
-    weights = np.sqrt(hist)
+    # weights = np.sqrt(hist)
     weights = np.ones_like(hist)
 
     def _solve_weighted(A, y):

@@ -24,7 +24,7 @@ class LigParConfig:
 
     # Type-9 dihedral (Gromacs) fitting parameters
     type9_temperature: float = 300.0
-    type9_fit_mode: str = "sum"  # "best1" or "sum"
+    type9_fit_mode: str = "best1"  # "best1" or "sum"
     type9_max_n: int = 6
     type9_bins: int = 360
     type9_min_prob: float = 1e-6
