@@ -7,7 +7,7 @@ from MDAnalysis import Universe
 logger = logging.getLogger(__name__)
 
 
-def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=5000):
+def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=-2, selection="all"):
     """Read AA trajectory and calculate COG trajectory for CG beads.
 
     Parameters
@@ -22,36 +22,48 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=5000):
         Starting frame index to read from the trajectory
     stop : int
         Ending frame index to read from the trajectory
+    selection : str, optional
+        MDAnalysis selection string (default: "all")
+        Examples: "all", "protein", "resname LIG", etc.
 
     Returns
     -------
     numpy.ndarray
         CG trajectory array with shape (n_frames, n_beads, 3)
     """
-    logger.info("Reading AA trajectory: %s, %s", in_pdb, in_xtc)
+    logger.info("Reading AA trajectory: %s, %s, selection='%s'", in_pdb, in_xtc, selection)
 
     u = Universe(str(in_pdb), str(in_xtc))
-    n_frames = stop - start
+    
+    # Select atoms based on selection string
+    atom_group = u.select_atoms(selection)
+    logger.info("Selected %s atoms with selection '%s'", len(atom_group), selection)
 
     n_beads = max(partitioning.values()) + 1
     bead_to_atoms = {i: [] for i in range(n_beads)}
     for atom_idx, bead_idx in partitioning.items():
         bead_to_atoms[bead_idx].append(atom_idx)
 
-    cg_trajectory = np.zeros((n_frames, n_beads, 3))
-
-    for frame_idx, _ in enumerate(u.trajectory[start:stop]):
+    # Read frames into list first to avoid zeros from frame mismatch
+    frames = []
+    for ts in u.trajectory[start:stop]:
+        frame_beads = np.zeros((n_beads, 3))
         for bead_idx in range(n_beads):
             atom_indices = bead_to_atoms[bead_idx]
             if atom_indices:
-                positions = u.atoms[atom_indices].positions
-                cg_trajectory[frame_idx, bead_idx] = positions.mean(axis=0) / 10.0
+                positions = atom_group[atom_indices].positions
+                frame_beads[bead_idx] = positions.mean(axis=0) / 10.0
+        frames.append(frame_beads)
+    
+    # Convert list to numpy array
+    cg_trajectory = np.array(frames)
+    n_frames = len(frames)
 
-    logger.info("COG trajectory computed: %s frames, %s beads", cg_trajectory.shape[0], n_beads)
+    logger.info("COG trajectory computed: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
 
 
-def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000):
+def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
     """Read CG trajectory and return positions in nm.
 
     Parameters
@@ -60,21 +72,36 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000):
         Path to CG PDB file
     in_xtc : str or Path
         Path to CG XTC trajectory
+    start : int, optional
+        Starting frame index (default: 0)
+    stop : int, optional
+        Stopping frame index (default: 5000)
+    selection : str, optional
+        MDAnalysis selection string (default: "all")
+        Examples: "all", "name BB", "resname LIG", "protein", etc.
 
     Returns
     -------
     numpy.ndarray
         CG trajectory array with shape (n_frames, n_beads, 3) in nm
     """
-    logger.info("Reading CG trajectory: %s, %s", in_pdb, in_xtc)
+    logger.info("Reading CG trajectory: %s, %s, selection='%s'", in_pdb, in_xtc, selection)
     u = Universe(str(in_pdb), str(in_xtc))
-    n_frames = stop - start
-    n_beads = len(u.atoms)
-    cg_trajectory = np.zeros((n_frames, n_beads, 3))
-
-    for frame_idx, _ in enumerate(u.trajectory[start:stop]):
-        cg_trajectory[frame_idx] = u.atoms.positions / 10.0
-
+    
+    # Select atoms based on selection string
+    atom_group = u.select_atoms(selection)
+    n_beads = len(atom_group)
+    logger.info("Selected %s atoms with selection '%s'", n_beads, selection)
+    
+    # Read frames into list first to avoid zeros from frame mismatch
+    frames = []
+    for ts in u.trajectory[start:stop]:
+        frames.append(atom_group.positions / 10.0)
+    
+    # Convert list to numpy array
+    cg_trajectory = np.array(frames)
+    n_frames = len(frames)
+    
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
 

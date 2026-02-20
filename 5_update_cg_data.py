@@ -53,6 +53,83 @@ def _dihedral_mode_deg(values: np.ndarray, center_deg: float, bins: int = 72) ->
     return float(wrap_to_180(center_deg + bin_center))
 
 
+def _circular_distance_deg(a: float, b: float) -> float:
+    return float(abs(wrap_to_180(a - b)))
+
+
+def _bimodal_dihedral_stats(
+    values: np.ndarray,
+    bins: int = 72,
+    min_separation_deg: float = 30.0,
+    min_cluster_size: int = 5,
+):
+    """Estimate up to two dihedral modes and their sigmas using a histogram.
+
+    Returns a list of (center_deg, sigma_deg) sorted by population.
+    """
+    if values is None or len(values) == 0:
+        return []
+
+    wrapped = wrap_to_180(np.asarray(values, dtype=float))
+    hist, edges = np.histogram(wrapped, bins=bins, range=(-180, 180))
+    if np.all(hist == 0):
+        return []
+
+    bin_centers = 0.5 * (edges[:-1] + edges[1:])
+    order = np.argsort(hist)[::-1]
+
+    picked_centers = []
+    for idx in order:
+        if hist[idx] == 0:
+            break
+        candidate = float(bin_centers[idx])
+        if not picked_centers:
+            picked_centers.append(candidate)
+            if len(picked_centers) == 2:
+                break
+            continue
+        if _circular_distance_deg(candidate, picked_centers[0]) >= min_separation_deg:
+            picked_centers.append(candidate)
+            break
+
+    if not picked_centers:
+        return []
+
+    # Assign samples to nearest picked center
+    centers = picked_centers
+    clusters = {c: [] for c in centers}
+    for val in wrapped:
+        nearest = min(centers, key=lambda c: _circular_distance_deg(val, c))
+        clusters[nearest].append(val)
+
+    stats = []
+    for center in centers:
+        cluster_vals = np.asarray(clusters[center], dtype=float)
+        if len(cluster_vals) < min_cluster_size:
+            continue
+        residual = wrap_to_180(cluster_vals - center)
+        sigma = float(np.std(residual))
+        stats.append((float(center), sigma, len(cluster_vals)))
+
+    if not stats:
+        return []
+
+    stats.sort(key=lambda x: x[2], reverse=True)
+    return [(c, s) for c, s, _ in stats]
+
+
+def _pair_mode_centers(aa_centers, cg_centers):
+    if len(aa_centers) != 2 or len(cg_centers) != 2:
+        return None
+    a0, a1 = aa_centers
+    c0, c1 = cg_centers
+    d_same = _circular_distance_deg(a0, c0) + _circular_distance_deg(a1, c1)
+    d_cross = _circular_distance_deg(a0, c1) + _circular_distance_deg(a1, c0)
+    if d_same <= d_cross:
+        return {c0: a0, c1: a1}
+    return {c0: a1, c1: a0}
+
+
 def _k_rescale(k_old: float, sigma_target: float, sigma_current: float, max_scale: float) -> float:
     if not np.isfinite(k_old) or k_old <= 0:
         return k_old
@@ -183,18 +260,17 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
 
 
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
-    """Update dihedrals by adjusting phi_0 and force constants.
+    """Update dihedrals by rescaling force constants.
     
     Strategy
     --------
-    - Equilibrium angles: shift by (mu_AA - mu_CG) using circular statistics
-    - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
+    - Force constants: rescale by (sigma_CG / sigma_AA)^2 with an upper cap of 2.0
     - Optionally remove dihedrals with force constants below threshold
     
     Notes
     -----
-    - Uses circular mean + std of wrapped residuals for dihedrals
-    - Each dihedral term is adjusted independently
+    - Uses circular mean + std of wrapped residuals for fallback
+    - Each dihedral term is rescaled by the same factor for a given torsion
     """
     n_dihedrals_updated = 0
     n_dihedrals_removed = 0
@@ -220,10 +296,12 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             continue
         
         # Calculate circular statistics for AA and CG trajectories
-        mu_aa, sigma_aa = _stats(aa_vals, "dihedral")
-        mu_cg, sigma_cg = _stats(cg_vals, "dihedral")
-        delta = wrap_to_180(mu_aa - mu_cg)
-        
+        _, sigma_aa = _stats(aa_vals, "dihedral")
+        _, sigma_cg = _stats(cg_vals, "dihedral")
+        scale = float((sigma_cg / sigma_aa) ** 2)
+        scale = float(min(scale, 2.0))
+        scale = float(max(scale, 1.0)) 
+
         # Update each term for this dihedral
         for term in terms:
             if len(term) < 7:
@@ -233,13 +311,10 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             
             phi0_old = float(term[5])
             k_old = float(term[6])
-            mult = int(term[7]) 
-            
-            # Adjust phi_0 by the circular mean difference
-            phi0_new = wrap_to_180(phi0_old + delta)
-            
-            # Rescale force constant based on sigma ratio
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
+            mult = int(term[7])
+
+            phi0_new = phi0_old
+            k_new = float(k_old * scale)
             
             # Optional pruning based on minimum k threshold
             if CFG.dihedral_k_cutoff is not None and abs(k_new) < CFG.dihedral_k_cutoff:
@@ -284,15 +359,15 @@ def refine_topology_from_cg_vs_aa(
     # Update dihedrals
     n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
-    logger.info(
-        "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
-        n_bonds_updated,
-        n_constraints_updated,
-        n_angles_updated,
-        n_angles_removed,
-        n_dihedrals_updated,
-        n_dihedrals_removed,
-    )
+    # logger.info(
+    #     "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
+    #     n_bonds_updated,
+    #     n_constraints_updated,
+    #     n_angles_updated,
+    #     n_angles_removed,
+    #     n_dihedrals_updated,
+    #     n_dihedrals_removed,
+    # )
 
     updated.to_itp(out_file=output_itp)
     logger.info("Wrote refined ITP to %s", output_itp)
@@ -317,19 +392,19 @@ if __name__ == "__main__":
     )
 
     aa_dir = CFG.aa_dir()
-    aa_pdb = aa_dir / "md.pdb"
-    aa_xtc = aa_dir / "md.xtc"
+    aa_pdb = aa_dir / "topology.pdb"
+    aa_xtc = aa_dir / "samples.xtc"
 
     cg_dir = CFG.cg_dir()
     cg_pdb = cg_dir / CFG.cg_runname / "topology.pdb"
     cg_xtc = cg_dir / CFG.cg_runname / "samples.xtc"
 
     logger.info("Reading AA trajectory from %s", aa_dir)
-    aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning)
+    aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, selection="resname ANP")
     aa_internal = calculate_internal_coordinates(aa_traj, topo)
 
     logger.info("Reading CG trajectory from %s", cg_dir)
-    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=CFG.cg_traj_stop)  # start and step can be adjusted to speed up processing for long trajectories
+    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None, selection="resname ANP")  
     cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
     plot_internal_coordinates_overlay(
@@ -344,4 +419,4 @@ if __name__ == "__main__":
     tmp_itp = wdir / "mapping" / f"{molname}_updated_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
-    # refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

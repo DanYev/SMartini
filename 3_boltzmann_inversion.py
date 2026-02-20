@@ -272,18 +272,18 @@ if __name__ == "__main__":
     topo = am.topology.read_itp(str(in_itp))
 
     mddir = CFG.aa_dir()
-    in_pdb = mddir / "md.pdb"
-    in_xtc = mddir / "md.xtc"
+    in_pdb = mddir / "topology.pdb"
+    in_xtc = mddir / "samples.xtc"
     logger.info("Reading trajectory files from %s", mddir)
 
-    # cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning)
+    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, selection="resname ANP")
     # np.save("traj_coords.npy", cg_traj)
-    cg_traj = np.load("traj_coords.npy")
+    # cg_traj = np.load("traj_coords.npy")
 
     logger.info("Calculating internal coordinates from trajectory")
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
 
-    # plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
+    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
 
     inverted_topo = boltzmann_invert_topology(topo, internal_coords, max_multiplicity=CFG.type9_max_n)
     updated_topo = filter_topology(
