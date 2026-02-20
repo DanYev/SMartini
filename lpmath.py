@@ -236,7 +236,7 @@ def fit_type9_dihedral(
     Parameters
     ----------
     fit_mode : {"sum", "best1"}
-        - "sum": fit all harmonics 1..max_n at once and return all terms.
+        - "sum": pick best single harmonic, then refit with it plus one additional harmonic.
         - "best1": fit each harmonic individually and return the single best n.
 
     Returns
@@ -293,46 +293,57 @@ def fit_type9_dihedral(
     if fit_mode not in {"sum", "best1"}:
         raise ValueError(f"fit_mode must be 'sum' or 'best1' (got {fit_mode!r})")
 
-    if fit_mode == "best1":
-        best = None
-        for n in range(1, max_n + 1):
-            A = np.column_stack(
-                [
-                    np.ones_like(phi_rad),
-                    np.cos(n * phi_rad),
-                    np.sin(n * phi_rad),
-                ]
-            )
-            c0, a, b = _solve_weighted(A, pmf)
-            pred = A @ np.array([c0, a, b])
-            resid = pmf - pred
-            sse = float(np.sum((resid * weights) ** 2))
-
+    def _fit_terms_for_ns(ns):
+        cols = [np.ones_like(phi_rad)]
+        for n in ns:
+            cols.append(np.cos(n * phi_rad))
+            cols.append(np.sin(n * phi_rad))
+        A = np.column_stack(cols)
+        coeffs = _solve_weighted(A, pmf)
+        pred = A @ coeffs
+        resid = pmf - pred
+        sse = float(np.sum((resid * weights) ** 2))
+        terms = []
+        for idx, n in enumerate(ns):
+            a = float(coeffs[1 + 2 * idx])
+            b = float(coeffs[1 + 2 * idx + 1])
             k, phi = _k_phi_from_ab(a, b, n)
-            candidate = (sse, n, k, phi)
-            if best is None or candidate[0] < best[0]:
-                best = candidate
+            terms.append((int(n), float(k), float(phi)))
+        return sse, terms
 
-        if best is None:
-            return []
+    if fit_mode == "best1":
+        best_sse = None
+        best_terms = []
+        for n in range(1, max_n + 1):
+            sse, terms = _fit_terms_for_ns([n])
+            if best_sse is None or sse < best_sse:
+                best_sse = sse
+                best_terms = terms
 
-        _, n, k, phi = best
-        
-        return [(int(n), float(k), float(phi))]
+        return best_terms
 
-    # fit_mode == "sum": all harmonics in one linear solve
-    cols = [np.ones_like(phi_rad)]
+    # fit_mode == "sum": iterative best1 + one additional term
+    best_sse = None
+    best_terms = []
+    best_n = None
     for n in range(1, max_n + 1):
-        cols.append(np.cos(n * phi_rad))
-        cols.append(np.sin(n * phi_rad))
-    A = np.column_stack(cols)
-    coeffs = _solve_weighted(A, pmf)
+        sse, terms = _fit_terms_for_ns([n])
+        if best_sse is None or sse < best_sse:
+            best_sse = sse
+            best_terms = terms
+            best_n = n
 
-    terms = []
+    if best_n is None or max_n <= 1:
+        return best_terms
+
+    best_pair_sse = None
+    best_pair_terms = None
     for n in range(1, max_n + 1):
-        a = float(coeffs[1 + 2 * (n - 1)])
-        b = float(coeffs[1 + 2 * (n - 1) + 1])
-        k, phi = _k_phi_from_ab(a, b, n)
-        terms.append((int(n), float(k), float(phi)))
+        if n == best_n:
+            continue
+        sse, terms = _fit_terms_for_ns([best_n, n])
+        if best_pair_sse is None or sse < best_pair_sse:
+            best_pair_sse = sse
+            best_pair_terms = terms
 
-    return terms
+    return best_pair_terms if best_pair_terms is not None else best_terms
