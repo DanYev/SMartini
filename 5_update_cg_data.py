@@ -65,7 +65,7 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float, max_scal
     return float(k_old * scale)
 
 
-def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
     """Update bonds and constraints by adjusting equilibrium values and force constants.
     
     Strategy
@@ -96,7 +96,7 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords,
         r0_new = float(r0_old + delta)
 
         if k_old is not None:
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
+            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
             new_bonds.append([i, j, bond[2], r0_new, k_new])
         else:
             new_bonds.append([i, j, bond[2], r0_new])
@@ -130,7 +130,7 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords,
     return n_bonds_updated, n_constraints_updated
 
 
-def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
     """Update angles by adjusting equilibrium values and force constants.
     
     Strategy
@@ -150,7 +150,7 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         cg_vals = cg_internal.get(key)
         if aa_vals is None or cg_vals is None:
             # Optional pruning based on existing k
-            if settings.angle_k_min is not None and len(angle) >= 6 and float(angle[5]) < settings.angle_k_min:
+            if CFG.angle_k_cutoff is not None and len(angle) >= 6 and float(angle[5]) < CFG.angle_k_cutoff:
                 n_angles_removed += 1
                 continue
             new_angles.append(angle)
@@ -166,8 +166,8 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
 
         k_old = float(angle[5]) if len(angle) >= 6 else None
         if k_old is not None:
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
-            if settings.angle_k_min is not None and k_new < settings.angle_k_min:
+            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
+            if CFG.angle_k_cutoff is not None and k_new < CFG.angle_k_cutoff:
                 n_angles_removed += 1
                 continue
             new_angles.append([i, j, k, angle[3], theta0_new, k_new])
@@ -181,7 +181,7 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
     return n_angles_updated, n_angles_removed
 
 
-def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords, settings):
+def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
     """Update dihedrals by adjusting phi_0 and force constants.
     
     Strategy
@@ -212,7 +212,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         if aa_vals is None or cg_vals is None:
             # No AA or CG data, keep existing terms (with optional pruning)
             for term in terms:
-                if settings.dihedral_k_min is not None and len(term) >= 7 and abs(float(term[6])) < settings.dihedral_k_min:
+                if CFG.dihedral_k_cutoff is not None and len(term) >= 7 and abs(float(term[6])) < CFG.dihedral_k_cutoff:
                     n_dihedrals_removed += 1
                     continue
                 new_dihedrals.append(term)
@@ -238,10 +238,10 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             phi0_new = wrap_to_180(phi0_old + delta)
             
             # Rescale force constant based on sigma ratio
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=settings.max_k_scale)
+            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
             
             # Optional pruning based on minimum k threshold
-            if settings.dihedral_k_min is not None and abs(k_new) < settings.dihedral_k_min:
+            if CFG.dihedral_k_cutoff is not None and abs(k_new) < CFG.dihedral_k_cutoff:
                 n_dihedrals_removed += 1
                 continue
             
@@ -275,13 +275,13 @@ def refine_topology_from_cg_vs_aa(
     updated = copy.deepcopy(topo)
 
     # Update bonds and constraints
-    n_bonds_updated, n_constraints_updated = update_bonds(updated, aa_internal, cg_internal, settings)
+    n_bonds_updated, n_constraints_updated = update_bonds(updated, aa_internal, cg_internal)
     
     # Update angles
-    n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal, settings)
+    n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
     # Update dihedrals
-    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal, settings)
+    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
     logger.info(
         "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
