@@ -28,7 +28,7 @@ class LigParConfig:
     temperature: float = 300.0
 
     # Type-9 dihedral (Gromacs) fitting parameters
-    type9_max_n: int = 1
+    type9_max_n: int = 6
     type9_bins: int = 360
     type9_min_prob: float = 1e-6
 

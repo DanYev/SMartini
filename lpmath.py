@@ -327,11 +327,11 @@ def fit_type9_dihedral(
     values = np.asarray(dihedrals, dtype=float)
     shift = circular_mean(values)
     values = wrap_to_180(values - shift) 
-    # values = values - shift
-    print(np.mean(values))
 
     data_min = float(np.min(values))
     data_max = float(np.max(values))
+    data_min = float(-180)
+    data_max = float(180)
     if data_min == data_max:
         data_min -= 1e-3
         data_max += 1e-3
@@ -384,6 +384,7 @@ def fit_type9_dihedral(
 
     A = np.column_stack(cols)
     coeffs, _, _, _ = np.linalg.lstsq(A, pmf, rcond=None)
+    print(coeffs)
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)

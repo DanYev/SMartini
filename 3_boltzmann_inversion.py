@@ -281,7 +281,7 @@ if __name__ == "__main__":
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
 
     inverted_topo = boltzmann_invert_topology(topo, internal_coords)
-    plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
+    # plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
 
     updated_topo = filter_topology(
         inverted_topo,
