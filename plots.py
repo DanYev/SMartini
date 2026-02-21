@@ -86,7 +86,7 @@ def _fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1
 def _plot_gmm(ax, x_grid, gmm):
     weights, means, variances = gmm
     total = _gmm_pdf_1d(x_grid, weights, means, variances)
-    ax.plot(x_grid, total, color="C1", linewidth=1.6, label="GMM")
+    ax.plot(x_grid, total, color="C1", linewidth=1.6, )
     for idx, (w, mu, var) in enumerate(zip(weights, means, variances)):
         comp = w * np.exp(-0.5 * (x_grid - mu) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
         ax.plot(x_grid, comp, color="C1", alpha=0.5, linestyle="--", linewidth=1.0)
@@ -286,7 +286,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
             vmin -= 1e-3
             vmax += 1e-3
 
-        ax.hist(dihedrals_shifted, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
+        ax.hist(dihedrals_shifted, bins=50, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
         gmm = _fit_gmm_1d_best(dihedrals_shifted, max_components=max_gaussians)
         if gmm is not None:
             x_grid = np.linspace(vmin, vmax, 400)

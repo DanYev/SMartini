@@ -123,8 +123,6 @@ def remove_unstable_dihedrals(
 def boltzmann_invert_topology(
     topo,
     internal_coords,
-    *,
-    max_multiplicity: int = 3,
 ):
     """Compute Boltzmann-inverted bonded parameters from internal coordinate samples."""
     updated_topo = copy.deepcopy(topo)
@@ -172,7 +170,7 @@ def boltzmann_invert_topology(
         fit_terms = fit_type9_dihedral(
             data,
             temperature=CFG.temperature,
-            max_n=max_multiplicity,
+            max_n=CFG.type9_max_n,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
         )

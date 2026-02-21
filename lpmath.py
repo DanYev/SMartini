@@ -244,7 +244,7 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
 def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
-    max_n=3,
+    max_n=6,
     bins=360,
     min_prob=1e-6,
 ):
@@ -276,11 +276,13 @@ def fit_type9_dihedral(
     shift = circular_mean_deg(values)
     values = ((values - shift + 180.0) % 360.0) - 180.0
 
-    # hist, edges = np.histogram(values, bins=bins, range=(-180.0, 180.0), density=True)
-    hist, edges = np.histogram(values, bins=bins, range=(np.min(values), np.max(values)), density=True)
-    hist = np.clip(hist, min_prob, None)
+    data_min = float(np.min(values))
+    data_max = float(np.max(values))
+    if data_min == data_max:
+        data_min -= 1e-3
+        data_max += 1e-3
 
-    phi_centers = 0.5 * (edges[:-1] + edges[1:])
+    phi_centers = np.linspace(data_min, data_max, int(bins))
     phi_rad = np.deg2rad(phi_centers)
 
     def _gmm_pdf_1d(x, weights, means, variances):
@@ -333,18 +335,16 @@ def fit_type9_dihedral(
             best_bic = bic
             best_gmm = (weights, means, variances)
 
-    if best_gmm is not None:
-        gmm_density = _gmm_pdf_1d(phi_centers, *best_gmm)
-        gmm_density = np.clip(gmm_density, min_prob, None)
-        density = gmm_density
-    else:
-        density = hist
+    if best_gmm is None:
+        raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
+
+    gmm_density = _gmm_pdf_1d(phi_centers, *best_gmm)
+    density = np.clip(gmm_density, min_prob, None)
 
     pmf = -kT * np.log(density)
     pmf = pmf - float(np.min(pmf))
 
-    # weights = np.sqrt(hist)
-    weights = np.ones_like(hist)
+    weights = np.ones_like(density)
 
     def _solve_weighted(A, y):
         Aw = A * weights[:, None]
