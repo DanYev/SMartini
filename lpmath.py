@@ -248,23 +248,17 @@ def fit_type9_dihedral(
     bins=360,
     min_prob=1e-6,
 ):
-    r"""Fit Gromacs type-9 dihedral terms from a distribution.
+    r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
 
-    We estimate a PMF from the histogram and fit Fourier terms of the form:
-
-        U(\phi) = \sum_n k_n \left(1 + \cos(n\phi - \phi_n)\right)
-
-    Since
-        k\cos(n\phi-\phi_n) = (k\cos\phi_n)\cos(n\phi) + (k\sin\phi_n)\sin(n\phi),
-    we can fit this robustly via (weighted) linear least squares in the basis
-    \{1, \cos(n\phi), \sin(n\phi)\}.
-
+    1. Fit a GMM to the dihedral distribution (1 to max_n components, BIC selection).
+    2. Determine optimal n from the spacing between modes: n = 180 / mean_spacing.
+    3. Fit Fourier terms: always include n=1 (to stabilize), plus harmonics up to optimal n.
+    4. Estimate PMF and fit via weighted least squares.
 
     Returns
     -------
     list[tuple[int, float, float]]
         List of (multiplicity n, k_n, phi_n_deg) terms.
-        The phase angle is in degrees (wrapped to [-180, 180]).
     """
     if max_n <= 0:
         return []
@@ -324,9 +318,11 @@ def fit_type9_dihedral(
         bic = -2.0 * prev_ll + p * np.log(n_samples)
         return weights, means, variances, bic
 
+    # Fit GMM with BIC selection
     best_gmm = None
     best_bic = None
-    for n_components in range(1, max_n + 1):
+    best_means = None
+    for n_components in range(1, int(max_n) + 1):
         fit = _fit_gmm_1d(values, n_components)
         if fit is None:
             continue
@@ -334,47 +330,68 @@ def fit_type9_dihedral(
         if best_bic is None or bic < best_bic:
             best_bic = bic
             best_gmm = (weights, means, variances)
+            best_means = means
 
     if best_gmm is None:
         raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
 
+    # Determine optimal n from mode spacing
+    if best_means is not None and len(best_means) > 1:
+        sorted_means = np.sort(best_means)
+        spacings = []
+        for i in range(len(sorted_means)):
+            for j in range(i + 1, len(sorted_means)):
+                spacing = abs(sorted_means[j] - sorted_means[i])
+                # Use smallest spacing (since angles wrap)
+                if spacing > 180:
+                    spacing = 360 - spacing
+                spacings.append(spacing)
+        if spacings:
+            mean_spacing = np.mean(spacings)
+            optimal_n = max(1, int(np.round(360.0 / mean_spacing)))
+            optimal_n = int(min(optimal_n, max_n))
+        else:
+            optimal_n = 1
+    else:
+        optimal_n = 1
+
+    # Fit PMF from GMM density
     gmm_density = _gmm_pdf_1d(phi_centers, *best_gmm)
     density = np.clip(gmm_density, min_prob, None)
-
     pmf = -kT * np.log(density)
     pmf = pmf - float(np.min(pmf))
 
-    weights = np.ones_like(density)
+    # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
+    harmonics_to_fit = [1]
+    if int(optimal_n) > 1:
+        harmonics_to_fit.append(int(optimal_n))
+    
+    cols = [np.ones_like(phi_rad)]
+    for n in harmonics_to_fit:
+        cols.append(np.cos(n * phi_rad))
+        cols.append(np.sin(n * phi_rad))
 
-    def _solve_weighted(A, y):
-        Aw = A * weights[:, None]
-        yw = y * weights
-        coeffs, _, _, _ = np.linalg.lstsq(Aw, yw, rcond=None)
-        return coeffs
+    A = np.column_stack(cols)
+    weights = np.ones_like(density)
+    Aw = A * weights[:, None]
+    yw = pmf * weights
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, yw, rcond=None)
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)
         if k < 1e-12:
             return 0.0, 0.0
         phi = np.rad2deg(np.arctan2(b, a))
-        # We fitted on shifted angles: phi' = phi - shift.
-        # For k*cos(n*phi - phi_n), shifting phi by `shift` shifts the phase by n*shift.
         phi += n * shift
         phi = (360 - phi) % 360
         phi = wrap_to_180(phi)
         return k, phi
 
+    # Extract and output the fitted terms
     terms = []
-    cols = [np.ones_like(phi_rad)]
-    for n in range(1, max_n + 1):
-        cols.append(np.cos(n * phi_rad))
-        cols.append(np.sin(n * phi_rad))
-    A = np.column_stack(cols)
-    coeffs = _solve_weighted(A, pmf)
-
-    for n in range(1, max_n + 1):
-        a = coeffs[1 + 2 * (n - 1)]
-        b = coeffs[1 + 2 * (n - 1) + 1]
+    for idx, n in enumerate(harmonics_to_fit):
+        a = coeffs[1 + 2 * idx]
+        b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
         terms.append((int(n), float(k), float(phi)))
 
