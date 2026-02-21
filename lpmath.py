@@ -216,7 +216,7 @@ def circular_mean_deg(angles):
 
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
-    return float((angles + 180) % 360 - 180)
+    return ((angles + 180) % 360) - 180
 
 
 def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
@@ -272,21 +272,75 @@ def fit_type9_dihedral(
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
-    values = dihedrals
+    values = np.asarray(dihedrals, dtype=float)
     shift = circular_mean_deg(values)
-    values -= shift
-    values = wrap_to_180(values)
-    min_val = np.min(values)
-    max_val = np.max(values)
+    values = ((values - shift + 180.0) % 360.0) - 180.0
 
-    hist, edges = np.histogram(values, bins=bins, range=(min_val, max_val), density=True)
-    # hist, edges = np.histogram(values, bins=bins, range=(-180, 180), density=True)
+    # hist, edges = np.histogram(values, bins=bins, range=(-180.0, 180.0), density=True)
+    hist, edges = np.histogram(values, bins=bins, range=(np.min(values), np.max(values)), density=True)
     hist = np.clip(hist, min_prob, None)
 
     phi_centers = 0.5 * (edges[:-1] + edges[1:])
     phi_rad = np.deg2rad(phi_centers)
 
-    pmf = -kT * np.log(hist)
+    def _gmm_pdf_1d(x, weights, means, variances):
+        x = x[:, None]
+        norm = np.sqrt(2.0 * np.pi * variances)[None, :]
+        exps = np.exp(-0.5 * (x - means) ** 2 / variances)
+        return np.sum(weights * exps / norm, axis=1)
+
+    def _fit_gmm_1d(data, n_components, max_iter=200, tol=1e-6, var_floor=1e-4):
+        n_samples = data.size
+        if n_samples < n_components:
+            return None
+
+        percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
+        means = np.percentile(data, percentiles)
+        variances = np.full(n_components, np.var(data) + var_floor)
+        weights = np.full(n_components, 1.0 / n_components)
+
+        prev_ll = None
+        for _ in range(max_iter):
+            pdf = _gmm_pdf_1d(data, weights, means, variances)
+            pdf = np.clip(pdf, 1e-12, None)
+            resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
+                    / np.sqrt(2.0 * np.pi * variances))
+            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
+
+            Nk = resp.sum(axis=0)
+            weights = Nk / n_samples
+            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = np.clip(variances, var_floor, None)
+
+            ll = np.sum(np.log(pdf))
+            if prev_ll is not None and abs(ll - prev_ll) < tol:
+                break
+            prev_ll = ll
+
+        p = 3 * n_components - 1
+        bic = -2.0 * prev_ll + p * np.log(n_samples)
+        return weights, means, variances, bic
+
+    best_gmm = None
+    best_bic = None
+    for n_components in range(1, max_n + 1):
+        fit = _fit_gmm_1d(values, n_components)
+        if fit is None:
+            continue
+        weights, means, variances, bic = fit
+        if best_bic is None or bic < best_bic:
+            best_bic = bic
+            best_gmm = (weights, means, variances)
+
+    if best_gmm is not None:
+        gmm_density = _gmm_pdf_1d(phi_centers, *best_gmm)
+        gmm_density = np.clip(gmm_density, min_prob, None)
+        density = gmm_density
+    else:
+        density = hist
+
+    pmf = -kT * np.log(density)
     pmf = pmf - float(np.min(pmf))
 
     # weights = np.sqrt(hist)
@@ -299,19 +353,18 @@ def fit_type9_dihedral(
         return coeffs
 
     def _k_phi_from_ab(a, b, n: int):
-        k = float(np.hypot(a, b))
+        k = np.hypot(a, b)
         if k < 1e-12:
             return 0.0, 0.0
-        phi = float(np.rad2deg(np.arctan2(b, a)))
+        phi = np.rad2deg(np.arctan2(b, a))
         # We fitted on shifted angles: phi' = phi - shift.
         # For k*cos(n*phi - phi_n), shifting phi by `shift` shifts the phase by n*shift.
-        phi += float(n) * float(shift)
+        phi += n * shift
         phi = (360 - phi) % 360
-        phi = float(wrap_to_180(phi))
+        phi = wrap_to_180(phi)
         return k, phi
 
-
-    # fit_mode == "sum": all harmonics in one linear solve
+    terms = []
     cols = [np.ones_like(phi_rad)]
     for n in range(1, max_n + 1):
         cols.append(np.cos(n * phi_rad))
@@ -319,10 +372,9 @@ def fit_type9_dihedral(
     A = np.column_stack(cols)
     coeffs = _solve_weighted(A, pmf)
 
-    terms = []
     for n in range(1, max_n + 1):
-        a = float(coeffs[1 + 2 * (n - 1)])
-        b = float(coeffs[1 + 2 * (n - 1) + 1])
+        a = coeffs[1 + 2 * (n - 1)]
+        b = coeffs[1 + 2 * (n - 1) + 1]
         k, phi = _k_phi_from_ab(a, b, n)
         terms.append((int(n), float(k), float(phi)))
 

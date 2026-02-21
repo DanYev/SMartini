@@ -171,11 +171,10 @@ def boltzmann_invert_topology(
 
         fit_terms = fit_type9_dihedral(
             data,
-            temperature=CFG.type9_temperature,
+            temperature=CFG.temperature,
             max_n=max_multiplicity,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
-            fit_mode=CFG.type9_fit_mode,
         )
         if not fit_terms:
             new_dihedrals.extend(existing_terms)
@@ -283,9 +282,9 @@ if __name__ == "__main__":
     logger.info("Calculating internal coordinates from trajectory")
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
 
+    inverted_topo = boltzmann_invert_topology(topo, internal_coords)
     plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
 
-    inverted_topo = boltzmann_invert_topology(topo, internal_coords, max_multiplicity=CFG.type9_max_n)
     updated_topo = filter_topology(
         inverted_topo,
         constraint_k_cutoff=CFG.constraint_k_cutoff,

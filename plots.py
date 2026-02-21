@@ -10,24 +10,86 @@ from lpmath import (
     boltzmann_inversion_bond,
     boltzmann_inversion_dihedral,
     circular_mean_deg,
-    wrap_to_180,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def plot_internal_coordinates(internal_coords, topo, output_file=None):
+def plot_internal_coordinates(internal_coords, topo, output_file=None, max_gaussians=3):
     """Plot histograms of internal coordinates (bonds, angles, dihedrals)."""
     bonds_data = {k: v for k, v in internal_coords.items() if k[-1] in ["bond", "constraint"]}
     angles_data = {k: v for k, v in internal_coords.items() if k[-1] == "angle"}
     dihedrals_data = {k: v for k, v in internal_coords.items() if k[-1] == "dihedral"}
 
     if bonds_data:
-        _plot_bonds(bonds_data, topo, output_file)
+        _plot_bonds(bonds_data, topo, output_file, max_gaussians)
     if angles_data:
-        _plot_angles(angles_data, topo, output_file)
+        _plot_angles(angles_data, topo, output_file, max_gaussians)
     if dihedrals_data:
-        _plot_dihedrals(dihedrals_data, topo, output_file)
+        _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians)
+
+
+def _wrap_to_180_array(values):
+    return ((values + 180.0) % 360.0) - 180.0
+
+
+def _gmm_pdf_1d(x, weights, means, variances):
+    x = x[:, None]
+    norm = np.sqrt(2.0 * np.pi * variances)[None, :]
+    exps = np.exp(-0.5 * (x - means) ** 2 / variances)
+    return np.sum(weights * exps / norm, axis=1)
+
+
+def _fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-6):
+    data = np.asarray(data, dtype=float)
+    if data.size < 2:
+        return None
+
+    max_components = int(max(1, min(max_components, data.size)))
+    best = None
+    best_bic = None
+
+    for n_components in range(1, max_components + 1):
+        percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
+        means = np.percentile(data, percentiles)
+        variances = np.full(n_components, np.var(data) + var_floor)
+        weights = np.full(n_components, 1.0 / n_components)
+
+        prev_ll = None
+        for _ in range(max_iter):
+            pdf = _gmm_pdf_1d(data, weights, means, variances)
+            pdf = np.clip(pdf, 1e-12, None)
+            resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
+                    / np.sqrt(2.0 * np.pi * variances))
+            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
+
+            Nk = resp.sum(axis=0)
+            weights = Nk / data.size
+            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = np.clip(variances, var_floor, None)
+
+            ll = np.sum(np.log(pdf))
+            if prev_ll is not None and abs(ll - prev_ll) < tol:
+                break
+            prev_ll = ll
+
+        p = 3 * n_components - 1
+        bic = -2.0 * ll + p * np.log(data.size)
+        if best_bic is None or bic < best_bic:
+            best_bic = bic
+            best = (weights, means, variances)
+
+    return best
+
+
+def _plot_gmm(ax, x_grid, gmm):
+    weights, means, variances = gmm
+    total = _gmm_pdf_1d(x_grid, weights, means, variances)
+    ax.plot(x_grid, total, color="C1", linewidth=1.6, label="GMM")
+    for idx, (w, mu, var) in enumerate(zip(weights, means, variances)):
+        comp = w * np.exp(-0.5 * (x_grid - mu) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
+        ax.plot(x_grid, comp, color="C1", alpha=0.5, linestyle="--", linewidth=1.0)
 
 
 def _dihedral_terms(topo):
@@ -43,7 +105,7 @@ def _dihedral_terms(topo):
     return terms
 
 
-def _plot_bonds(bonds_data, topo, output_file):
+def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
     logger.info("Plotting %s bonds/constraints", len(bonds_data))
 
     bond_ref = {(int(b[0]), int(b[1])): b[3] for b in topo.bonds}
@@ -63,7 +125,11 @@ def _plot_bonds(bonds_data, topo, output_file):
         ax = axes[idx]
         i, j, bond_type = key
 
-        ax.hist(distances, bins=30, alpha=0.7, edgecolor="black")
+        ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
+        gmm = _fit_gmm_1d_best(distances, max_components=max_gaussians)
+        if gmm is not None:
+            x_grid = np.linspace(np.min(distances), np.max(distances), 300)
+            _plot_gmm(ax, x_grid, gmm)
 
         if bond_type == "bond" and (i, j) in bond_ref:
             ref_length = bond_ref[(i, j)]
@@ -115,7 +181,7 @@ def _plot_bonds(bonds_data, topo, output_file):
     _save_or_show(output_file, "bonds")
 
 
-def _plot_angles(angles_data, topo, output_file):
+def _plot_angles(angles_data, topo, output_file, max_gaussians):
     logger.info("Plotting %s angles", len(angles_data))
 
     angle_ref = {(int(a[0]), int(a[1]), int(a[2])): a[4] for a in topo.angles}
@@ -140,7 +206,11 @@ def _plot_angles(angles_data, topo, output_file):
             vmin -= 1e-3
             vmax += 1e-3
 
-        ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black")
+        ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
+        gmm = _fit_gmm_1d_best(angles, max_components=max_gaussians)
+        if gmm is not None:
+            x_grid = np.linspace(vmin, vmax, 300)
+            _plot_gmm(ax, x_grid, gmm)
 
         if (i, j, k) in angle_ref:
             ref_angle = angle_ref[(i, j, k)]
@@ -189,7 +259,7 @@ def _plot_angles(angles_data, topo, output_file):
     _save_or_show(output_file, "angles")
 
 
-def _plot_dihedrals(dihedrals_data, topo, output_file):
+def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
     logger.info("Plotting %s dihedrals", len(dihedrals_data))
 
     dihedral_terms = _dihedral_terms(topo)
@@ -209,15 +279,24 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
         i, j, k, l, dihedral_type = key
 
         circ_mean = circular_mean_deg(dihedrals)
-        dihedrals_shifted = wrap_to_180(dihedrals - circ_mean)
+        dihedrals_shifted = _wrap_to_180_array(dihedrals - circ_mean)
+        vmin = float(np.min(dihedrals_shifted))
+        vmax = float(np.max(dihedrals_shifted))
+        if vmin == vmax:
+            vmin -= 1e-3
+            vmax += 1e-3
 
-        ax.hist(dihedrals_shifted, bins=30, range=(-180, 180), alpha=0.7, edgecolor="black")
+        ax.hist(dihedrals_shifted, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
+        gmm = _fit_gmm_1d_best(dihedrals_shifted, max_components=max_gaussians)
+        if gmm is not None:
+            x_grid = np.linspace(vmin, vmax, 400)
+            _plot_gmm(ax, x_grid, gmm)
 
         ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
-        ax.set_xlim(-180, 180)
+        ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         _, k_calc = boltzmann_inversion_dihedral(dihedrals)
@@ -230,7 +309,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
             ref_fc = terms[0].get("k")
 
         mean_dihedral = circular_mean_deg(dihedrals)
-        dihedrals_centered = wrap_to_180(dihedrals - mean_dihedral)
+        dihedrals_centered = _wrap_to_180_array(dihedrals - mean_dihedral)
         std_dihedral = np.std(dihedrals_centered)
         k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_dihedral:.1f} deg\nsigma={std_dihedral:.1f} deg\n"
