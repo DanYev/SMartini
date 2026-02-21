@@ -228,7 +228,7 @@ def gmm_pdf_1d(x, weights, means, variances):
 
 
 def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4, 
-                    min_weight=0.1, min_spacing_std=2.0):
+                    min_weight=0.1, min_spacing_std=6.0):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
     Parameters
@@ -276,16 +276,13 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
                 break
             prev_ll = ll
 
-        # AIC + penalties
-        p = 3 * n_components - 1
-        aic = 2 * p - 2 * ll
+        # Hard cutoff: reject if any component has weight < min_weight
+        if np.any(weights < min_weight):
+            continue
         
-        # Penalty for low-weight components
-        low_weight_penalty = np.sum(1000.0 * np.clip(min_weight - weights, 0, None))
-        
-        # Penalty for overlapping components
-        overlap_penalty = 0.0
+        # Hard cutoff: reject if any two components are too close
         if n_components > 1:
+            too_close = False
             for i in range(n_components):
                 for j in range(i + 1, n_components):
                     # Distance between means in units of std dev
@@ -294,9 +291,17 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
                     avg_std = 0.5 * (std_i + std_j)
                     spacing = abs(means[j] - means[i]) / avg_std
                     if spacing < min_spacing_std:
-                        overlap_penalty += 100.0 * (min_spacing_std - spacing)
+                        too_close = True
+                        break
+                if too_close:
+                    break
+            if too_close:
+                continue
         
-        aic_penalized = aic + low_weight_penalty + overlap_penalty
+        # AIC
+        p = 3 * n_components - 1
+        aic = 2 * p - 2 * ll
+        aic_penalized = aic
         
         if best_aic_penalized is None or aic_penalized < best_aic_penalized:
             best_aic_penalized = aic_penalized
@@ -367,7 +372,6 @@ def fit_type9_dihedral(
     # Fit GMM with BIC selection (using module-level function)
     best_gmm = fit_gmm_1d_best(values, max_components=int(max_n))
     best_means = best_gmm[1] if best_gmm is not None else None
-    print(best_gmm)
 
     if best_gmm is None:
         raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
