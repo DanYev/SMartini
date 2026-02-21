@@ -227,8 +227,16 @@ def gmm_pdf_1d(x, weights, means, variances):
     return np.sum(weights * exps / norm, axis=1)
 
 
-def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4):
-    """Fit 1D Gaussian mixture with BIC selection.
+def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4, 
+                    min_weight=0.1, min_spacing_std=2.0):
+    """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
+    
+    Parameters
+    ----------
+    min_weight : float
+        Penalty weight for components with weight < this threshold.
+    min_spacing_std : float
+        Penalty if two components' means are < this many std devs apart.
     
     Returns
     -------
@@ -241,7 +249,7 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
 
     max_components = int(max(1, min(max_components, data.size)))
     best = None
-    best_bic = None
+    best_aic_penalized = None
 
     for n_components in range(1, max_components + 1):
         percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
@@ -268,10 +276,30 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
                 break
             prev_ll = ll
 
+        # AIC + penalties
         p = 3 * n_components - 1
-        bic = -2.0 * ll + p * np.log(data.size)
-        if best_bic is None or bic < best_bic:
-            best_bic = bic
+        aic = 2 * p - 2 * ll
+        
+        # Penalty for low-weight components
+        low_weight_penalty = np.sum(1000.0 * np.clip(min_weight - weights, 0, None))
+        
+        # Penalty for overlapping components
+        overlap_penalty = 0.0
+        if n_components > 1:
+            for i in range(n_components):
+                for j in range(i + 1, n_components):
+                    # Distance between means in units of std dev
+                    std_i = np.sqrt(variances[i])
+                    std_j = np.sqrt(variances[j])
+                    avg_std = 0.5 * (std_i + std_j)
+                    spacing = abs(means[j] - means[i]) / avg_std
+                    if spacing < min_spacing_std:
+                        overlap_penalty += 100.0 * (min_spacing_std - spacing)
+        
+        aic_penalized = aic + low_weight_penalty + overlap_penalty
+        
+        if best_aic_penalized is None or aic_penalized < best_aic_penalized:
+            best_aic_penalized = aic_penalized
             best = (weights, means, variances)
 
     return best
@@ -332,9 +360,6 @@ def fit_type9_dihedral(
     data_max = float(np.max(values))
     data_min = float(-180)
     data_max = float(180)
-    if data_min == data_max:
-        data_min -= 1e-3
-        data_max += 1e-3
 
     phi_centers = np.linspace(data_min, data_max, int(bins))
     phi_rad = np.deg2rad(phi_centers)
@@ -342,6 +367,7 @@ def fit_type9_dihedral(
     # Fit GMM with BIC selection (using module-level function)
     best_gmm = fit_gmm_1d_best(values, max_components=int(max_n))
     best_means = best_gmm[1] if best_gmm is not None else None
+    print(best_gmm)
 
     if best_gmm is None:
         raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
@@ -384,7 +410,6 @@ def fit_type9_dihedral(
 
     A = np.column_stack(cols)
     coeffs, _, _, _ = np.linalg.lstsq(A, pmf, rcond=None)
-    print(coeffs)
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)
