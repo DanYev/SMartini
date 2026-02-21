@@ -11,7 +11,7 @@ from lpmath import (
     read_cg_trajectory,
     read_cog_trajectory,
     calculate_internal_coordinates,
-    circular_mean_deg,
+    circular_mean,
     wrap_to_180,
 )
 from plots import plot_internal_coordinates_overlay
@@ -24,7 +24,7 @@ InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
 def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
     if value_type == "dihedral":
-        mu = float(circular_mean_deg(values))
+        mu = float(circular_mean(values))
         centered = wrap_to_180(values - mu)
         sigma = float(np.std(centered))
         return mu, sigma
@@ -46,7 +46,7 @@ def _dihedral_mode_deg(values: np.ndarray, center_deg: float, bins: int = 72) ->
     residual = wrap_to_180(values - center_deg)
     hist, edges = np.histogram(residual, bins=bins, range=(-180, 180))
     if np.all(hist == 0):
-        return float(wrap_to_180(circular_mean_deg(values)))
+        return float(wrap_to_180(circular_mean(values)))
 
     idx = int(np.argmax(hist))
     bin_center = float(0.5 * (edges[idx] + edges[idx + 1]))
@@ -419,4 +419,4 @@ if __name__ == "__main__":
     tmp_itp = wdir / "mapping" / f"{molname}_updated_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
-    refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    # refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

@@ -9,7 +9,10 @@ from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
     boltzmann_inversion_dihedral,
-    circular_mean_deg,
+    circular_mean,
+    wrap_to_180,
+    fit_gmm_1d_best,
+    gmm_pdf_1d,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,63 +32,9 @@ def plot_internal_coordinates(internal_coords, topo, output_file=None, max_gauss
         _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians)
 
 
-def _wrap_to_180_array(values):
-    return ((values + 180.0) % 360.0) - 180.0
-
-
-def _gmm_pdf_1d(x, weights, means, variances):
-    x = x[:, None]
-    norm = np.sqrt(2.0 * np.pi * variances)[None, :]
-    exps = np.exp(-0.5 * (x - means) ** 2 / variances)
-    return np.sum(weights * exps / norm, axis=1)
-
-
-def _fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-6):
-    data = np.asarray(data, dtype=float)
-    if data.size < 2:
-        return None
-
-    max_components = int(max(1, min(max_components, data.size)))
-    best = None
-    best_bic = None
-
-    for n_components in range(1, max_components + 1):
-        percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
-        means = np.percentile(data, percentiles)
-        variances = np.full(n_components, np.var(data) + var_floor)
-        weights = np.full(n_components, 1.0 / n_components)
-
-        prev_ll = None
-        for _ in range(max_iter):
-            pdf = _gmm_pdf_1d(data, weights, means, variances)
-            pdf = np.clip(pdf, 1e-12, None)
-            resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
-                    / np.sqrt(2.0 * np.pi * variances))
-            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
-
-            Nk = resp.sum(axis=0)
-            weights = Nk / data.size
-            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
-            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
-            variances = np.clip(variances, var_floor, None)
-
-            ll = np.sum(np.log(pdf))
-            if prev_ll is not None and abs(ll - prev_ll) < tol:
-                break
-            prev_ll = ll
-
-        p = 3 * n_components - 1
-        bic = -2.0 * ll + p * np.log(data.size)
-        if best_bic is None or bic < best_bic:
-            best_bic = bic
-            best = (weights, means, variances)
-
-    return best
-
-
 def _plot_gmm(ax, x_grid, gmm):
     weights, means, variances = gmm
-    total = _gmm_pdf_1d(x_grid, weights, means, variances)
+    total = gmm_pdf_1d(x_grid, weights, means, variances)
     ax.plot(x_grid, total, color="C1", linewidth=1.6, )
     for idx, (w, mu, var) in enumerate(zip(weights, means, variances)):
         comp = w * np.exp(-0.5 * (x_grid - mu) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
@@ -126,7 +75,7 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
         i, j, bond_type = key
 
         ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
-        gmm = _fit_gmm_1d_best(distances, max_components=max_gaussians)
+        gmm = fit_gmm_1d_best(distances, max_components=max_gaussians)
         if gmm is not None:
             x_grid = np.linspace(np.min(distances), np.max(distances), 300)
             _plot_gmm(ax, x_grid, gmm)
@@ -207,7 +156,7 @@ def _plot_angles(angles_data, topo, output_file, max_gaussians):
             vmax += 1e-3
 
         ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
-        gmm = _fit_gmm_1d_best(angles, max_components=max_gaussians)
+        gmm = fit_gmm_1d_best(angles, max_components=max_gaussians)
         if gmm is not None:
             x_grid = np.linspace(vmin, vmax, 300)
             _plot_gmm(ax, x_grid, gmm)
@@ -278,8 +227,8 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
         ax = axes[idx]
         i, j, k, l, dihedral_type = key
 
-        circ_mean = circular_mean_deg(dihedrals)
-        dihedrals_shifted = _wrap_to_180_array(dihedrals - circ_mean)
+        circ_mean = circular_mean(dihedrals)
+        dihedrals_shifted = np.asarray([wrap_to_180(d - circ_mean) for d in dihedrals])
         vmin = float(np.min(dihedrals_shifted))
         vmax = float(np.max(dihedrals_shifted))
         if vmin == vmax:
@@ -287,7 +236,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
             vmax += 1e-3
 
         ax.hist(dihedrals_shifted, bins=50, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
-        gmm = _fit_gmm_1d_best(dihedrals_shifted, max_components=max_gaussians)
+        gmm = fit_gmm_1d_best(dihedrals_shifted, max_components=max_gaussians)
         if gmm is not None:
             x_grid = np.linspace(vmin, vmax, 400)
             _plot_gmm(ax, x_grid, gmm)
@@ -308,8 +257,8 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
         if len(terms) == 1:
             ref_fc = terms[0].get("k")
 
-        mean_dihedral = circular_mean_deg(dihedrals)
-        dihedrals_centered = _wrap_to_180_array(dihedrals - mean_dihedral)
+        mean_dihedral = circular_mean(dihedrals)
+        dihedrals_centered = np.asarray([wrap_to_180(d - mean_dihedral) for d in dihedrals])
         std_dihedral = np.std(dihedrals_centered)
         k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_dihedral:.1f} deg\nsigma={std_dihedral:.1f} deg\n"
@@ -512,19 +461,20 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         aa_vals = dihedrals_aa.get(key)
         cg_vals = dihedrals_cg.get(key)
 
-        circ_mean = _reference_circ_mean(aa_vals, cg_vals)
-        aa_shifted = _shift_dihedrals(aa_vals, circ_mean)
-        cg_shifted = _shift_dihedrals(cg_vals, circ_mean)
+        aa_shift = circular_mean(aa_vals)
+        aa_shifted = wrap_to_180(aa_vals - aa_shift)
+        cg_shift = circular_mean(cg_vals)
+        cg_shifted = wrap_to_180(cg_vals - cg_shift)
 
         _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=30)
 
-        ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
+        ax.set_xlabel(f"Dihedral - {aa_shift:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral", dihedral_center=circ_mean)
+        _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral", dihedral_center=aa_shift)
         ax.legend(fontsize=8)
 
     for idx in range(n_plots, len(axes)):
@@ -626,7 +576,7 @@ def _add_stats_box(ax, aa_vals, cg_vals, value_type, dihedral_center=None):
 def _compute_stats(values, value_type, dihedral_center=None):
     mu_shifted = None
     if value_type == "dihedral":
-        mean_val = circular_mean_deg(values)
+        mean_val = circular_mean(values)
         centered = wrap_to_180(values - mean_val)
         std_val = float(np.std(centered))
         if dihedral_center is not None:
@@ -635,20 +585,6 @@ def _compute_stats(values, value_type, dihedral_center=None):
         mean_val = float(np.mean(values))
         std_val = float(np.std(values))
     return float(mean_val), std_val, mu_shifted
-
-
-def _reference_circ_mean(aa_vals, cg_vals):
-    if aa_vals is not None and len(aa_vals) > 0:
-        return circular_mean_deg(aa_vals)
-    if cg_vals is not None and len(cg_vals) > 0:
-        return circular_mean_deg(cg_vals)
-    return 0.0
-
-
-def _shift_dihedrals(values, center):
-    if values is None:
-        return None
-    return wrap_to_180(values - center)
 
 
 def _save_or_show(output_file, suffix):

@@ -205,7 +205,7 @@ def boltzmann_inversion_angle(angles, temperature=300.0):
     return theta0, k
 
 
-def circular_mean_deg(angles):
+def circular_mean(angles):
     """Calculate circular mean of angles in degrees."""
     angles_rad = np.deg2rad(angles)
     sin_mean = np.mean(np.sin(angles_rad))
@@ -217,6 +217,64 @@ def circular_mean_deg(angles):
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
     return ((angles + 180) % 360) - 180
+
+
+def gmm_pdf_1d(x, weights, means, variances):
+    """Compute 1D Gaussian mixture PDF."""
+    x = x[:, None]
+    norm = np.sqrt(2.0 * np.pi * variances)[None, :]
+    exps = np.exp(-0.5 * (x - means) ** 2 / variances)
+    return np.sum(weights * exps / norm, axis=1)
+
+
+def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4):
+    """Fit 1D Gaussian mixture with BIC selection.
+    
+    Returns
+    -------
+    tuple or None
+        (weights, means, variances) if successful, None otherwise.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.size < 2:
+        return None
+
+    max_components = int(max(1, min(max_components, data.size)))
+    best = None
+    best_bic = None
+
+    for n_components in range(1, max_components + 1):
+        percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
+        means = np.percentile(data, percentiles)
+        variances = np.full(n_components, np.var(data) + var_floor)
+        weights = np.full(n_components, 1.0 / n_components)
+
+        prev_ll = None
+        for _ in range(max_iter):
+            pdf = gmm_pdf_1d(data, weights, means, variances)
+            pdf = np.clip(pdf, 1e-12, None)
+            resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
+                    / np.sqrt(2.0 * np.pi * variances))
+            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
+
+            Nk = resp.sum(axis=0)
+            weights = Nk / data.size
+            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            variances = np.clip(variances, var_floor, None)
+
+            ll = np.sum(np.log(pdf))
+            if prev_ll is not None and abs(ll - prev_ll) < tol:
+                break
+            prev_ll = ll
+
+        p = 3 * n_components - 1
+        bic = -2.0 * ll + p * np.log(data.size)
+        if best_bic is None or bic < best_bic:
+            best_bic = bic
+            best = (weights, means, variances)
+
+    return best
 
 
 def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
@@ -231,7 +289,7 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
     kT = kB * temperature
 
     dihedrals = np.asarray(dihedrals, dtype=float)
-    phi0 = wrap_to_180(circular_mean_deg(dihedrals))
+    phi0 = wrap_to_180(circular_mean(dihedrals))
 
     residual_deg = wrap_to_180(dihedrals - phi0)
     residual_rad = np.deg2rad(residual_deg)
@@ -267,7 +325,7 @@ def fit_type9_dihedral(
     kT = kB * temperature
 
     values = np.asarray(dihedrals, dtype=float)
-    shift = circular_mean_deg(values)
+    shift = circular_mean(values)
     values = ((values - shift + 180.0) % 360.0) - 180.0
 
     data_min = float(np.min(values))
@@ -279,58 +337,9 @@ def fit_type9_dihedral(
     phi_centers = np.linspace(data_min, data_max, int(bins))
     phi_rad = np.deg2rad(phi_centers)
 
-    def _gmm_pdf_1d(x, weights, means, variances):
-        x = x[:, None]
-        norm = np.sqrt(2.0 * np.pi * variances)[None, :]
-        exps = np.exp(-0.5 * (x - means) ** 2 / variances)
-        return np.sum(weights * exps / norm, axis=1)
-
-    def _fit_gmm_1d(data, n_components, max_iter=200, tol=1e-6, var_floor=1e-4):
-        n_samples = data.size
-        if n_samples < n_components:
-            return None
-
-        percentiles = np.linspace(0.0, 100.0, n_components + 2)[1:-1]
-        means = np.percentile(data, percentiles)
-        variances = np.full(n_components, np.var(data) + var_floor)
-        weights = np.full(n_components, 1.0 / n_components)
-
-        prev_ll = None
-        for _ in range(max_iter):
-            pdf = _gmm_pdf_1d(data, weights, means, variances)
-            pdf = np.clip(pdf, 1e-12, None)
-            resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
-                    / np.sqrt(2.0 * np.pi * variances))
-            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
-
-            Nk = resp.sum(axis=0)
-            weights = Nk / n_samples
-            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
-            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
-            variances = np.clip(variances, var_floor, None)
-
-            ll = np.sum(np.log(pdf))
-            if prev_ll is not None and abs(ll - prev_ll) < tol:
-                break
-            prev_ll = ll
-
-        p = 3 * n_components - 1
-        bic = -2.0 * prev_ll + p * np.log(n_samples)
-        return weights, means, variances, bic
-
-    # Fit GMM with BIC selection
-    best_gmm = None
-    best_bic = None
-    best_means = None
-    for n_components in range(1, int(max_n) + 1):
-        fit = _fit_gmm_1d(values, n_components)
-        if fit is None:
-            continue
-        weights, means, variances, bic = fit
-        if best_bic is None or bic < best_bic:
-            best_bic = bic
-            best_gmm = (weights, means, variances)
-            best_means = means
+    # Fit GMM with BIC selection (using module-level function)
+    best_gmm = fit_gmm_1d_best(values, max_components=int(max_n))
+    best_means = best_gmm[1] if best_gmm is not None else None
 
     if best_gmm is None:
         raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
@@ -356,13 +365,14 @@ def fit_type9_dihedral(
         optimal_n = 1
 
     # Fit PMF from GMM density
-    gmm_density = _gmm_pdf_1d(phi_centers, *best_gmm)
+    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
     density = np.clip(gmm_density, min_prob, None)
     pmf = -kT * np.log(density)
     pmf = pmf - float(np.min(pmf))
 
     # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
     harmonics_to_fit = [1]
+    optimal_n = 1
     if int(optimal_n) > 1:
         harmonics_to_fit.append(int(optimal_n))
     
@@ -382,8 +392,7 @@ def fit_type9_dihedral(
         if k < 1e-12:
             return 0.0, 0.0
         phi = np.rad2deg(np.arctan2(b, a))
-        phi += n * shift
-        phi = (360 - phi) % 360
+        phi += n * shift + 180.0
         phi = wrap_to_180(phi)
         return k, phi
 
