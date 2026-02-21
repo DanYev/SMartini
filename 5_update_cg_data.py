@@ -419,4 +419,4 @@ if __name__ == "__main__":
     tmp_itp = wdir / "mapping" / f"{molname}_updated_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
-    # refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

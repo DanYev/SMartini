@@ -196,7 +196,7 @@ class Topology:
                     for at_j in mapping[j]:
                         if at_j in ha_neighbors[at_i]:
                             dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                            self.constraints.append([i, j, 1, dist])
+                            self.constraints.append([i, j, 1, dist, ""])
                             found_connection = True
                             break
                     if found_connection:
@@ -230,7 +230,7 @@ class Topology:
                             min_dist = dist
                             min_pair = pair
                 if n_bonds == 4: 
-                    self.constraints.append([min_pair[0], min_pair[1], 1, min_dist])
+                    self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
 
             # added_to_constraints = False
             # for ring in ringatoms:
@@ -355,14 +355,27 @@ class Topology:
                     ij_bonded = False
                     jk_bonded = False
                     ik_bonded = False
+                    ij_ring_diagonal = False
+                    jk_ring_diagonal = False
+                    ik_ring_diagonal = False
                     for b in bondlist + constlist:
                         connectivity = [b[0], b[1]]
+                        is_ring_diag = len(b) >= 5 and b[4] == "ring_diagonal"
                         if i in connectivity and j in connectivity:
                             ij_bonded = True
+                            if is_ring_diag:
+                                ij_ring_diagonal = True
                         if j in connectivity and k in connectivity:
                             jk_bonded = True
+                            if is_ring_diag:
+                                jk_ring_diagonal = True
                         if i in connectivity and k in connectivity:
                             ik_bonded = True
+                            if is_ring_diag:
+                                ik_ring_diagonal = True
+                    # Skip angles involving ring_diagonal constraints
+                    if ij_ring_diagonal or jk_ring_diagonal or ik_ring_diagonal:
+                        continue
                     # If all three are bonded, skip. If only ij and jk are bonded, keep.
                     if ij_bonded and jk_bonded and ik_bonded:
                         continue
@@ -428,7 +441,7 @@ class Topology:
                             if db_force is not None:
                                 force_const = db_force
                     
-                    self.angles.append([i, j, k, funct, angle, force_const])
+                    self.angles.append([i, j, k, funct, angle, force_const, ""])
     
     def build_dihedrals(self, cgbeads, ringatoms, cgbead_coords):
         """Build dihedrals data structure and return num_ar."""
@@ -569,7 +582,7 @@ class Topology:
                                         forc_const = forc_const / 2
                             angle = (180 + angle) % 360
                             multiplicity = 1  # Default multiplicity
-                            dihed_list.append([i, j, k, l, 9, angle, forc_const, multiplicity])
+                            dihed_list.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
                             
                             # if angle_ijk < 145.0 and angle_jkl < 145.0:
                             #     dihed_list.append([i, j, k, l, 2, angle, forc_const])
@@ -732,16 +745,18 @@ class Topology:
         """Format bonds and constraints into ITP text."""
         text = "\n[bonds]\n" + ";  i  j     funct   length   force.c.\n"
         for b in self.bonds:
-            # Bond data is [i, j, funct, dist, k]
-            text = text + "  {:2} {:2}       {:2}      {:<5.3f}       {:4.1f}\n".format(
-                b[0] + 1, b[1] + 1, b[2], b[3], b[4],
+            # Bond data is [i, j, funct, dist, k, comment]
+            comment = f" ; {b[5]}" if len(b) >= 6 and b[5] else ""
+            text = text + "  {:2} {:2}       {:2}      {:<5.3f}       {:4.1f}{}\n".format(
+                b[0] + 1, b[1] + 1, b[2], b[3], b[4], comment,
             )
 
         text = text + "\n\n[constraints]\n" + ";  i   j     funct   length\n"
         for c in self.constraints:
-                # Constraint data is [i, j, funct, dist]
-                text = text + "  {:2} {:2}       {:2}      {:<5.3f}\n".format(
-                    c[0] + 1, c[1] + 1, c[2], c[3]
+                # Constraint data is [i, j, funct, dist, comment]
+                comment = f" ; {c[4]}" if len(c) >= 5 and c[4] else ""
+                text = text + "  {:2} {:2}       {:2}      {:<5.3f}{}\n".format(
+                    c[0] + 1, c[1] + 1, c[2], c[3], comment
                 )
         
         return text
@@ -753,9 +768,10 @@ class Topology:
             text = text + "\n[angles]\n"
             text = text + ";  i  j  k    funct  angle  force.c.\n"
             for a in self.angles:
-                # Angle data is [i, j, k, funct, angle, force_const]
-                text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}\n".format(
-                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], a[5]
+                # Angle data is [i, j, k, funct, angle, force_const, comment]
+                comment = f" ; {a[6]}" if len(a) >= 7 and a[6] else ""
+                text = text + "  {:2} {:2} {:2}       {:2}    {:<5.1f}  {:5.1f}{}\n".format(
+                    a[0] + 1, a[1] + 1, a[2] + 1, a[3], a[4], a[5], comment
                 )
         return text
     
@@ -766,11 +782,12 @@ class Topology:
             text = text + "\n[dihedrals]\n"
             text = text + ";  i  j  k  l  funct  angle  force.c.  multiplicity\n"
             for d in self.dihedrals:
-                # Dihedral data is [i, j, k, l, funct, angle, force_const, multiplicity]
+                # Dihedral data is [i, j, k, l, funct, angle, force_const, multiplicity, comment]
+                comment = f" ; {d[8]}" if len(d) >= 9 and d[8] else ""
                 text = (
                     text
-                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6], d[7],
+                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}{}\n".format(
+                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6], d[7], comment,
                     )
                 )
         return text
@@ -1040,28 +1057,36 @@ def read_itp(itp_file):
                     topo.atoms_in_smi_dict[atom_id] = ', '.join(atom_labels)
         
         elif current_section == 'bonds':
-            parts = stripped.split()
+            # Parse data and comment separately
+            pre_comment, _, comment_text = line.partition(';')
+            parts = pre_comment.split()
             if len(parts) >= 4 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
                 j = int(parts[1]) - 1
                 funct = int(parts[2])
                 length = float(parts[3])
                 force_const = float(parts[4]) if len(parts) >= 5 else 10000
-                # Store as [i, j, funct, length, force_const]
-                topo.bonds.append([i, j, funct, length, force_const])
+                comment = comment_text.strip() if comment_text else ""
+                # Store as [i, j, funct, length, force_const, comment]
+                topo.bonds.append([i, j, funct, length, force_const, comment])
         
         elif current_section == 'constraints':
-            parts = stripped.split()
+            # Parse data and comment separately
+            pre_comment, _, comment_text = line.partition(';')
+            parts = pre_comment.split()
             if len(parts) >= 4 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
                 j = int(parts[1]) - 1
                 funct = int(parts[2])
                 length = float(parts[3])
-                # Store as [i, j, funct, length]
-                topo.constraints.append([i, j, funct, length])
+                comment = comment_text.strip() if comment_text else ""
+                # Store as [i, j, funct, length, comment]
+                topo.constraints.append([i, j, funct, length, comment])
         
         elif current_section == 'angles':
-            parts = stripped.split()
+            # Parse data and comment separately
+            pre_comment, _, comment_text = line.partition(';')
+            parts = pre_comment.split()
             if len(parts) >= 5 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
                 j = int(parts[1]) - 1
@@ -1069,11 +1094,14 @@ def read_itp(itp_file):
                 funct = int(parts[3])
                 angle = float(parts[4])
                 force_const = float(parts[5]) if len(parts) >= 6 else 0.0
-                # Store as [i, j, k, funct, angle, force_const]
-                topo.angles.append([i, j, k, funct, angle, force_const])
+                comment = comment_text.strip() if comment_text else ""
+                # Store as [i, j, k, funct, angle, force_const, comment]
+                topo.angles.append([i, j, k, funct, angle, force_const, comment])
         
         elif current_section == 'dihedrals':
-            parts = stripped.split()
+            # Parse data and comment separately
+            pre_comment, _, comment_text = line.partition(';')
+            parts = pre_comment.split()
             # proper dihedral
             if len(parts) >= 7 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
@@ -1084,8 +1112,9 @@ def read_itp(itp_file):
                 angle = float(parts[5])
                 force_const = float(parts[6]) if len(parts) >= 7 else 0.0
                 multiplicity = int(parts[7]) if len(parts) >= 8 else 1
-                # Store as [i, j, k, l, funct, angle, force_const, multiplicity]
-                topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity])
+                comment = comment_text.strip() if comment_text else ""
+                # Store as [i, j, k, l, funct, angle, force_const, multiplicity, comment]
+                topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity, comment])
         
         elif current_section == 'virtual_sitesn':
             parts = stripped.split()

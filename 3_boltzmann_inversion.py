@@ -152,7 +152,7 @@ def boltzmann_invert_topology(
             continue
         samples = internal_coords[(i, j, k, "angle")]
         theta0_calc, k_calc = boltzmann_inversion_angle(samples)
-        updated_topo.angles[idx] = [i, j, k, angle[3], float(theta0_calc), float(k_calc)]
+        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc)]
 
     # Dihedrals (type-9 terms)
     dihedrals_by_key = {}
