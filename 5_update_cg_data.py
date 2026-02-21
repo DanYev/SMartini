@@ -309,8 +309,8 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         
         # Force constant scale
         scale = float((sigma_cg / sigma_aa) ** 2)
-        scale = float(min(scale, 2.0))
-        scale = float(max(scale, 0.5)) 
+        scale = float(min(scale, 3.0))
+        scale = float(max(scale, 0.33)) 
 
         # Find maximum multiplicity among all terms for this dihedral
         max_mult = max((int(term[7]) for term in terms if len(term) >= 8), default=1)
@@ -324,7 +324,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             comment = term[8] if len(term) >= 9 else ""
 
             # Shift phase for all terms by mult * delta (accounting for n-fold symmetry)
-            phi0_new = wrap_to_180(phi0_old + mult * delta)
+            phi0_new = wrap_to_180(phi0_old - mult * delta)
             
             # Rescale force constant only for the highest multiplicity term
             if mult == max_mult:

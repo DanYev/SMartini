@@ -336,7 +336,7 @@ def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=6,
-    bins=360,
+    bins=180,
     min_prob=1e-6,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
@@ -365,8 +365,9 @@ def fit_type9_dihedral(
     # data_max = float(np.max(values))
     data_min = float(-180)
     data_max = float(180)
+    lim  = max(abs(data_min), abs(data_max))
 
-    phi_centers = np.linspace(data_min, data_max, int(bins))
+    phi_centers = np.linspace(-lim, lim, int(bins))
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
@@ -422,7 +423,7 @@ def fit_type9_dihedral(
         phi = np.rad2deg(np.arctan2(b, a))
         phi += n * shift
         phi = wrap_to_180(phi)
-        test_val = (360 + shift - phi) % 360 - 180
+        test_val = (360 + n * shift - phi) % 360 - 180
         print(test_val)
         return k, -phi
 
