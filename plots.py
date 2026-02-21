@@ -259,26 +259,6 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
 
         mean_dihedral = circular_mean(dihedrals)
         dihedrals_centered = np.asarray([wrap_to_180(d - mean_dihedral) for d in dihedrals])
-        std_dihedral = np.std(dihedrals_centered)
-        k_rounded = round(k_calc / 10) * 10
-        stats_text = f"mu={mean_dihedral:.1f} deg\nsigma={std_dihedral:.1f} deg\n"
-        stats_text += f"k={int(k_rounded)}"
-        if ref_fc is not None:
-            ref_k_rounded = round(ref_fc / 10) * 10
-            stats_text += f"\nITP k={int(ref_k_rounded)}"
-        elif len(terms) > 1:
-            stats_text += f"\nITP terms={len(terms)}"
-
-        ax.text(
-            0.98,
-            0.98,
-            stats_text,
-            transform=ax.transAxes,
-            fontsize=8,
-            verticalalignment="top",
-            horizontalalignment="right",
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-        )
 
     for idx in range(n_plots, len(axes)):
         axes[idx].axis("off")
@@ -462,9 +442,9 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         cg_vals = dihedrals_cg.get(key)
 
         aa_shift = circular_mean(aa_vals)
-        aa_shifted = wrap_to_180(aa_vals - aa_shift - 180)
+        aa_shifted = wrap_to_180(aa_vals - aa_shift)
         cg_shift = circular_mean(cg_vals)
-        cg_shifted = wrap_to_180(cg_vals - cg_shift - 180)
+        cg_shifted = wrap_to_180(cg_vals - cg_shift)
 
         _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=30)
 

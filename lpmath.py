@@ -216,7 +216,7 @@ def circular_mean(angles):
 
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
-    return (angles + 360) % 360
+    return (angles + 180) % 360 - 180
 
 
 def gmm_pdf_1d(x, weights, means, variances):
@@ -326,7 +326,9 @@ def fit_type9_dihedral(
 
     values = np.asarray(dihedrals, dtype=float)
     shift = circular_mean(values)
-    values = wrap_to_180(values - shift) - 180.0
+    values = wrap_to_180(values - shift) 
+    # values = values - shift
+    print(np.mean(values))
 
     data_min = float(np.min(values))
     data_max = float(np.max(values))
@@ -358,7 +360,6 @@ def fit_type9_dihedral(
         if spacings:
             mean_spacing = np.mean(spacings)
             optimal_n = max(1, int(np.round(360.0 / mean_spacing)))
-            optimal_n = int(min(optimal_n, max_n))
         else:
             optimal_n = 1
     else:
@@ -371,10 +372,10 @@ def fit_type9_dihedral(
     pmf = pmf - float(np.min(pmf))
 
     # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
+    optimal_n = int(min(optimal_n, max_n))
     harmonics_to_fit = [1]
-    optimal_n = 1
     if int(optimal_n) > 1:
-        harmonics_to_fit.append(int(optimal_n))
+        harmonics_to_fit.append(optimal_n)
     
     cols = [np.ones_like(phi_rad)]
     for n in harmonics_to_fit:
@@ -382,17 +383,14 @@ def fit_type9_dihedral(
         cols.append(np.sin(n * phi_rad))
 
     A = np.column_stack(cols)
-    weights = np.ones_like(density)
-    Aw = A * weights[:, None]
-    yw = pmf * weights
-    coeffs, _, _, _ = np.linalg.lstsq(Aw, yw, rcond=None)
+    coeffs, _, _, _ = np.linalg.lstsq(A, pmf, rcond=None)
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)
         if k < 1e-12:
             return 0.0, 0.0
         phi = np.rad2deg(np.arctan2(b, a))
-        phi += n * shift + 180.0
+        phi += n * shift # - 180.0
         phi = wrap_to_180(phi)
         return k, phi
 
