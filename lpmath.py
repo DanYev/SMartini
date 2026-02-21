@@ -424,7 +424,7 @@ def fit_type9_dihedral(
         phi = wrap_to_180(phi)
         test_val = (360 + shift - phi) % 360 - 180
         print(test_val)
-        return k, phi
+        return k, -phi
 
     # Extract and output the fitted terms
     terms = []

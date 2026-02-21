@@ -310,7 +310,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         # Force constant scale
         scale = float((sigma_cg / sigma_aa) ** 2)
         scale = float(min(scale, 2.0))
-        scale = float(max(scale, 1.0)) 
+        scale = float(max(scale, 0.5)) 
 
         # Find maximum multiplicity among all terms for this dihedral
         max_mult = max((int(term[7]) for term in terms if len(term) >= 8), default=1)
@@ -369,8 +369,8 @@ def refine_topology_from_cg_vs_aa(
     # Update bonds and constraints
     n_bonds_updated, n_constraints_updated = update_bonds(updated, aa_internal, cg_internal)
     
-    # # Update angles
-    # n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
+    # Update angles
+    n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
     # Update dihedrals
     n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
