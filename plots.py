@@ -213,22 +213,6 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
 
         ax.hist(dihedrals_shifted, bins=30, range=(-180, 180), alpha=0.7, edgecolor="black")
 
-        terms = dihedral_terms.get((i, j, k, l), [])
-        for term in terms:
-            if term["phi0"] is None:
-                continue
-            ref_dihedral = term["phi0"]
-            ref_dihedral_shifted = wrap_to_180(ref_dihedral - circ_mean)
-            mult = term["mult"]
-            mult_label = f" (n={mult})" if mult is not None else ""
-            ax.axvline(
-                ref_dihedral_shifted,
-                color="red",
-                linestyle="--",
-                linewidth=1.5,
-                label=f"ITP: {ref_dihedral:.1f} deg{mult_label}",
-            )
-
         ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
@@ -240,6 +224,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file):
 
         ax.legend(fontsize=8)
 
+        terms = dihedral_terms.get((i, j, k, l), [])
         ref_fc = None
         if len(terms) == 1:
             ref_fc = terms[0].get("k")
@@ -453,22 +438,6 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         cg_shifted = _shift_dihedrals(cg_vals, circ_mean)
 
         _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=30)
-
-        terms = dihedral_terms.get((i, j, k, l), [])
-        for term in terms:
-            if term["phi0"] is None:
-                continue
-            ref_dihedral = term["phi0"]
-            ref_shifted = wrap_to_180(ref_dihedral - circ_mean)
-            mult = term["mult"]
-            mult_label = f" (n={mult})" if mult is not None else ""
-            ax.axvline(
-                ref_shifted,
-                color="red",
-                linestyle="--",
-                linewidth=1.5,
-                label=f"ITP: {ref_dihedral:.1f} deg{mult_label}",
-            )
 
         ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)

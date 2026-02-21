@@ -24,8 +24,10 @@ class LigParConfig:
     # Sampling defaults
     cg_traj_stop: int = 2000
 
+    # Fitting defaults
+    temperature: float = 300.0
+
     # Type-9 dihedral (Gromacs) fitting parameters
-    type9_temperature: float = 300.0
     type9_fit_mode: str = "best1"  # "best1" or "sum"
     type9_max_n: int = 6
     type9_bins: int = 360

@@ -216,7 +216,7 @@ def circular_mean_deg(angles):
 
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
-    return (angles + 180) % 360 - 180 
+    return float((angles + 180) % 360 - 180)
 
 
 def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
@@ -231,7 +231,7 @@ def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
     kT = kB * temperature
 
     dihedrals = np.asarray(dihedrals, dtype=float)
-    phi0 = float(wrap_to_180(circular_mean_deg(dihedrals)))
+    phi0 = wrap_to_180(circular_mean_deg(dihedrals))
 
     residual_deg = wrap_to_180(dihedrals - phi0)
     residual_rad = np.deg2rad(residual_deg)
@@ -247,7 +247,6 @@ def fit_type9_dihedral(
     max_n=3,
     bins=360,
     min_prob=1e-6,
-    fit_mode="sum",
 ):
     r"""Fit Gromacs type-9 dihedral terms from a distribution.
 
@@ -260,11 +259,6 @@ def fit_type9_dihedral(
     we can fit this robustly via (weighted) linear least squares in the basis
     \{1, \cos(n\phi), \sin(n\phi)\}.
 
-    Parameters
-    ----------
-    fit_mode : {"sum", "best1"}
-        - "sum": pick best single harmonic, then refit with it plus one additional harmonic.
-        - "best1": fit each harmonic individually and return the single best n.
 
     Returns
     -------
@@ -272,6 +266,9 @@ def fit_type9_dihedral(
         List of (multiplicity n, k_n, phi_n_deg) terms.
         The phase angle is in degrees (wrapped to [-180, 180]).
     """
+    if max_n <= 0:
+        return []
+
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
 
@@ -291,9 +288,6 @@ def fit_type9_dihedral(
 
     pmf = -kT * np.log(hist)
     pmf = pmf - float(np.min(pmf))
-
-    if max_n <= 0:
-        return []
 
     # weights = np.sqrt(hist)
     weights = np.ones_like(hist)
@@ -316,61 +310,20 @@ def fit_type9_dihedral(
         phi = float(wrap_to_180(phi))
         return k, phi
 
-    fit_mode = str(fit_mode).lower().strip()
-    if fit_mode not in {"sum", "best1"}:
-        raise ValueError(f"fit_mode must be 'sum' or 'best1' (got {fit_mode!r})")
 
-    def _fit_terms_for_ns(ns):
-        cols = [np.ones_like(phi_rad)]
-        for n in ns:
-            cols.append(np.cos(n * phi_rad))
-            cols.append(np.sin(n * phi_rad))
-        A = np.column_stack(cols)
-        coeffs = _solve_weighted(A, pmf)
-        pred = A @ coeffs
-        resid = pmf - pred
-        sse = float(np.sum((resid * weights) ** 2))
-        terms = []
-        for idx, n in enumerate(ns):
-            a = float(coeffs[1 + 2 * idx])
-            b = float(coeffs[1 + 2 * idx + 1])
-            k, phi = _k_phi_from_ab(a, b, n)
-            terms.append((int(n), float(k), float(phi)))
-        return sse, terms
-
-    if fit_mode == "best1":
-        best_sse = None
-        best_terms = []
-        for n in range(1, max_n + 1):
-            sse, terms = _fit_terms_for_ns([n])
-            if best_sse is None or sse < best_sse:
-                best_sse = sse
-                best_terms = terms
-
-        return best_terms
-
-    # fit_mode == "sum": iterative best1 + one additional term
-    best_sse = None
-    best_terms = []
-    best_n = None
+    # fit_mode == "sum": all harmonics in one linear solve
+    cols = [np.ones_like(phi_rad)]
     for n in range(1, max_n + 1):
-        sse, terms = _fit_terms_for_ns([n])
-        if best_sse is None or sse < best_sse:
-            best_sse = sse
-            best_terms = terms
-            best_n = n
+        cols.append(np.cos(n * phi_rad))
+        cols.append(np.sin(n * phi_rad))
+    A = np.column_stack(cols)
+    coeffs = _solve_weighted(A, pmf)
 
-    if best_n is None or max_n <= 1:
-        return best_terms
-
-    best_pair_sse = None
-    best_pair_terms = None
+    terms = []
     for n in range(1, max_n + 1):
-        if n == best_n:
-            continue
-        sse, terms = _fit_terms_for_ns([best_n, n])
-        if best_pair_sse is None or sse < best_pair_sse:
-            best_pair_sse = sse
-            best_pair_terms = terms
+        a = float(coeffs[1 + 2 * (n - 1)])
+        b = float(coeffs[1 + 2 * (n - 1) + 1])
+        k, phi = _k_phi_from_ab(a, b, n)
+        terms.append((int(n), float(k), float(phi)))
 
-    return best_pair_terms if best_pair_terms is not None else best_terms
+    return terms
