@@ -363,8 +363,8 @@ def fit_type9_dihedral(
 
     data_min = float(np.min(values))
     data_max = float(np.max(values))
-    data_min = float(-180)
-    data_max = float(180)
+    # data_min = float(-180)
+    # data_max = float(180)
 
     phi_centers = np.linspace(data_min, data_max, int(bins))
     phi_rad = np.deg2rad(phi_centers)
@@ -420,8 +420,10 @@ def fit_type9_dihedral(
         if k < 1e-12:
             return 0.0, 0.0
         phi = np.rad2deg(np.arctan2(b, a))
-        phi += n * shift # - 180.0
+        phi += n * shift
         phi = wrap_to_180(phi)
+        test_val = (360 + shift - phi) % 360 - 180
+        print(test_val)
         return k, phi
 
     # Extract and output the fitted terms
