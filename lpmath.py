@@ -216,7 +216,7 @@ def circular_mean(angles):
 
 def wrap_to_180(angles):
     """Wrap angles to [-180, 180] range."""
-    return ((angles + 180) % 360) - 180
+    return (angles + 360) % 360
 
 
 def gmm_pdf_1d(x, weights, means, variances):
@@ -326,7 +326,7 @@ def fit_type9_dihedral(
 
     values = np.asarray(dihedrals, dtype=float)
     shift = circular_mean(values)
-    values = ((values - shift + 180.0) % 360.0) - 180.0
+    values = wrap_to_180(values - shift) - 180.0
 
     data_min = float(np.min(values))
     data_max = float(np.max(values))
