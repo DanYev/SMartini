@@ -134,16 +134,36 @@ def boltzmann_invert_topology(
             continue
         distances = internal_coords[(i, j, "bond")]
         r0_calc, k_calc = boltzmann_inversion_bond(distances)
-        updated_topo.bonds[idx] = [i, j, bond[2], float(r0_calc), float(k_calc)]
+        comment = bond[5] if len(bond) >= 6 else ""
+        updated_topo.bonds[idx] = [i, j, bond[2], float(r0_calc), float(k_calc), comment]
 
-    # Constraints (distance only)
-    for idx, constraint in enumerate(getattr(updated_topo, "constraints", [])):
+    # Constraints: calculate k and move weak ones to bonds
+    constraint_k_cutoff = 20000
+    new_constraints = []
+    bonds_from_constraints = []
+    
+    for constraint in getattr(updated_topo, "constraints", []):
         i, j = int(constraint[0]), int(constraint[1])
         if (i, j, "constraint") not in internal_coords:
+            new_constraints.append(constraint)
             continue
+        
         distances = internal_coords[(i, j, "constraint")]
-        r0_calc, _ = boltzmann_inversion_bond(distances)
-        updated_topo.constraints[idx] = [i, j, constraint[2], float(r0_calc)]
+        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+        
+        # Get comment field if present
+        comment = constraint[4] if len(constraint) >= 5 else ""
+        
+        if k_calc < constraint_k_cutoff:
+            # Convert to bond: [i, j, funct, r0, k, comment]
+            bonds_from_constraints.append([i, j, 1, float(r0_calc), float(k_calc), comment])
+            logger.info("Constraint %d-%d converted to bond (k=%.1f < %.1f)", i+1, j+1, k_calc, constraint_k_cutoff)
+        else:
+            # Keep as constraint: [i, j, funct, r0, comment]
+            new_constraints.append([i, j, constraint[2], float(r0_calc), comment])
+    
+    updated_topo.constraints = new_constraints
+    updated_topo.bonds.extend(bonds_from_constraints)
 
     # Angles
     for idx, angle in enumerate(getattr(updated_topo, "angles", [])):
@@ -152,7 +172,8 @@ def boltzmann_invert_topology(
             continue
         samples = internal_coords[(i, j, k, "angle")]
         theta0_calc, k_calc = boltzmann_inversion_angle(samples)
-        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc)]
+        comment = angle[6] if len(angle) >= 7 else ""
+        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
 
     # Dihedrals (type-9 terms)
     dihedrals_by_key = {}
@@ -166,6 +187,11 @@ def boltzmann_invert_topology(
         if data is None:
             new_dihedrals.extend(existing_terms)
             continue
+
+        # Get comment from first existing term if present
+        comment = ""
+        if existing_terms and len(existing_terms[0]) >= 9:
+            comment = existing_terms[0][8]
 
         fit_terms = fit_type9_dihedral(
             data,
@@ -184,7 +210,7 @@ def boltzmann_invert_topology(
                 phi0 = 0.0
             else:
                 mult, k_term, phi0 = term
-            new_dihedrals.append([i, j, k, l, 9, float(phi0), float(k_term), int(mult)])
+            new_dihedrals.append([i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment])
 
     updated_topo.dihedrals = new_dihedrals
     return updated_topo
@@ -243,12 +269,16 @@ def filter_topology(
             if len(bond) < 5:
                 new_bonds.append(bond)
                 continue
-            i, j, funct, dist, k = bond
+            
+            # Extract fields: [i, j, funct, dist, k, comment?]
+            i, j, funct, dist, k = bond[0], bond[1], bond[2], bond[3], bond[4]
+            comment = bond[5] if len(bond) >= 6 else ""
+            
             if float(k) > constraint_k_cutoff:
                 key = (int(i), int(j))
                 rev_key = (int(j), int(i))
                 if key not in existing_constraints and rev_key not in existing_constraints:
-                    constraints_to_add.append([i, j, funct, dist])
+                    constraints_to_add.append([i, j, funct, dist, comment])
                     existing_constraints.add(key)
             else:
                 new_bonds.append(bond)
