@@ -336,15 +336,16 @@ def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=6,
-    bins=100,
+    bins=800,
     min_prob=1e-6,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
 
     1. Fit a GMM to the dihedral distribution (1 to max_n components, BIC selection).
     2. Determine optimal n from the spacing between modes: n = 180 / mean_spacing.
-    3. Fit Fourier terms: always include n=1 (to stabilize), plus harmonics up to optimal n.
-    4. Estimate PMF and fit via weighted least squares.
+     3. Choose a small harmonic set (bimodal -> include n=2) and always include n=1.
+     4. Estimate free energy F(\phi) = -kT ln p(\phi) and fit via *density-weighted* least squares,
+         focusing the fit on the support (high-probability region).
 
     Returns
     -------
@@ -358,16 +359,18 @@ def fit_type9_dihedral(
     kT = kB * temperature
 
     values = np.asarray(dihedrals, dtype=float)
-    shift = circular_mean(values)
-    values = wrap_to_180(values - shift) 
+    shift = float(circular_mean(values))
+    values = wrap_to_180(values - shift)
 
     data_min = float(np.min(values))
     data_max = float(np.max(values))
-    # data_min = float(-180)
-    # data_max = float(180)
-    lim  = max(abs(data_min), abs(data_max))
+    if not np.isfinite(data_min) or not np.isfinite(data_max):
+        return []
+    if data_min == data_max:
+        data_min -= 1e-3
+        data_max += 1e-3
 
-    phi_centers = np.linspace(-lim, lim, int(bins))
+    phi_centers = np.linspace(data_min, data_max, int(max(24, bins)))
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
@@ -377,53 +380,60 @@ def fit_type9_dihedral(
     if best_gmm is None:
         raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
 
-    # Determine optimal n from mode spacing
-    if best_means is not None and len(best_means) > 1:
-        sorted_means = np.sort(best_means)
-        spacings = []
-        for i in range(len(sorted_means)):
-            for j in range(i + 1, len(sorted_means)):
-                spacing = abs(sorted_means[j] - sorted_means[i])
-                # Use smallest spacing (since angles wrap)
-                if spacing > 180:
-                    spacing = 360 - spacing
-                spacings.append(spacing)
-        if spacings:
-            mean_spacing = np.mean(spacings)
-            optimal_n = max(1, int(np.round(360.0 / mean_spacing)))
-        else:
-            optimal_n = 1
-    else:
-        optimal_n = 1
+    # Choose harmonics based on the number of modes (GMM components).
+    # Practical heuristic for stable fits on the support:
+    # - unimodal: n=1
+    # - bimodal: include n=2 (common for two wells)
+    # - multi-modal: allow up to number of modes, capped by max_n
+    n_modes = int(len(best_means)) if best_means is not None else 1
+    n_modes = max(1, n_modes)
+    optimal_n = int(min(max_n, n_modes))
+    if n_modes == 2:
+        optimal_n = int(min(max_n, 2))
 
-    # Fit PMF from GMM density
+    # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    density = gmm_density
-    # density = np.clip(gmm_density, min_prob, None)
-    pmf = -kT * np.log(density)
+    density = np.clip(gmm_density, min_prob, None)
+    free_energy = -kT * np.log(density)
 
-    # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
-    optimal_n = int(min(optimal_n, max_n))
-    harmonics_to_fit = [1]
-    if int(optimal_n) > 1:
-        harmonics_to_fit.append(optimal_n)
-    
-    cols = [np.ones_like(phi_rad)]
+    # Focus fit on the support: ignore the extreme low-density tail.
+    # This matches the goal "good fit on the support, pretty much zeros elsewhere".
+    dmax = float(np.max(density))
+    support_cut = max(float(min_prob), dmax * 1e-3)
+    mask = density >= support_cut
+    if int(np.sum(mask)) < 8:
+        # fallback: keep everything (but still weight by density)
+        mask = np.ones_like(density, dtype=bool)
+
+    phi_rad_fit = phi_rad[mask]
+    fe_fit = free_energy[mask]
+    dens_fit = density[mask]
+
+    # Weighted least squares with weights ~ sqrt(p) so high-probability regions dominate.
+    w = np.sqrt(dens_fit / float(np.max(dens_fit)))
+
+    optimal_n = int(max(1, min(int(optimal_n), int(max_n))))
+    harmonics_to_fit = list(range(1, optimal_n + 1))
+
+    cols = [np.ones_like(phi_rad_fit)]
     for n in harmonics_to_fit:
-        cols.append(np.cos(n * phi_rad))
-        cols.append(np.sin(n * phi_rad))
+        cols.append(np.cos(n * phi_rad_fit))
+        cols.append(np.sin(n * phi_rad_fit))
 
     A = np.column_stack(cols)
-    coeffs, _, _, _ = np.linalg.lstsq(A, pmf, rcond=None)
+    Aw = A * w[:, None]
+    bw = fe_fit * w
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)
         if k < 1e-12:
             return 0.0, 0.0
         phi = np.rad2deg(np.arctan2(b, a))
+        # We fit in the centered coordinate x = wrap(phi - shift).
+        # Convert phase back to the absolute coordinate expected by type-9: cos(n*phi - phi0).
         phi += n * shift
         phi = wrap_to_180(phi)
-        test_val = (360 + n * shift - phi) % 360 - 180
         return k, phi
 
     # Extract and output the fitted terms
