@@ -151,9 +151,9 @@ def calculate_internal_coordinates(cg_trajectory, topo):
             pos_j = cg_trajectory[frame_idx, j]
             pos_k = cg_trajectory[frame_idx, k]
             pos_l = cg_trajectory[frame_idx, l]
-            b1 = pos_j - pos_i
-            b2 = pos_k - pos_j
-            b3 = pos_l - pos_k
+            b1 = pos_i - pos_j
+            b2 = pos_j - pos_k
+            b3 = pos_k - pos_l
             n1 = np.cross(b1, b2)
             n2 = np.cross(b2, b3)
             b2_norm = b2 / np.linalg.norm(b2)
@@ -401,7 +401,6 @@ def fit_type9_dihedral(
     density = gmm_density
     # density = np.clip(gmm_density, min_prob, None)
     pmf = -kT * np.log(density)
-    # pmf = pmf - float(np.min(pmf))
 
     # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
     optimal_n = int(min(optimal_n, max_n))

@@ -547,7 +547,6 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
 
         aa_shift = circular_mean(aa_vals)
         cg_shift = circular_mean(cg_vals)
-        print(aa_shift, cg_shift)
         aa_shifted = wrap_to_180(aa_vals - aa_shift)
         cg_shifted = wrap_to_180(cg_vals - aa_shift)
 

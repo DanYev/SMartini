@@ -40,7 +40,7 @@ def setup_martini(sysdir, sysname):
     
     # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
         # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
-    mdsys.make_box(d="1.2", bt="dodecahedron")
+    mdsys.make_box(d="1.0", bt="cubic")
     solvent = mdsys.root / "water.gro"
     mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.17") # all kwargs go to gmx solvate command
     mdsys.add_bulk_ions(conc=0.0, pname="NA", nname="CL")
