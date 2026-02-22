@@ -311,7 +311,6 @@ if __name__ == "__main__":
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
 
     inverted_topo = boltzmann_invert_topology(topo, internal_coords)
-    # plot_internal_coordinates(internal_coords, topo, output_file=wdir / "png" / "aa.png")
 
     updated_topo = filter_topology(
         inverted_topo,
@@ -329,3 +328,10 @@ if __name__ == "__main__":
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     filtered_topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
+
+    plot_internal_coordinates(
+        internal_coords,
+        inverted_topo,
+        output_file=wdir / "png" / "aa.png",
+        temperature=CFG.temperature,
+    )

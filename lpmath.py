@@ -310,8 +310,8 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
     return best
 
 
-def boltzmann_inversion_dihedral(dihedrals, temperature=300.0):
-    """Estimate harmonic dihedral parameters from samples.
+def boltzmann_inversion_improper(dihedrals, temperature=300.0):
+    """Estimate harmonic improper dihedral parameters from samples.
 
     Mean-based harmonic approximation for periodic angles:
     - Equilibrium value phi0 is the circular mean (degrees, wrapped to [-180, 180]).
@@ -336,7 +336,7 @@ def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=6,
-    bins=180,
+    bins=100,
     min_prob=1e-6,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
@@ -361,10 +361,10 @@ def fit_type9_dihedral(
     shift = circular_mean(values)
     values = wrap_to_180(values - shift) 
 
-    # data_min = float(np.min(values))
-    # data_max = float(np.max(values))
-    data_min = float(-180)
-    data_max = float(180)
+    data_min = float(np.min(values))
+    data_max = float(np.max(values))
+    # data_min = float(-180)
+    # data_max = float(180)
     lim  = max(abs(data_min), abs(data_max))
 
     phi_centers = np.linspace(-lim, lim, int(bins))
@@ -398,9 +398,10 @@ def fit_type9_dihedral(
 
     # Fit PMF from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    density = np.clip(gmm_density, min_prob, None)
+    density = gmm_density
+    # density = np.clip(gmm_density, min_prob, None)
     pmf = -kT * np.log(density)
-    pmf = pmf - float(np.min(pmf))
+    # pmf = pmf - float(np.min(pmf))
 
     # Solve for Fourier coefficients: fit only n=1 and n=optimal_n
     optimal_n = int(min(optimal_n, max_n))
@@ -424,8 +425,7 @@ def fit_type9_dihedral(
         phi += n * shift
         phi = wrap_to_180(phi)
         test_val = (360 + n * shift - phi) % 360 - 180
-        print(test_val)
-        return k, -phi
+        return k, phi
 
     # Extract and output the fitted terms
     terms = []

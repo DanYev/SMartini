@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
-    boltzmann_inversion_dihedral,
+    boltzmann_inversion_improper,
     circular_mean,
     wrap_to_180,
     fit_gmm_1d_best,
@@ -18,18 +18,89 @@ from lpmath import (
 logger = logging.getLogger(__name__)
 
 
-def plot_internal_coordinates(internal_coords, topo, output_file=None, max_gaussians=3):
-    """Plot histograms of internal coordinates (bonds, angles, dihedrals)."""
+def _kT_kjmol(temperature: float) -> float:
+    kB = 0.008314462618  # kJ/mol/K
+    return float(kB * float(temperature))
+
+
+def _normalize_density(x_grid, unnorm):
+    x_grid = np.asarray(x_grid, dtype=float)
+    unnorm = np.asarray(unnorm, dtype=float)
+    area = float(np.trapz(unnorm, x_grid))
+    if not np.isfinite(area) or area <= 0.0:
+        return None
+    return unnorm / area
+
+
+def _boltzmann_density_from_U(x_grid, U, temperature: float, prefactor=None):
+    """Return normalized density p(x) ~ prefactor(x) * exp(-U(x)/kT).
+
+    Notes
+    -----
+    For internal coordinates, the Jacobian matters:
+    - bond length: prefactor(r) = r^2
+    - bond angle: prefactor(theta) = sin(theta)
+    - dihedral: prefactor(phi) = 1
+    """
+    kT = _kT_kjmol(temperature)
+    U = np.asarray(U, dtype=float)
+    # Numerical stability: subtract min(U) before exponentiating.
+    U0 = float(np.nanmin(U)) if U.size else 0.0
+    unnorm = np.exp(-(U - U0) / kT)
+    if prefactor is not None:
+        pref = np.asarray(prefactor, dtype=float)
+        unnorm = unnorm * pref
+    return _normalize_density(x_grid, unnorm)
+
+
+def _bond_U_harmonic(r_nm, r0_nm: float, k_kjmol_nm2: float):
+    r_nm = np.asarray(r_nm, dtype=float)
+    return 0.5 * float(k_kjmol_nm2) * (r_nm - float(r0_nm)) ** 2
+
+
+def _angle_U_harmonic(theta_deg, theta0_deg: float, k_kjmol_rad2: float):
+    theta_deg = np.asarray(theta_deg, dtype=float)
+    dtheta_rad = np.deg2rad(theta_deg - float(theta0_deg))
+    return 0.5 * float(k_kjmol_rad2) * dtheta_rad**2
+
+
+def _dihedral_U_type9(phi_deg, terms):
+    """Gromacs proper dihedral type-9: V = sum k * (1 + cos(n*phi - phi0))."""
+    phi_deg = np.asarray(phi_deg, dtype=float)
+    phi_rad = np.deg2rad(phi_deg)
+    U = np.zeros_like(phi_rad, dtype=float)
+    for t in terms:
+        if t.get("k") is None or t.get("mult") is None or t.get("phi0") is None:
+            continue
+        k = float(t["k"])
+        mult = int(t["mult"])
+        phi0_rad = np.deg2rad(float(t["phi0"]))
+        U += k * (1.0 + np.cos(mult * phi_rad - phi0_rad))
+    return U
+
+
+def plot_internal_coordinates(
+    internal_coords,
+    topo,
+    output_file=None,
+    max_gaussians=3,
+    temperature: float = 300.0,
+):
+    """Plot histograms of internal coordinates (bonds, angles, dihedrals).
+
+    Each subplot overlays the topology-implied Boltzmann density
+    $p(x) \propto e^{-U(x)/kT}$ for the corresponding bonded potential.
+    """
     bonds_data = {k: v for k, v in internal_coords.items() if k[-1] in ["bond", "constraint"]}
     angles_data = {k: v for k, v in internal_coords.items() if k[-1] == "angle"}
     dihedrals_data = {k: v for k, v in internal_coords.items() if k[-1] == "dihedral"}
 
     if bonds_data:
-        _plot_bonds(bonds_data, topo, output_file, max_gaussians)
+        _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature)
     if angles_data:
-        _plot_angles(angles_data, topo, output_file, max_gaussians)
+        _plot_angles(angles_data, topo, output_file, max_gaussians, temperature)
     if dihedrals_data:
-        _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians)
+        _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperature)
 
 
 def _plot_gmm(ax, x_grid, gmm):
@@ -46,6 +117,13 @@ def _dihedral_terms(topo):
     for d in topo.dihedrals:
         if len(d) < 6:
             continue
+        # Only use Gromacs type-9 (proper dihedral) terms for Boltzmann density overlays.
+        try:
+            funct = int(d[4])
+        except Exception:
+            funct = None
+        if funct is not None and funct != 9:
+            continue
         key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
         phi0 = float(d[5]) if len(d) >= 6 else None
         k = float(d[6]) if len(d) >= 7 else None
@@ -54,11 +132,11 @@ def _dihedral_terms(topo):
     return terms
 
 
-def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
+def _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature: float):
     logger.info("Plotting %s bonds/constraints", len(bonds_data))
 
-    bond_ref = {(int(b[0]), int(b[1])): b[3] for b in topo.bonds}
-    constraint_ref = {(int(c[0]), int(c[1])): c[3] for c in topo.constraints}
+    bond_params = {(int(b[0]), int(b[1])): b for b in topo.bonds}
+    constraint_params = {(int(c[0]), int(c[1])): c for c in topo.constraints}
 
     n_plots = len(bonds_data)
     n_cols = min(4, n_plots)
@@ -80,12 +158,30 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
             x_grid = np.linspace(np.min(distances), np.max(distances), 300)
             _plot_gmm(ax, x_grid, gmm)
 
-        if bond_type == "bond" and (i, j) in bond_ref:
-            ref_length = bond_ref[(i, j)]
-            ax.axvline(ref_length, color="red", linestyle="--", linewidth=1.5, label=f"ITP: {ref_length:.3f}")
-        elif bond_type == "constraint" and (i, j) in constraint_ref:
-            ref_length = constraint_ref[(i, j)]
-            ax.axvline(ref_length, color="red", linestyle="--", linewidth=1.5, label=f"ITP: {ref_length:.3f}")
+        # Overlay topology-implied density p(r) ~ exp(-U(r)/kT)
+        if bond_type == "bond" and (i, j) in bond_params:
+            b = bond_params[(i, j)]
+            if len(b) >= 5:
+                r0 = float(b[3])
+                k = float(b[4])
+                x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                U = _bond_U_harmonic(x_grid, r0, k)
+                p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
+                if p is not None:
+                    ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+        elif bond_type == "constraint" and (i, j) in constraint_params:
+            c = constraint_params[(i, j)]
+            if len(c) >= 4:
+                r0 = float(c[3])
+                # Constraints are delta-like; approximate with a very stiff harmonic.
+                x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                if float(np.ptp(x_grid)) <= 0:
+                    x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, 400)
+                k_eff = 1.0e6  # kJ/mol/nm^2 (visualization-only)
+                U = _bond_U_harmonic(x_grid, r0, k_eff)
+                p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
+                if p is not None:
+                    ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
 
         ax.set_xlabel("Distance (nm)", fontsize=9)
         ax.set_title(f"{bond_type.capitalize()}: {i+1}-{j+1}", fontsize=10)
@@ -96,21 +192,18 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
 
         _, k_calc = boltzmann_inversion_bond(distances)
 
-        ref_fc = None
-        if bond_type == "bond":
-            for bond in topo.bonds:
-                if int(bond[0]) == i and int(bond[1]) == j and len(bond) >= 5:
-                    ref_fc = bond[4]
-                    break
+        param_k = None
+        if bond_type == "bond" and (i, j) in bond_params and len(bond_params[(i, j)]) >= 5:
+            param_k = float(bond_params[(i, j)][4])
 
         mean_dist = np.mean(distances)
         std_dist = np.std(distances)
         k_rounded = round(k_calc / 1000) * 1000
         stats_text = f"mu={mean_dist:.3f}\nsigma={std_dist:.3f}\n"
         stats_text += f"k={int(k_rounded/1000)}e3"
-        if ref_fc is not None:
-            ref_k_rounded = round(ref_fc / 1000) * 1000
-            stats_text += f"\nITP k={int(ref_k_rounded/1000)}e3"
+        if param_k is not None:
+            param_k_rounded = round(param_k / 1000) * 1000
+            stats_text += f"\nparam k={int(param_k_rounded/1000)}e3"
 
         ax.text(
             0.98,
@@ -130,10 +223,8 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians):
     _save_or_show(output_file, "bonds")
 
 
-def _plot_angles(angles_data, topo, output_file, max_gaussians):
+def _plot_angles(angles_data, topo, output_file, max_gaussians, temperature: float):
     logger.info("Plotting %s angles", len(angles_data))
-
-    angle_ref = {(int(a[0]), int(a[1]), int(a[2])): a[4] for a in topo.angles}
 
     n_plots = len(angles_data)
     n_cols = min(4, n_plots)
@@ -161,9 +252,18 @@ def _plot_angles(angles_data, topo, output_file, max_gaussians):
             x_grid = np.linspace(vmin, vmax, 300)
             _plot_gmm(ax, x_grid, gmm)
 
-        if (i, j, k) in angle_ref:
-            ref_angle = angle_ref[(i, j, k)]
-            ax.axvline(ref_angle, color="red", linestyle="--", linewidth=1.5, label=f"ITP: {ref_angle:.1f} deg")
+        # Overlay topology-implied density p(theta) ~ exp(-U(theta)/kT)
+        for angle in topo.angles:
+            if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
+                theta0 = float(angle[4])
+                k_param = float(angle[5])
+                x_grid = np.linspace(vmin, vmax, 400)
+                U = _angle_U_harmonic(x_grid, theta0, k_param)
+                jac = np.clip(np.sin(np.deg2rad(x_grid)), 0.0, None)
+                p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=jac)
+                if p is not None:
+                    ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+                break
 
         ax.set_xlabel("Angle (degrees)", fontsize=9)
         ax.set_title(f"Angle: {i+1}-{j+1}-{k+1}", fontsize=10)
@@ -175,10 +275,10 @@ def _plot_angles(angles_data, topo, output_file, max_gaussians):
 
         _, k_calc = boltzmann_inversion_angle(angles)
 
-        ref_fc = None
+        param_k = None
         for angle in topo.angles:
             if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
-                ref_fc = angle[5]
+                param_k = float(angle[5])
                 break
 
         mean_angle = np.mean(angles)
@@ -186,9 +286,9 @@ def _plot_angles(angles_data, topo, output_file, max_gaussians):
         k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_angle:.1f} deg\nsigma={std_angle:.1f} deg\n"
         stats_text += f"k={int(k_rounded)}"
-        if ref_fc is not None:
-            ref_k_rounded = round(ref_fc / 10) * 10
-            stats_text += f"\nITP k={int(ref_k_rounded)}"
+        if param_k is not None:
+            param_k_rounded = round(param_k / 10) * 10
+            stats_text += f"\nparam k={int(param_k_rounded)}"
 
         ax.text(
             0.98,
@@ -208,7 +308,7 @@ def _plot_angles(angles_data, topo, output_file, max_gaussians):
     _save_or_show(output_file, "angles")
 
 
-def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
+def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperature: float):
     logger.info("Plotting %s dihedrals", len(dihedrals_data))
 
     dihedral_terms = _dihedral_terms(topo)
@@ -227,38 +327,40 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians):
         ax = axes[idx]
         i, j, k, l, dihedral_type = key
 
-        circ_mean = circular_mean(dihedrals)
-        dihedrals_shifted = np.asarray([wrap_to_180(d - circ_mean) for d in dihedrals])
-        vmin = float(np.min(dihedrals_shifted))
-        vmax = float(np.max(dihedrals_shifted))
-        if vmin == vmax:
-            vmin -= 1e-3
-            vmax += 1e-3
+        # Plot in absolute wrapped coordinates so we match the potential definition.
+        dihedrals_wrapped = wrap_to_180(np.asarray(dihedrals, dtype=float))
+        vmin, vmax = -180.0, 180.0
 
-        ax.hist(dihedrals_shifted, bins=50, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
-        gmm = fit_gmm_1d_best(dihedrals_shifted, max_components=max_gaussians)
+        ax.hist(
+            dihedrals_wrapped,
+            bins=72,
+            range=(vmin, vmax),
+            alpha=0.7,
+            edgecolor="black",
+            density=True,
+        )
+        gmm = fit_gmm_1d_best(dihedrals_wrapped, max_components=max_gaussians)
         if gmm is not None:
-            x_grid = np.linspace(vmin, vmax, 400)
+            x_grid = np.linspace(vmin, vmax, 600)
             _plot_gmm(ax, x_grid, gmm)
 
-        ax.set_xlabel(f"Dihedral - {circ_mean:.1f} deg", fontsize=9)
+        # Overlay topology-implied density p(phi) ~ exp(-U(phi)/kT)
+        terms = dihedral_terms.get((i, j, k, l), [])
+        if terms:
+            x_grid = np.linspace(vmin, vmax, 800)
+            U = _dihedral_U_type9(x_grid, terms)
+            p = _boltzmann_density_from_U(x_grid, U, temperature)
+            if p is not None:
+                ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+
+        ax.set_xlabel("Dihedral (deg)", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
         ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        _, k_calc = boltzmann_inversion_dihedral(dihedrals)
-
         ax.legend(fontsize=8)
-
-        terms = dihedral_terms.get((i, j, k, l), [])
-        ref_fc = None
-        if len(terms) == 1:
-            ref_fc = terms[0].get("k")
-
-        mean_dihedral = circular_mean(dihedrals)
-        dihedrals_centered = np.asarray([wrap_to_180(d - mean_dihedral) for d in dihedrals])
 
     for idx in range(n_plots, len(axes)):
         axes[idx].axis("off")
@@ -438,10 +540,10 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
     for idx, key in enumerate(keys):
         ax = axes[idx]
         i, j, k, l, _ = key
-        aa_vals = wrap_to_180(dihedrals_aa.get(key))
-        cg_vals = wrap_to_180(dihedrals_cg.get(key))
-        # aa_vals = dihedrals_aa.get(key)
-        # cg_vals = dihedrals_cg.get(key)
+        # aa_vals = wrap_to_180(dihedrals_aa.get(key))
+        # cg_vals = wrap_to_180(dihedrals_cg.get(key))
+        aa_vals = dihedrals_aa.get(key)
+        cg_vals = dihedrals_cg.get(key)
 
         aa_shift = circular_mean(aa_vals)
         cg_shift = circular_mean(cg_vals)
