@@ -379,10 +379,10 @@ def plot_internal_coordinates_overlay(aa_coords, cg_coords, topo, output_file=No
     angles_cg = {k: v for k, v in cg_coords.items() if k[-1] == "angle"}
     dihedrals_cg = {k: v for k, v in cg_coords.items() if k[-1] == "dihedral"}
 
-    # if bonds_aa or bonds_cg:
-    #     _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file)
-    # if angles_aa or angles_cg:
-    #     _plot_angles_overlay(angles_aa, angles_cg, topo, output_file)
+    if bonds_aa or bonds_cg:
+        _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file)
+    if angles_aa or angles_cg:
+        _plot_angles_overlay(angles_aa, angles_cg, topo, output_file)
     if dihedrals_aa or dihedrals_cg:
         _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file)
 
