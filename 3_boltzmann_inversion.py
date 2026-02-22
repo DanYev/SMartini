@@ -331,7 +331,7 @@ if __name__ == "__main__":
 
     plot_internal_coordinates(
         internal_coords,
-        inverted_topo,
+        filtered_topo,
         output_file=wdir / "png" / "aa.png",
         temperature=CFG.temperature,
     )

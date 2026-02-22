@@ -228,7 +228,7 @@ def gmm_pdf_1d(x, weights, means, variances):
 
 
 def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4, 
-                    min_weight=0.1, min_spacing_std=6.0):
+                    min_weight=0.1, min_spacing_std=4.0):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
     Parameters
@@ -336,7 +336,7 @@ def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=6,
-    bins=180,
+    bins=360,
     min_prob=1e-3,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
@@ -423,7 +423,7 @@ def fit_type9_dihedral(
     if len(harmonics_to_fit) == 1:
         w = np.pow(density, 1.0)
     else:
-        w = np.ones_like(density)
+        w = np.pow(density, 0.2)
 
     A = np.column_stack(cols)
     Aw = A * w[:, None]

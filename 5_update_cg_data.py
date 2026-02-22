@@ -325,6 +325,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
             # Shift phase for all terms by mult * delta (accounting for n-fold symmetry)
             phi0_new = wrap_to_180(phi0_old - mult * delta)
+            phi0_new = float(phi0_old)
             
             # Rescale force constant only for the highest multiplicity term
             if mult == max_mult:
