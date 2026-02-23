@@ -716,6 +716,7 @@ class Topology:
             + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
             + "; SMILES code : " + self.mol_smi + "\n"
             + "; Partitioning: " + str(self.partitioning) + "\n"
+            + "; Ringbeads: " + str(self.ringbeads) + "\n"
             + "\n"
             + "[moleculetype]\n"
             + "; molname       nrexcl\n"
@@ -990,6 +991,14 @@ def read_itp(itp_file):
                     topo.partitioning = ast.literal_eval(partitioning_str)
                 except (ValueError, SyntaxError):
                     logger.warning(f"Could not parse partitioning from ITP: {partitioning_str}")
+            # Extract Ringbeads from header comment
+            if 'Ringbeads:' in line:
+                import ast
+                ringbeads_str = line.split('Ringbeads:')[1].strip()
+                try:
+                    topo.ringbeads = ast.literal_eval(ringbeads_str)
+                except (ValueError, SyntaxError):
+                    logger.warning(f"Could not parse ringbeads from ITP: {ringbeads_str}")
             continue
         
         # Parse based on current section

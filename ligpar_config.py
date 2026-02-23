@@ -34,7 +34,7 @@ class LigParConfig:
 
     # Post-fit filtering / topology cleanup
     constraint_k_cutoff: float = 20000.0
-    angle_k_cutoff: float = 0.0
+    angle_k_cutoff: float = 50.0
     dihedral_k_cutoff: float = 0.0
 
     # Refinement guardrails
