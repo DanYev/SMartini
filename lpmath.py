@@ -4,6 +4,8 @@ from typing import Dict, Tuple
 import numpy as np
 from MDAnalysis import Universe
 
+import ligpar_cy
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,59 +110,27 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
 
 def calculate_internal_coordinates(cg_trajectory, topo):
     """Calculate internal coordinates (bonds, angles, dihedrals) from CG trajectory."""
+    cg_trajectory = np.ascontiguousarray(cg_trajectory, dtype=np.float64)
     n_frames = cg_trajectory.shape[0]
     internal_coords = {}
 
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
-        distances = np.zeros(n_frames)
-        for frame_idx in range(n_frames):
-            pos_i = cg_trajectory[frame_idx, i]
-            pos_j = cg_trajectory[frame_idx, j]
-            distances[frame_idx] = np.linalg.norm(pos_i - pos_j)
-        internal_coords[(i, j, "bond")] = distances
+        internal_coords[(i, j, "bond")] = ligpar_cy.bond_series(cg_trajectory, i, j)
 
     for constraint in topo.constraints:
         i, j = int(constraint[0]), int(constraint[1])
-        distances = np.zeros(n_frames)
-        for frame_idx in range(n_frames):
-            pos_i = cg_trajectory[frame_idx, i]
-            pos_j = cg_trajectory[frame_idx, j]
-            distances[frame_idx] = np.linalg.norm(pos_i - pos_j)
-        internal_coords[(i, j, "constraint")] = distances
+        internal_coords[(i, j, "constraint")] = ligpar_cy.bond_series(cg_trajectory, i, j)
 
     for angle in topo.angles:
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
-        angles = np.zeros(n_frames)
-        for frame_idx in range(n_frames):
-            pos_i = cg_trajectory[frame_idx, i]
-            pos_j = cg_trajectory[frame_idx, j]
-            pos_k = cg_trajectory[frame_idx, k]
-            v1 = pos_i - pos_j
-            v2 = pos_k - pos_j
-            cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-            cos_angle = np.clip(cos_angle, -1.0, 1.0)
-            angles[frame_idx] = np.degrees(np.arccos(cos_angle))
-        internal_coords[(i, j, k, "angle")] = angles
+        internal_coords[(i, j, k, "angle")] = ligpar_cy.angle_series(cg_trajectory, i, j, k)
 
     for dihedral in topo.dihedrals:
         i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
-        dihedrals = np.zeros(n_frames)
-        for frame_idx in range(n_frames):
-            pos_i = cg_trajectory[frame_idx, i]
-            pos_j = cg_trajectory[frame_idx, j]
-            pos_k = cg_trajectory[frame_idx, k]
-            pos_l = cg_trajectory[frame_idx, l]
-            b1 = pos_i - pos_j
-            b2 = pos_j - pos_k
-            b3 = pos_k - pos_l
-            n1 = np.cross(b1, b2)
-            n2 = np.cross(b2, b3)
-            b2_norm = b2 / np.linalg.norm(b2)
-            x = np.dot(n1, n2)
-            y = np.dot(np.cross(n1, b2_norm), n2)
-            dihedrals[frame_idx] = np.degrees(np.arctan2(y, x))
-        internal_coords[(i, j, k, l, "dihedral")] = dihedrals
+        internal_coords[(i, j, k, l, "dihedral")] = ligpar_cy.dihedral_series(
+            cg_trajectory, i, j, k, l
+        )
 
     return internal_coords
 

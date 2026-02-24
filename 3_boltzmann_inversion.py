@@ -206,11 +206,18 @@ def update_bonds(
 
 def update_angles(
     topo,
-    k_cutoff=25,
+    k_cutoff=25.0,
+    theta_cutoff=165.0
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
     updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(k_cutoff)]
+
+    # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
+    for angle in updated_topo.angles:
+        if float(angle[4]) > float(theta_cutoff):
+            angle[3] = 1
+
     return updated_topo
 
 
