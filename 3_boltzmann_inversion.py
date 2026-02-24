@@ -326,9 +326,9 @@ if __name__ == "__main__":
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 
-    plot_internal_coordinates(
-        internal_coords,
-        topo,
-        output_file=wdir / "png" / "aa.png",
-        temperature=CFG.temperature,
-    )
+    # plot_internal_coordinates(
+    #     internal_coords,
+    #     topo,
+    #     output_file=wdir / "png" / "aa.png",
+    #     temperature=CFG.temperature,
+    # )
