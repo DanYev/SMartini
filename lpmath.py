@@ -421,3 +421,90 @@ def fit_type9_dihedral(
         terms.append((int(n), float(k), float(phi)))
 
     return terms
+
+
+def fit_type11_cbt_dihedral(
+    dihedrals,
+    temperature=300.0,
+    bins=360,
+    min_prob=1e-3,
+    cos_power_max: int = 4,
+):
+    r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).
+
+    The CBT functional form (GROMACS manual Eq. 204) is:
+
+    $$
+    V(\theta_1, \theta_2, \phi) = k_\phi \sin^3\theta_1\,\sin^3\theta_2\,\sum_{n=0}^{4} a_n \cos^n\phi
+    $$
+
+    Parameters in the topology are: k_phi (kJ/mol), then a0..a4 (dimensionless).
+
+    In principle, CBT depends on \phi and the adjacent bending angles \theta_1 and \theta_2.
+    In LigPar we use CBT specifically as a numerically stable replacement for ill-defined
+    torsions; for fitting we assume \theta_1=\theta_2=90° so the prefactor
+
+        \sin^3\theta_1\sin^3\theta_2 = 1.
+
+    Under this approximation we fit a 1D PMF in \phi:
+
+        PMF(\phi) \approx \sum_n c_n \cos^n\phi,
+
+    then rescale c_n into (k_phi, a_n) with c_n = k_phi * a_n.
+
+    Returns
+    -------
+    tuple[float, list[float]]
+        (k_phi, [a0, a1, a2, a3, a4])
+    """
+    if cos_power_max != 4:
+        raise ValueError("Only cos_power_max=4 is supported for funct=11")
+
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * float(temperature)
+
+    phi = np.asarray(dihedrals, dtype=float)
+    if phi.size < 2:
+        raise ValueError("Type-11 CBT fit failed: not enough samples")
+
+    phi = wrap_to_180(phi)
+    phi_centers = np.linspace(-180.0, 180.0, int(max(24, bins)), endpoint=False)
+    phi_rad = np.deg2rad(phi_centers)
+
+    best_gmm = fit_gmm_1d_best(phi, max_components=6)
+    if best_gmm is None:
+        raise ValueError("Type-11 CBT fit failed: Gaussian mixture could not be fit.")
+
+    density = np.clip(gmm_pdf_1d(phi_centers, *best_gmm), float(min_prob), None)
+    pmf = -kT * np.log(density)
+
+    # Build weighted least squares system: PMF(phi) ~ sum_n c_n * cos^n(phi)
+    cols = []
+    cos_phi = np.cos(phi_rad)
+    cos_pow = np.ones_like(cos_phi)
+    for n in range(0, 5):
+        if n == 0:
+            cos_pow = np.ones_like(cos_phi)
+        elif n == 1:
+            cos_pow = cos_phi
+        else:
+            cos_pow = cos_pow * cos_phi
+        cols.append(cos_pow)
+
+    A = np.column_stack(cols)  # shape (nbins, 5)
+    # Weights: emphasize well-sampled/high-probability regions
+    w = np.power(density, 0.2)
+    Aw = A * w[:, None]
+    bw = pmf * w
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    coeffs = np.asarray(coeffs, dtype=float)
+
+    scale = float(np.max(np.abs(coeffs)))
+    if not np.isfinite(scale) or scale < 1e-12:
+        return 0.0, [0.0, 0.0, 0.0, 0.0, 0.0]
+
+    k_phi = scale
+    a = (coeffs / scale).tolist()
+    # Ensure length exactly 5
+    a = [float(x) for x in a[:5]]
+    return float(k_phi), a

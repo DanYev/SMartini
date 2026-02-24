@@ -781,16 +781,55 @@ class Topology:
         text = ""
         if len(self.dihedrals) > 0:
             text = text + "\n[dihedrals]\n"
-            text = text + ";  i  j  k  l  funct  angle  force.c.  multiplicity\n"
+            text = text + ";  i  j  k  l  funct  parameters...\n"
             for d in self.dihedrals:
-                # Dihedral data is [i, j, k, l, funct, angle, force_const, multiplicity, comment]
-                comment = f" ; {d[8]}" if len(d) >= 9 and d[8] else ""
-                text = (
-                    text
-                    + "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}{}\n".format(
-                        d[0] + 1, d[1] + 1, d[2] + 1, d[3] + 1, d[4], d[5], d[6], d[7], comment,
+                # Supported storage forms:
+                # - funct 1/9/etc: [i, j, k, l, funct, angle, force_const, multiplicity, comment]
+                # - funct 11 (CBT): [i, j, k, l, 11, kphi, a0, a1, a2, a3, a4, comment]
+                funct = int(d[4])
+                comment = ""
+                if len(d) > 0 and isinstance(d[-1], str) and d[-1]:
+                    comment = f" ; {d[-1]}"
+
+                if funct == 11:
+                    if len(d) < 11:
+                        raise ValueError(f"Invalid funct=11 dihedral entry (too short): {d}")
+                    kphi = float(d[5])
+                    a0, a1, a2, a3, a4 = (float(d[6]), float(d[7]), float(d[8]), float(d[9]), float(d[10]))
+                    text += (
+                        "  {:2} {:2} {:2} {:2}    11   {: .6g}  {: .6g}  {: .6g}  {: .6g}  {: .6g}  {: .6g}{}\n".format(
+                            d[0] + 1,
+                            d[1] + 1,
+                            d[2] + 1,
+                            d[3] + 1,
+                            kphi,
+                            a0,
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            comment,
+                        )
                     )
-                )
+                else:
+                    if len(d) < 8:
+                        raise ValueError(f"Invalid dihedral entry (too short): {d}")
+                    angle = float(d[5])
+                    force_const = float(d[6])
+                    multiplicity = int(d[7])
+                    text += (
+                        "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}{}\n".format(
+                            d[0] + 1,
+                            d[1] + 1,
+                            d[2] + 1,
+                            d[3] + 1,
+                            funct,
+                            angle,
+                            force_const,
+                            multiplicity,
+                            comment,
+                        )
+                    )
         return text
     
     def format_virtual_sites(self):
@@ -1111,19 +1150,34 @@ def read_itp(itp_file):
             # Parse data and comment separately
             pre_comment, _, comment_text = line.partition(';')
             parts = pre_comment.split()
-            # proper dihedral
-            if len(parts) >= 7 and parts[0].isdigit():
+            if len(parts) >= 5 and parts[0].isdigit():
                 i = int(parts[0]) - 1  # Convert to 0-based
                 j = int(parts[1]) - 1
                 k = int(parts[2]) - 1
                 l = int(parts[3]) - 1
                 funct = int(parts[4])
-                angle = float(parts[5])
-                force_const = float(parts[6]) if len(parts) >= 7 else 0.0
-                multiplicity = int(parts[7]) if len(parts) >= 8 else 1
                 comment = comment_text.strip() if comment_text else ""
-                # Store as [i, j, k, l, funct, angle, force_const, multiplicity, comment]
-                topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity, comment])
+
+                if funct == 11:
+                    # funct=11: kphi a0 a1 a2 a3 a4
+                    if len(parts) < 11:
+                        raise ValueError(f"Invalid funct=11 dihedral line (expected 6 params): {line}")
+                    kphi = float(parts[5])
+                    a0 = float(parts[6])
+                    a1 = float(parts[7])
+                    a2 = float(parts[8])
+                    a3 = float(parts[9])
+                    a4 = float(parts[10])
+                    topo.dihedrals.append([i, j, k, l, 11, kphi, a0, a1, a2, a3, a4, comment])
+                else:
+                    # Default: interpret as (angle, force_const, multiplicity) as used by funct=1/9.
+                    # Note: other funct values (e.g. RB) are not explicitly supported here.
+                    if len(parts) < 7:
+                        raise ValueError(f"Invalid dihedral line (expected >=2 params): {line}")
+                    angle = float(parts[5])
+                    force_const = float(parts[6])
+                    multiplicity = int(parts[7]) if len(parts) >= 8 else 1
+                    topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity, comment])
         
         elif current_section == 'virtual_sitesn':
             parts = stripped.split()

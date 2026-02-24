@@ -79,6 +79,37 @@ def _dihedral_U_type9(phi_deg, terms):
     return U
 
 
+def _dihedral_U_type11(phi_deg, terms):
+    """Gromacs dihedral funct=11 (combined bending-torsion, CBT).
+
+    We evaluate the 1D form used by LigPar fitting (theta1=theta2=90 deg):
+        V(phi) = kphi * sum_{n=0..4} a_n * cos(phi)^n
+
+    Parameters are (kphi, a0..a4). If multiple funct=11 entries exist for the same
+    dihedral, their contributions are summed.
+    """
+    phi_deg = np.asarray(phi_deg, dtype=float)
+    phi_rad = np.deg2rad(phi_deg)
+    c = np.cos(phi_rad)
+    U = np.zeros_like(c, dtype=float)
+    for t in terms:
+        if t.get("kphi") is None or t.get("a") is None:
+            continue
+        kphi = float(t["kphi"])
+        a = t["a"]
+        if len(a) < 5:
+            continue
+        poly = (
+            float(a[0])
+            + float(a[1]) * c
+            + float(a[2]) * (c**2)
+            + float(a[3]) * (c**3)
+            + float(a[4]) * (c**4)
+        )
+        U += kphi * poly
+    return U
+
+
 def plot_internal_coordinates(
     internal_coords,
     topo,
@@ -129,6 +160,24 @@ def _dihedral_terms(topo):
         k = float(d[6]) if len(d) >= 7 else None
         mult = int(d[7]) if len(d) >= 8 else None
         terms.setdefault(key, []).append({"phi0": phi0, "k": k, "mult": mult})
+    return terms
+
+
+def _dihedral_terms_type11(topo):
+    terms = {}
+    for d in topo.dihedrals:
+        if len(d) < 11:
+            continue
+        try:
+            funct = int(d[4])
+        except Exception:
+            continue
+        if funct != 11:
+            continue
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        kphi = float(d[5])
+        a = [float(d[6]), float(d[7]), float(d[8]), float(d[9]), float(d[10])]
+        terms.setdefault(key, []).append({"kphi": kphi, "a": a})
     return terms
 
 
@@ -312,6 +361,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperatur
     logger.info("Plotting %s dihedrals", len(dihedrals_data))
 
     dihedral_terms = _dihedral_terms(topo)
+    dihedral_terms_11 = _dihedral_terms_type11(topo)
 
     n_plots = len(dihedrals_data)
     n_cols = min(4, n_plots)
@@ -345,13 +395,32 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperatur
             _plot_gmm(ax, x_grid, gmm)
 
         # Overlay topology-implied density p(phi) ~ exp(-U(phi)/kT)
-        terms = dihedral_terms.get((i, j, k, l), [])
-        if terms:
-            x_grid = np.linspace(vmin, vmax, 800)
-            U = _dihedral_U_type9(x_grid, terms)
+        terms11 = dihedral_terms_11.get((i, j, k, l), [])
+        terms9 = dihedral_terms.get((i, j, k, l), [])
+
+        x_grid = np.linspace(vmin, vmax, 800)
+        if terms11:
+            U = _dihedral_U_type11(x_grid, terms11)
             p = _boltzmann_density_from_U(x_grid, U, temperature)
             if p is not None:
-                ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+                ax.plot(
+                    x_grid,
+                    p,
+                    color="black",
+                    linewidth=1.6,
+                    label=r"funct=11: $p\propto e^{-U/kT}$",
+                )
+        elif terms9:
+            U = _dihedral_U_type9(x_grid, terms9)
+            p = _boltzmann_density_from_U(x_grid, U, temperature)
+            if p is not None:
+                ax.plot(
+                    x_grid,
+                    p,
+                    color="black",
+                    linewidth=1.6,
+                    label=r"funct=9: $p\propto e^{-U/kT}$",
+                )
 
         ax.set_xlabel("Dihedral (deg)", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)

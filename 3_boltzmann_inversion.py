@@ -11,6 +11,7 @@ from lpmath import (
     boltzmann_inversion_bond,
     calculate_internal_coordinates,
     fit_type9_dihedral,
+    fit_type11_cbt_dihedral,
     read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
@@ -223,10 +224,18 @@ def update_angles(
 
 def update_dihedrals(
     topo,
+    internal_coords=None,
     k_cutoff=5,
     angle_linear_cutoff_deg: float = 170.0,
 ):
-    """update/post-process dihedral terms (including unstable-dihedral removal)."""
+    """update/post-process dihedral terms.
+
+    Notes
+    -----
+    - k_cutoff/symmetric scaling are applied only to funct=9 terms.
+    - Dihedrals that are ill-defined due to (near-)linear adjacent angles are converted to
+      funct=11 (combined bending-torsion) using trajectory-derived coefficients.
+    """
     updated_topo = copy.deepcopy(topo)
 
     # Drop weak |k|, optionally keep strongest per (i,j,k,l)
@@ -246,14 +255,14 @@ def update_dihedrals(
 
     new_dihedrals = []
     for key, terms in dihedrals_by_key.items():
-        eligible = [t for t in terms if len(t) >= 8]
-        ineligible = [t for t in terms if len(t) < 8]
+        type9 = [t for t in terms if len(t) >= 8 and int(t[4]) == 9]
+        other = [t for t in terms if not (len(t) >= 8 and int(t[4]) == 9)]
 
-        kept_for_key = [t for t in eligible if abs(float(t[6])) >= k_cutoff]
-        if not kept_for_key and eligible:
-            kept_for_key = [max(eligible, key=lambda t: abs(float(t[6])))]
+        kept_for_key = [t for t in type9 if abs(float(t[6])) >= k_cutoff]
+        if not kept_for_key and type9:
+            kept_for_key = [max(type9, key=lambda t: abs(float(t[6])))]
 
-        new_dihedrals.extend(ineligible)
+        new_dihedrals.extend(other)
 
         scale = 0.5 if key in symmetric_keys else 1.0
         for t in kept_for_key:
@@ -263,7 +272,7 @@ def update_dihedrals(
 
     updated_topo.dihedrals = new_dihedrals
 
-    # Remove unstable dihedrals ill-defined due to near-linear adjacent angles.
+    # Convert unstable dihedrals that become ill-defined due to near-linear adjacent angles.
     angle_lookup = _build_angle_lookup(updated_topo)
     length_lookup = _build_length_lookup(updated_topo)
 
@@ -273,28 +282,73 @@ def update_dihedrals(
         return _angle_from_triangle(length_lookup, i, j, k)
 
     kept = []
-    removed_linear = 0
-    removed_undefined = 0
+    converted_linear = 0
+    converted_undefined = 0
 
     for d in updated_topo.dihedrals:
         i, j, k, l = int(d[0]), int(d[1]), int(d[2]), int(d[3])
+        funct = int(d[4])
+
+        # Only convert funct=9 terms; leave other dihedral types alone.
+        if funct != 9:
+            kept.append(d)
+            continue
+
         a1 = _eq_angle(i, j, k)
         a2 = _eq_angle(j, k, l)
         if a1 is None or a2 is None:
-            removed_undefined += 1
+            converted_undefined += 1
+            if internal_coords is None:
+                raise ValueError(
+                    f"Need internal_coords to convert dihedral ({i},{j},{k},{l}) to funct=11"
+                )
+            phi = internal_coords.get((i, j, k, l, "dihedral"))
+            if phi is None:
+                raise KeyError(
+                    f"Missing samples for CBT fit of dihedral ({i},{j},{k},{l}): "
+                    f"phi={phi is not None}"
+                )
+            kphi, a = fit_type11_cbt_dihedral(
+                phi,
+                temperature=CFG.temperature,
+                bins=max(60, int(CFG.type9_bins)),
+                min_prob=float(CFG.type9_min_prob),
+            )
+            comment = d[-1] if (len(d) > 0 and isinstance(d[-1], str)) else ""
+            d2 = [i, j, k, l, 11, float(kphi), float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4]), comment]
+            kept.append(d2)
             continue
         if a1 >= angle_linear_cutoff_deg or a2 >= angle_linear_cutoff_deg:
-            removed_linear += 1
+            converted_linear += 1
+            if internal_coords is None:
+                raise ValueError(
+                    f"Need internal_coords to convert dihedral ({i},{j},{k},{l}) to funct=11"
+                )
+            phi = internal_coords.get((i, j, k, l, "dihedral"))
+            if phi is None:
+                raise KeyError(
+                    f"Missing samples for CBT fit of dihedral ({i},{j},{k},{l}): "
+                    f"phi={phi is not None}"
+                )
+            kphi, a = fit_type11_cbt_dihedral(
+                phi,
+                temperature=CFG.temperature,
+                bins=max(60, int(CFG.type9_bins)),
+                min_prob=float(CFG.type9_min_prob),
+            )
+            comment = d[-1] if (len(d) > 0 and isinstance(d[-1], str)) else ""
+            d2 = [i, j, k, l, 11, float(kphi), float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4]), comment]
+            kept.append(d2)
             continue
         kept.append(d)
 
     updated_topo.dihedrals = kept
     logger.info(
-        "updated dihedrals: kept=%s, removed_linear=%s (>%s deg), removed_undefined=%s",
+        "updated dihedrals: kept=%s, converted_linear=%s (>%s deg), converted_undefined=%s",
         len(kept),
-        removed_linear,
+        converted_linear,
         angle_linear_cutoff_deg,
-        removed_undefined,
+        converted_undefined,
     )
 
     return updated_topo
@@ -329,7 +383,12 @@ if __name__ == "__main__":
 
     topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff)
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_linear_cutoff_deg=160.0)
+    topo = update_dihedrals(
+        topo,
+        internal_coords=internal_coords,
+        k_cutoff=CFG.dihedral_k_cutoff,
+        angle_linear_cutoff_deg=160.0,
+    )
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
