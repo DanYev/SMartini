@@ -183,12 +183,12 @@ def update_bonds(
 
     for bond in updated_topo.bonds:
         # Extract fields: [i, j, funct, dist, k, comment?]
-        i, j, funct, dist, k = bond[0], bond[1], bond[2], bond[3], bond[4]
+        i, j, funct, dist, k = int(bond[0]), int(bond[1]), int(bond[2]), float(bond[3]), float(bond[4])
         comment = bond[5] if len(bond) >= 6 else ""
 
         # Never convert ring-ring link bonds into constraints.
-        if _connects_two_different_rings(bead_to_rings, int(i), int(j)):
-            bond[4] = min(float(bond[4]), constraint_k_cutoff)  # boost k to ensure it's kept as a bond
+        if _connects_two_different_rings(i, j, bead_to_rings):
+            bond[4] = min(bond[4], constraint_k_cutoff)  # boost k to ensure it's kept as a bond
             bond[5] = "ring-ring link"  # update comment
             new_bonds.append(bond)
             continue
@@ -206,23 +206,16 @@ def update_bonds(
 
 def update_angles(
     topo,
-    *,
     angle_k_cutoff=25,
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
-
-    if angle_k_cutoff is not None:
-        updated_topo.angles = [
-            a for a in updated_topo.angles if float(a[5]) >= float(angle_k_cutoff)
-        ]
-
+    updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(angle_k_cutoff)]
     return updated_topo
 
 
 def update_dihedrals(
     topo,
-    *,
     dihedral_k_cutoff=5,
     keep_best_dihedral_term: bool = True,
     angle_linear_cutoff_deg: float = 170.0,
@@ -298,29 +291,6 @@ def update_dihedrals(
     return updated_topo
 
 
-def update_topology(
-    topo,
-    *,
-    constraint_k_cutoff=20000,
-    angle_k_cutoff=25,
-    dihedral_k_cutoff=5,
-    keep_best_dihedral_term: bool = True,
-    angle_linear_cutoff_deg: float = 170.0,
-    drop_if_undefined: bool = True,
-):
-    """Backwards-compatible wrapper around bond/angle/dihedral updates."""
-    updated_topo = update_bonds(topo, constraint_k_cutoff=constraint_k_cutoff)
-    updated_topo = update_angles(updated_topo, angle_k_cutoff=angle_k_cutoff)
-    updated_topo = update_dihedrals(
-        updated_topo,
-        dihedral_k_cutoff=dihedral_k_cutoff,
-        keep_best_dihedral_term=keep_best_dihedral_term,
-        angle_linear_cutoff_deg=angle_linear_cutoff_deg,
-        drop_if_undefined=drop_if_undefined,
-    )
-    return updated_topo
-
-
 if __name__ == "__main__":
     molname = MOLNAME
     wdir = CFG.wdir()
@@ -346,13 +316,10 @@ if __name__ == "__main__":
     topo = boltzmann_invert_angles(topo, internal_coords)
     topo = boltzmann_invert_dihedrals(topo, internal_coords)
 
-    updated_topo = update_bonds(topo, constraint_k_cutoff=CFG.constraint_k_cutoff)
-    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
-    updated_topo.to_itp(out_file=out_itp)
-    exit()
-    updated_topo = update_angles(updated_topo, angle_k_cutoff=CFG.angle_k_cutoff)
-    updated_topo = update_dihedrals(
-        updated_topo,
+    topo = update_bonds(topo, constraint_k_cutoff=CFG.constraint_k_cutoff)
+    topo = update_angles(topo, angle_k_cutoff=CFG.angle_k_cutoff)
+    topo = update_dihedrals(
+        topo,
         dihedral_k_cutoff=CFG.dihedral_k_cutoff,
         keep_best_dihedral_term=True,
         angle_linear_cutoff_deg=160.0,
@@ -360,12 +327,12 @@ if __name__ == "__main__":
     )
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
-    updated_topo.to_itp(out_file=out_itp)
+    topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 
     plot_internal_coordinates(
         internal_coords,
-        updated_topo,
+        topo,
         output_file=wdir / "png" / "aa.png",
         temperature=CFG.temperature,
     )
