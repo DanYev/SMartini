@@ -9,15 +9,15 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
+    molname: str = "FTA"
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
 
     # AutoMartini / mapping
-    n_beads: int = 11
+    n_beads: int = None # if None, will be determined by AutoMartini
 
     # Common subfolders
-    aa_sysname: str = "aa_md_pro"
+    aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
 
@@ -34,7 +34,7 @@ class LigParConfig:
 
     # Post-fit filtering / topology cleanup
     constraint_k_cutoff: float = 20000.0
-    angle_k_cutoff: float = 50.0
+    angle_k_cutoff: float = 10.0
     dihedral_k_cutoff: float = 0.0
 
     # Refinement guardrails

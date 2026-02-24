@@ -222,26 +222,7 @@ def _get_reporters(mdrun, append=False, prefix="md"):
     return log_reporter, err_reporter, traj_reporter, state_reporter
 
 
-# def trjconv(sysdir, sysname, runname):
-#     system = MDSystem(sysdir, sysname)
-#     mdrun = MDRun(sysdir, sysname, runname)
-#     mdrun.rundir = mdrun.root / "mdrun"
-#     logger.info(f"WDIR: %s", mdrun.rundir)
-#     # INPUT
-#     top = mdrun.rundir / "md.pdb"
-#     # top = mdrun.root / "system.pdb"
-#     traj = mdrun.rundir / f"md.{TRJEXT}"
-#     ext_trajs = sorted([f for f in mdrun.rundir.glob(f"md_*.{TRJEXT}")])
-#     trajs = [traj] + ext_trajs
-#     logger.info(f'Input trajectory files: {trajs}')
-#     out_top = mdrun.rundir / "topology.pdb"
-#     out_traj = mdrun.rundir / f"samples.{TRJEXT}"
-#     # CONVERT
-#     convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0000, stop=None, step=10, fit=True)
-#     logger.info("Done!")
-
-
 if __name__ == "__main__":
-    # process_ligand(sysdir, sysname, ligand_name)
-    # md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
+    process_ligand(sysdir, sysname, ligand_name)
+    md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
     trjconv(sysdir, sysname, runname)

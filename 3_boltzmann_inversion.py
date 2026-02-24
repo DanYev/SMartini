@@ -306,10 +306,7 @@ if __name__ == "__main__":
     in_pdb = mddir / "topology.pdb"
     in_xtc = mddir / "samples.xtc"
     logger.info("Reading trajectory files from %s", mddir)
-
-    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, selection="resname ANP")
-    # np.save("traj_coords.npy", cg_traj)
-    # cg_traj = np.load("traj_coords.npy")
+    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, stop=2000)
 
     logger.info("Calculating internal coordinates from trajectory")
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
@@ -326,9 +323,9 @@ if __name__ == "__main__":
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 
-    # plot_internal_coordinates(
-    #     internal_coords,
-    #     topo,
-    #     output_file=wdir / "png" / "aa.png",
-    #     temperature=CFG.temperature,
-    # )
+    plot_internal_coordinates(
+        internal_coords,
+        topo,
+        output_file=wdir / "png" / "aa.png",
+        temperature=CFG.temperature,
+    )

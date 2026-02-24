@@ -415,11 +415,11 @@ if __name__ == "__main__":
     cg_xtc = cg_dir / CFG.cg_runname / "samples.xtc"
 
     logger.info("Reading AA trajectory from %s", aa_dir)
-    aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, selection="resname ANP")
+    aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning)
     aa_internal = calculate_internal_coordinates(aa_traj, topo)
 
     logger.info("Reading CG trajectory from %s", cg_dir)
-    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None, selection="resname ANP")  
+    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None)  
     cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
     plot_internal_coordinates_overlay(
