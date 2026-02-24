@@ -60,6 +60,7 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=-2, selectio
     # Convert list to numpy array
     cg_trajectory = np.array(frames)
     n_frames = len(frames)
+    cg_trajectory = np.ascontiguousarray(cg_trajectory, dtype=np.float64)
 
     logger.info("COG trajectory computed: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
@@ -103,6 +104,7 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
     # Convert list to numpy array
     cg_trajectory = np.array(frames)
     n_frames = len(frames)
+    cg_trajectory = np.ascontiguousarray(cg_trajectory, dtype=np.float64)
     
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
@@ -110,7 +112,6 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
 
 def calculate_internal_coordinates(cg_trajectory, topo):
     """Calculate internal coordinates (bonds, angles, dihedrals) from CG trajectory."""
-    cg_trajectory = np.ascontiguousarray(cg_trajectory, dtype=np.float64)
     n_frames = cg_trajectory.shape[0]
     internal_coords = {}
 

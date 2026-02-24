@@ -139,7 +139,6 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float, max_scal
         return k_old
 
     scale = (sigma_current / sigma_target) ** 2
-    scale = float(np.clip(scale, 1.0 / max_scale, max_scale))
     return float(k_old * scale)
 
 
@@ -169,13 +168,16 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
         mu_cg, sigma_cg = _stats(cg_vals, "bond")
         delta = mu_aa - mu_cg
 
-        r0_old = float(bond[3])
-        k_old = float(bond[4]) if len(bond) >= 5 else None
-        r0_new = float(r0_old + delta)
-
-        k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
-        k_new = min(k_new, CFG.constraint_k_cutoff)
-        new_bonds.append([i, j, bond[2], r0_new, k_new])
+        updated = list(bond)
+        updated[3] = float(updated[3]) + delta
+        k_new = _k_rescale(
+            float(updated[4]),
+            sigma_target=sigma_aa,
+            sigma_current=sigma_cg,
+            max_scale=CFG.refine_max_k_scale,
+        )
+        updated[4] = min(float(k_new), CFG.constraint_k_cutoff)
+        new_bonds.append(updated)
 
         n_bonds_updated += 1
 
@@ -188,17 +190,14 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
         key = (i, j, "constraint")
         aa_vals = aa_internal.get(key)
         cg_vals = cg_internal.get(key)
-        if aa_vals is None or cg_vals is None:
-            new_constraints.append(constraint)
-            continue
 
         mu_aa, _ = _stats(aa_vals, "constraint")
         mu_cg, _ = _stats(cg_vals, "constraint")
         delta = mu_aa - mu_cg
 
-        r0_old = float(constraint[3])
-        r0_new = float(r0_old + delta)
-        new_constraints.append([i, j, constraint[2], r0_new])
+        updated = list(constraint)
+        updated[3] = float(updated[3]) + delta
+        new_constraints.append(updated)
         n_constraints_updated += 1
 
     topo.constraints = new_constraints
@@ -213,10 +212,9 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
     --------
     - Equilibrium values: shift by (mu_AA - mu_CG)
     - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
-    - Optionally remove angles with force constants below threshold
+    - Never removes angles; only updates parameters when data exist.
     """
     n_angles_updated = 0
-    n_angles_removed = 0
     
     new_angles = []
     for angle in topo.angles:
@@ -225,10 +223,6 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         aa_vals = aa_internal.get(key)
         cg_vals = cg_internal.get(key)
         if aa_vals is None or cg_vals is None:
-            # Optional pruning based on existing k
-            if CFG.angle_k_cutoff is not None and len(angle) >= 6 and float(angle[5]) < CFG.angle_k_cutoff:
-                n_angles_removed += 1
-                continue
             new_angles.append(angle)
             continue
 
@@ -236,25 +230,26 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         mu_cg, sigma_cg = _stats(cg_vals, "angle")
         delta = mu_aa - mu_cg
 
-        theta0_old = float(angle[4])
+        updated = list(angle)
+        theta0_old = float(updated[4])
         theta0_new = float(theta0_old + delta)
         theta0_new = float(np.clip(theta0_new, 0.0, 180.0))
 
-        k_old = float(angle[5]) if len(angle) >= 6 else None
-        if k_old is not None:
-            k_new = _k_rescale(k_old, sigma_target=sigma_aa, sigma_current=sigma_cg, max_scale=CFG.refine_max_k_scale)
-            if CFG.angle_k_cutoff is not None and k_new < CFG.angle_k_cutoff:
-                n_angles_removed += 1
-                continue
-            new_angles.append([i, j, k, angle[3], theta0_new, k_new])
-        else:
-            new_angles.append([i, j, k, angle[3], theta0_new])
+        updated[4] = theta0_new
+        updated[5] = _k_rescale(
+            float(updated[5]),
+            sigma_target=sigma_aa,
+            sigma_current=sigma_cg,
+            max_scale=CFG.refine_max_k_scale,
+        )
+
+        new_angles.append(updated)
 
         n_angles_updated += 1
 
     topo.angles = new_angles
-    
-    return n_angles_updated, n_angles_removed
+
+    return n_angles_updated, 0
 
 
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
@@ -268,7 +263,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
       **Applied to all terms**
     - Force constants: rescale by (sigma_CG / sigma_AA)^2 with an upper cap of 2.0
       **Only applied to the highest multiplicity term** (e.g., n=3 not n=1)
-    - Optionally remove dihedrals with force constants below threshold
+    - Never removes dihedrals; only updates parameters when data exist.
     
     Notes
     -----
@@ -276,7 +271,6 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
     - All terms are phase-shifted, but only max(n) term is rescaled
     """
     n_dihedrals_updated = 0
-    n_dihedrals_removed = 0
     
     new_dihedrals = []
     dihedrals_by_key = {}
@@ -290,12 +284,8 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_vals = cg_internal.get(key)
         
         if aa_vals is None or cg_vals is None:
-            # No AA or CG data, keep existing terms (with optional pruning)
-            for term in terms:
-                if CFG.dihedral_k_cutoff is not None and abs(float(term[6])) < CFG.dihedral_k_cutoff:
-                    n_dihedrals_removed += 1
-                    continue
-                new_dihedrals.append(term)
+            # No AA or CG data, keep existing terms
+            new_dihedrals.extend(terms)
             continue
         
         # Calculate circular statistics for AA and CG trajectories
@@ -307,41 +297,30 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         
         # Force constant scale
         scale = float((sigma_cg / sigma_aa) ** 2)
-        scale = float(min(scale, 3.0))
-        scale = float(max(scale, 0.33)) 
 
         # Find maximum multiplicity among all terms for this dihedral
         max_mult = max((int(term[7]) for term in terms if len(term) >= 8), default=1)
 
         # Update each term for this dihedral
         for term in terms:
-
-            phi0_old = float(term[5])
-            k_old = float(term[6])
-            mult = int(term[7])
-            comment = term[8] if len(term) >= 9 else ""
+            updated = list(term)
+            phi0_old = float(updated[5])
+            k_old = float(updated[6])
+            mult = int(updated[7])
 
             # Shift phase for all terms by mult * delta (accounting for n-fold symmetry)
-            phi0_new = wrap_to_180(phi0_old - mult * delta)
-            phi0_new = float(phi0_old)
-            
+            updated[5] = float(wrap_to_180(phi0_old - mult * delta))
+
             # Rescale force constant only for the highest multiplicity term
             if mult == max_mult:
-                k_new = float(k_old * scale)
-            else:
-                k_new = k_old
-            
-            # Optional pruning based on minimum k threshold
-            if CFG.dihedral_k_cutoff is not None and abs(k_new) < CFG.dihedral_k_cutoff:
-                n_dihedrals_removed += 1
-                continue
-            
-            new_dihedrals.append([i, j, k, l, 9, float(phi0_new), k_new, mult, comment])
+                updated[6] = float(k_old * scale)
+
+            new_dihedrals.append(updated)
             n_dihedrals_updated += 1
 
     topo.dihedrals = new_dihedrals
-    
-    return n_dihedrals_updated, n_dihedrals_removed
+
+    return n_dihedrals_updated, 0
 
 
 def refine_topology_from_cg_vs_aa(
@@ -371,8 +350,8 @@ def refine_topology_from_cg_vs_aa(
     # Update angles
     n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
-    # Update dihedrals
-    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
+    # # Update dihedrals
+    # n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
     # logger.info(
     #     "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
@@ -422,16 +401,16 @@ if __name__ == "__main__":
     cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None)  
     cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
-    plot_internal_coordinates_overlay(
-        aa_internal,
-        cg_internal,
-        topo,
-        output_file=wdir / "png" / "cg_vs_aa.png",
-    )
-
     # Refine the CG topology based on CG-vs-AA distribution mismatch.
     # Writes a new file and leaves the original ITP unchanged.
     tmp_itp = wdir / "mapping" / f"{molname}_updated_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+
+    plot_internal_coordinates_overlay(
+        aa_internal,
+        cg_internal,
+        topo,
+        output_file=wdir / "png" / "cg_vs_aa.png",
+    )

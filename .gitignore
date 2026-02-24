@@ -11,6 +11,7 @@ Automartini_M3/
 *.txt
 *.npy
 *.npz
+*.pkl
 
 # ---- Python ----
 __pycache__/
