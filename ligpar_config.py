@@ -14,7 +14,7 @@ class LigParConfig:
     ligands_dir: Path = Path("ligands")
 
     # AutoMartini / mapping
-    n_beads: int = 10
+    n_beads: int = 11
 
     # Common subfolders
     aa_sysname: str = "aa_md_pro"

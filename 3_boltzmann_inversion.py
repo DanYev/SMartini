@@ -67,6 +67,147 @@ def _angle_from_triangle(length_lookup, i: int, j: int, k: int):
     return float(np.degrees(np.arccos(cos_theta)))
 
 
+def _connects_two_different_rings(topo, i: int, j: int, bead_to_rings=None) -> bool:
+    """Return True if i-j connects two different rings (per topo.ringbeads).
+
+    If `bead_to_rings` is provided, it should be a map bead_index -> set(ring_ids).
+    """
+    if bead_to_rings is None:
+        bead_to_rings = {}
+        for ring_id, ring in enumerate(getattr(topo, "ringbeads", []) or []):
+            try:
+                beads = [int(b) for b in ring]
+            except Exception:
+                continue
+            for bead in beads:
+                bead_to_rings.setdefault(bead, set()).add(ring_id)
+
+    rings_i = bead_to_rings.get(int(i), set())
+    rings_j = bead_to_rings.get(int(j), set())
+    if not rings_i or not rings_j:
+        return False
+    return rings_i.isdisjoint(rings_j)
+
+
+def boltzmann_invert_bonds(
+    topo,
+    internal_coords,
+    *,
+    constraint_k_cutoff: float,
+    bead_to_rings=None,
+):
+    updated_topo = copy.deepcopy(topo)
+
+    # Bonds
+    for idx, bond in enumerate(updated_topo.bonds): 
+        i, j = int(bond[0]), int(bond[1])
+        if (i, j, "bond") not in internal_coords:
+            continue
+        distances = internal_coords[(i, j, "bond")]
+        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+        comment = bond[5] if len(bond) >= 6 else ""
+        updated_topo.bonds[idx] = [i, j, bond[2], float(r0_calc), float(k_calc), comment]
+
+    # Constraints: calculate k and move weak ones (and ring-ring links) to bonds
+    new_constraints = []
+    bonds_from_constraints = []
+
+    for constraint in updated_topo.constraints:
+        i, j = int(constraint[0]), int(constraint[1])
+        connects_diff_rings = _connects_two_different_rings(
+            updated_topo, i, j, bead_to_rings=bead_to_rings
+        )
+
+        distances = internal_coords[(i, j, "constraint")]
+        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+
+        comment = constraint[4] if len(constraint) >= 5 else ""
+
+        if connects_diff_rings or (k_calc < constraint_k_cutoff):
+            k_calc = min(k_calc, constraint_k_cutoff)  
+            bonds_from_constraints.append([i, j, 1, float(r0_calc), float(k_calc), comment])
+            if connects_diff_rings:
+                logger.info(
+                    "Constraint %d-%d moved to bond (ring-ring link; k=%.1f)",
+                    i + 1,
+                    j + 1,
+                    k_calc,
+                )
+            else:
+                logger.info(
+                    "Constraint %d-%d converted to bond (k=%.1f < %.1f)",
+                    i + 1,
+                    j + 1,
+                    k_calc,
+                    constraint_k_cutoff,
+                )
+        else:
+            new_constraints.append([i, j, constraint[2], float(r0_calc), comment])
+
+    updated_topo.constraints = new_constraints
+    updated_topo.bonds.extend(bonds_from_constraints)
+    return updated_topo
+
+
+def boltzmann_invert_angles(topo, internal_coords):
+    updated_topo = copy.deepcopy(topo)
+
+    for idx, angle in enumerate(getattr(updated_topo, "angles", [])):
+        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
+        if (i, j, k, "angle") not in internal_coords:
+            continue
+        samples = internal_coords[(i, j, k, "angle")]
+        theta0_calc, k_calc = boltzmann_inversion_angle(samples)
+        comment = angle[6] if len(angle) >= 7 else ""
+        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
+
+    return updated_topo
+
+
+def boltzmann_invert_dihedrals(topo, internal_coords):
+    updated_topo = copy.deepcopy(topo)
+
+    dihedrals_by_key = {}
+    for d in getattr(updated_topo, "dihedrals", []):
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        dihedrals_by_key.setdefault(key, []).append(d)
+
+    new_dihedrals = []
+    for (i, j, k, l), existing_terms in dihedrals_by_key.items():
+        data = internal_coords.get((i, j, k, l, "dihedral"))
+        if data is None:
+            new_dihedrals.extend(existing_terms)
+            continue
+
+        comment = ""
+        if existing_terms and len(existing_terms[0]) >= 9:
+            comment = existing_terms[0][8]
+
+        fit_terms = fit_type9_dihedral(
+            data,
+            temperature=CFG.temperature,
+            max_n=CFG.type9_max_n,
+            bins=CFG.type9_bins,
+            min_prob=CFG.type9_min_prob,
+        )
+        if not fit_terms:
+            new_dihedrals.extend(existing_terms)
+            continue
+
+        for term in fit_terms:
+            if len(term) == 2:
+                mult, k_term = term
+                phi0 = 0.0
+            else:
+                mult, k_term, phi0 = term
+            new_dihedrals.append(
+                [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
+            )
+
+    updated_topo.dihedrals = new_dihedrals
+    return updated_topo
+
+
 def remove_unstable_dihedrals(
     topo,
     *,
@@ -123,96 +264,31 @@ def remove_unstable_dihedrals(
 def boltzmann_invert_topology(
     topo,
     internal_coords,
+    *,
+    constraint_k_cutoff: float | None = None,
 ):
     """Compute Boltzmann-inverted bonded parameters from internal coordinate samples."""
-    updated_topo = copy.deepcopy(topo)
+    if constraint_k_cutoff is None:
+        constraint_k_cutoff = float(CFG.constraint_k_cutoff)
 
-    # Bonds
-    for idx, bond in enumerate(getattr(updated_topo, "bonds", [])):
-        i, j = int(bond[0]), int(bond[1])
-        if (i, j, "bond") not in internal_coords:
+    # Build this once and pass into the helper (faster than rebuilding every check)
+    bead_to_rings = {}
+    for ring_id, ring in enumerate(getattr(topo, "ringbeads", []) or []):
+        try:
+            beads = [int(b) for b in ring]
+        except Exception:
             continue
-        distances = internal_coords[(i, j, "bond")]
-        r0_calc, k_calc = boltzmann_inversion_bond(distances)
-        comment = bond[5] if len(bond) >= 6 else ""
-        updated_topo.bonds[idx] = [i, j, bond[2], float(r0_calc), float(k_calc), comment]
+        for bead in beads:
+            bead_to_rings.setdefault(bead, set()).add(ring_id)
 
-    # Constraints: calculate k and move weak ones to bonds
-    constraint_k_cutoff = 20000
-    new_constraints = []
-    bonds_from_constraints = []
-    
-    for constraint in getattr(updated_topo, "constraints", []):
-        i, j = int(constraint[0]), int(constraint[1])
-        if (i, j, "constraint") not in internal_coords:
-            new_constraints.append(constraint)
-            continue
-        
-        distances = internal_coords[(i, j, "constraint")]
-        r0_calc, k_calc = boltzmann_inversion_bond(distances)
-        
-        # Get comment field if present
-        comment = constraint[4] if len(constraint) >= 5 else ""
-        
-        if k_calc < constraint_k_cutoff:
-            # Convert to bond: [i, j, funct, r0, k, comment]
-            bonds_from_constraints.append([i, j, 1, float(r0_calc), float(k_calc), comment])
-            logger.info("Constraint %d-%d converted to bond (k=%.1f < %.1f)", i+1, j+1, k_calc, constraint_k_cutoff)
-        else:
-            # Keep as constraint: [i, j, funct, r0, comment]
-            new_constraints.append([i, j, constraint[2], float(r0_calc), comment])
-    
-    updated_topo.constraints = new_constraints
-    updated_topo.bonds.extend(bonds_from_constraints)
-
-    # Angles
-    for idx, angle in enumerate(getattr(updated_topo, "angles", [])):
-        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
-        if (i, j, k, "angle") not in internal_coords:
-            continue
-        samples = internal_coords[(i, j, k, "angle")]
-        theta0_calc, k_calc = boltzmann_inversion_angle(samples)
-        comment = angle[6] if len(angle) >= 7 else ""
-        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
-
-    # Dihedrals (type-9 terms)
-    dihedrals_by_key = {}
-    for d in getattr(updated_topo, "dihedrals", []):
-        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
-        dihedrals_by_key.setdefault(key, []).append(d)
-
-    new_dihedrals = []
-    for (i, j, k, l), existing_terms in dihedrals_by_key.items():
-        data = internal_coords.get((i, j, k, l, "dihedral"))
-        if data is None:
-            new_dihedrals.extend(existing_terms)
-            continue
-
-        # Get comment from first existing term if present
-        comment = ""
-        if existing_terms and len(existing_terms[0]) >= 9:
-            comment = existing_terms[0][8]
-
-        fit_terms = fit_type9_dihedral(
-            data,
-            temperature=CFG.temperature,
-            max_n=CFG.type9_max_n,
-            bins=CFG.type9_bins,
-            min_prob=CFG.type9_min_prob,
-        )
-        if not fit_terms:
-            new_dihedrals.extend(existing_terms)
-            continue
-
-        for term in fit_terms:
-            if len(term) == 2:
-                mult, k_term = term
-                phi0 = 0.0
-            else:
-                mult, k_term, phi0 = term
-            new_dihedrals.append([i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment])
-
-    updated_topo.dihedrals = new_dihedrals
+    updated_topo = boltzmann_invert_bonds(
+        topo,
+        internal_coords,
+        constraint_k_cutoff=float(constraint_k_cutoff),
+        bead_to_rings=bead_to_rings,
+    )
+    updated_topo = boltzmann_invert_angles(updated_topo, internal_coords)
+    updated_topo = boltzmann_invert_dihedrals(updated_topo, internal_coords)
     return updated_topo
 
 
@@ -226,6 +302,14 @@ def filter_topology(
 ):
     """Filter/post-process a topology after Boltzmann inversion."""
     updated_topo = copy.deepcopy(topo)
+    bead_to_rings = {}
+    for ring_id, ring in enumerate(getattr(updated_topo, "ringbeads", []) or []):
+        try:
+            beads = [int(b) for b in ring]
+        except Exception:
+            continue
+        for bead in beads:
+            bead_to_rings.setdefault(bead, set()).add(ring_id)
 
     # Angles: drop weak k
     if angle_k_cutoff is not None:
@@ -273,6 +357,11 @@ def filter_topology(
             # Extract fields: [i, j, funct, dist, k, comment?]
             i, j, funct, dist, k = bond[0], bond[1], bond[2], bond[3], bond[4]
             comment = bond[5] if len(bond) >= 6 else ""
+
+            # Never convert ring-ring link bonds into constraints.
+            if _connects_two_different_rings(updated_topo, int(i), int(j), bead_to_rings=bead_to_rings):
+                new_bonds.append(bond)
+                continue
             
             if float(k) > constraint_k_cutoff:
                 key = (int(i), int(j))
