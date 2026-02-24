@@ -171,7 +171,7 @@ def boltzmann_invert_dihedrals(topo, internal_coords):
 
 def update_bonds(
     topo,
-    constraint_k_cutoff=20000,
+    k_cutoff=20000,
 ):
     """update/post-process bond+constraint terms."""
     updated_topo = copy.deepcopy(topo)
@@ -188,12 +188,12 @@ def update_bonds(
 
         # Never convert ring-ring link bonds into constraints.
         if _connects_two_different_rings(i, j, bead_to_rings):
-            bond[4] = min(bond[4], constraint_k_cutoff)  # boost k to ensure it's kept as a bond
+            bond[4] = min(bond[4], k_cutoff)  # boost k to ensure it's kept as a bond
             bond[5] = "ring-ring link"  # update comment
             new_bonds.append(bond)
             continue
         
-        if float(k) > constraint_k_cutoff:
+        if float(k) > k_cutoff:
             new_constraints.append([i, j, funct, dist, comment])
         else:
             new_bonds.append(bond)
@@ -206,44 +206,55 @@ def update_bonds(
 
 def update_angles(
     topo,
-    angle_k_cutoff=25,
+    k_cutoff=25,
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
-    updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(angle_k_cutoff)]
+    updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(k_cutoff)]
     return updated_topo
 
 
 def update_dihedrals(
     topo,
-    dihedral_k_cutoff=5,
-    keep_best_dihedral_term: bool = True,
+    k_cutoff=5,
     angle_linear_cutoff_deg: float = 170.0,
-    drop_if_undefined: bool = True,
 ):
     """update/post-process dihedral terms (including unstable-dihedral removal)."""
     updated_topo = copy.deepcopy(topo)
 
     # Drop weak |k|, optionally keep strongest per (i,j,k,l)
-    if dihedral_k_cutoff is not None:
-        dihedrals_by_key = {}
-        for d in updated_topo.dihedrals:
-            key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
-            dihedrals_by_key.setdefault(key, []).append(d)
+    dihedrals_by_key = {}
+    for d in updated_topo.dihedrals:
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        dihedrals_by_key.setdefault(key, []).append(d)
 
-        new_dihedrals = []
-        for _, terms in dihedrals_by_key.items():
-            eligible = [t for t in terms if len(t) >= 8]
-            ineligible = [t for t in terms if len(t) < 8]
+    # If both (i,j,k,l) and (i,k,j,l) exist, they represent a symmetric dihedral.
+    # Rescale force constants to avoid double counting.
+    keys = set(dihedrals_by_key)
+    symmetric_keys = {
+        key
+        for key in keys
+        if (key[0], key[2], key[1], key[3]) in keys
+    }
 
-            kept_for_key = [t for t in eligible if abs(float(t[6])) >= dihedral_k_cutoff]
-            if not kept_for_key and eligible and keep_best_dihedral_term:
-                kept_for_key = [max(eligible, key=lambda t: abs(float(t[6])))]
+    new_dihedrals = []
+    for key, terms in dihedrals_by_key.items():
+        eligible = [t for t in terms if len(t) >= 8]
+        ineligible = [t for t in terms if len(t) < 8]
 
-            new_dihedrals.extend(ineligible)
-            new_dihedrals.extend(kept_for_key)
+        kept_for_key = [t for t in eligible if abs(float(t[6])) >= k_cutoff]
+        if not kept_for_key and eligible:
+            kept_for_key = [max(eligible, key=lambda t: abs(float(t[6])))]
 
-        updated_topo.dihedrals = new_dihedrals
+        new_dihedrals.extend(ineligible)
+
+        scale = 0.5 if key in symmetric_keys else 1.0
+        for t in kept_for_key:
+            tt = t.copy()
+            tt[6] = float(tt[6]) * scale
+            new_dihedrals.append(tt)
+
+    updated_topo.dihedrals = new_dihedrals
 
     # Remove unstable dihedrals ill-defined due to near-linear adjacent angles.
     angle_lookup = _build_angle_lookup(updated_topo)
@@ -259,24 +270,15 @@ def update_dihedrals(
     removed_undefined = 0
 
     for d in updated_topo.dihedrals:
-        if len(d) < 6:
-            kept.append(d)
-            continue
         i, j, k, l = int(d[0]), int(d[1]), int(d[2]), int(d[3])
         a1 = _eq_angle(i, j, k)
         a2 = _eq_angle(j, k, l)
-
         if a1 is None or a2 is None:
-            if drop_if_undefined:
-                removed_undefined += 1
-                continue
-            kept.append(d)
+            removed_undefined += 1
             continue
-
         if a1 >= angle_linear_cutoff_deg or a2 >= angle_linear_cutoff_deg:
             removed_linear += 1
             continue
-
         kept.append(d)
 
     updated_topo.dihedrals = kept
@@ -316,15 +318,9 @@ if __name__ == "__main__":
     topo = boltzmann_invert_angles(topo, internal_coords)
     topo = boltzmann_invert_dihedrals(topo, internal_coords)
 
-    topo = update_bonds(topo, constraint_k_cutoff=CFG.constraint_k_cutoff)
-    topo = update_angles(topo, angle_k_cutoff=CFG.angle_k_cutoff)
-    topo = update_dihedrals(
-        topo,
-        dihedral_k_cutoff=CFG.dihedral_k_cutoff,
-        keep_best_dihedral_term=True,
-        angle_linear_cutoff_deg=160.0,
-        drop_if_undefined=True,
-    )
+    topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
+    topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_linear_cutoff_deg=160.0)
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
