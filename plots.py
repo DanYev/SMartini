@@ -18,6 +18,56 @@ from lpmath import (
 logger = logging.getLogger(__name__)
 
 
+def _pair_key(i: int, j: int):
+    i = int(i)
+    j = int(j)
+    return (i, j) if i <= j else (j, i)
+
+
+def _distance_series_by_pair(internal_coords):
+    """Map unordered atom pairs -> distance series.
+
+    Internal-coordinate keys may be tagged as either 'bond' or 'constraint' depending
+    on which topology was used when sampling. For plotting, the distance series is the
+    same regardless of the tag, so we collapse both.
+    """
+    out = {}
+    for k, v in internal_coords.items():
+        if len(k) != 3:
+            continue
+        i, j, kind = k
+        if kind not in ("bond", "constraint"):
+            continue
+        out[_pair_key(i, j)] = v
+    return out
+
+
+def _build_bonds_data_for_topo(internal_coords, topo):
+    """Return bonds_data keyed by (i,j,type) matching the provided topology."""
+    series_by_pair = _distance_series_by_pair(internal_coords)
+    bonds_data = {}
+
+    for b in topo.bonds:
+        i, j = int(b[0]), int(b[1])
+        distances = series_by_pair.get(_pair_key(i, j))
+        if distances is not None:
+            bonds_data[(i, j, "bond")] = distances
+
+    for c in topo.constraints:
+        i, j = int(c[0]), int(c[1])
+        distances = series_by_pair.get(_pair_key(i, j))
+        if distances is not None:
+            bonds_data[(i, j, "constraint")] = distances
+
+    # Fallback: if topo has no bonded terms, just plot whatever series exist.
+    if not bonds_data:
+        for k, v in internal_coords.items():
+            if len(k) == 3 and k[2] in ("bond", "constraint"):
+                bonds_data[k] = v
+
+    return bonds_data
+
+
 def _kT_kjmol(temperature: float) -> float:
     kB = 0.008314462618  # kJ/mol/K
     return float(kB * float(temperature))
@@ -122,7 +172,10 @@ def plot_internal_coordinates(
     Each subplot overlays the topology-implied Boltzmann density
     $p(x) \propto e^{-U(x)/kT}$ for the corresponding bonded potential.
     """
-    bonds_data = {k: v for k, v in internal_coords.items() if k[-1] in ["bond", "constraint"]}
+    # Bonds/constraints may have changed type (bond -> constraint) after fitting.
+    # Always plot using the *current* topology list, but re-use whatever distance
+    # series was sampled for that atom pair.
+    bonds_data = _build_bonds_data_for_topo(internal_coords, topo)
     angles_data = {k: v for k, v in internal_coords.items() if k[-1] == "angle"}
     dihedrals_data = {k: v for k, v in internal_coords.items() if k[-1] == "dihedral"}
 
@@ -184,8 +237,8 @@ def _dihedral_terms_type11(topo):
 def _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature: float):
     logger.info("Plotting %s bonds/constraints", len(bonds_data))
 
-    bond_params = {(int(b[0]), int(b[1])): b for b in topo.bonds}
-    constraint_params = {(int(c[0]), int(c[1])): c for c in topo.constraints}
+    bond_params = {_pair_key(int(b[0]), int(b[1])): b for b in topo.bonds}
+    constraint_params = {_pair_key(int(c[0]), int(c[1])): c for c in topo.constraints}
 
     n_plots = len(bonds_data)
     n_cols = min(4, n_plots)
@@ -200,31 +253,44 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature: float
     for idx, (key, distances) in enumerate(bonds_data.items()):
         ax = axes[idx]
         i, j, bond_type = key
+        pair = _pair_key(i, j)
 
-        ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
-        gmm = fit_gmm_1d_best(distances, max_components=max_gaussians)
-        if gmm is not None:
-            x_grid = np.linspace(np.min(distances), np.max(distances), 300)
-            _plot_gmm(ax, x_grid, gmm)
+        if distances is None or len(distances) == 0:
+            # Keep a placeholder axis so the bond/constraint still shows up.
+            ax.text(0.5, 0.5, "No samples", transform=ax.transAxes, ha="center", va="center")
+            distances = np.asarray([], dtype=float)
+
+        if len(distances) > 0:
+            ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
+            gmm = fit_gmm_1d_best(distances, max_components=max_gaussians)
+            if gmm is not None:
+                x_grid = np.linspace(np.min(distances), np.max(distances), 300)
+                _plot_gmm(ax, x_grid, gmm)
 
         # Overlay topology-implied density p(r) ~ exp(-U(r)/kT)
-        if bond_type == "bond" and (i, j) in bond_params:
-            b = bond_params[(i, j)]
+        if bond_type == "bond" and pair in bond_params:
+            b = bond_params[pair]
             if len(b) >= 5:
                 r0 = float(b[3])
                 k = float(b[4])
-                x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                if len(distances) > 0:
+                    x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                else:
+                    x_grid = np.linspace(r0 - 0.02, r0 + 0.02, 400)
                 U = _bond_U_harmonic(x_grid, r0, k)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
                 if p is not None:
                     ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
-        elif bond_type == "constraint" and (i, j) in constraint_params:
-            c = constraint_params[(i, j)]
+        elif bond_type == "constraint" and pair in constraint_params:
+            c = constraint_params[pair]
             if len(c) >= 4:
                 r0 = float(c[3])
                 # Constraints are delta-like; approximate with a very stiff harmonic.
-                x_grid = np.linspace(np.min(distances), np.max(distances), 400)
-                if float(np.ptp(x_grid)) <= 0:
+                if len(distances) > 0:
+                    x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                    if float(np.ptp(x_grid)) <= 0:
+                        x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, 400)
+                else:
                     x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, 400)
                 k_eff = 1.0e6  # kJ/mol/nm^2 (visualization-only)
                 U = _bond_U_harmonic(x_grid, r0, k_eff)
@@ -239,17 +305,25 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature: float
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        _, k_calc = boltzmann_inversion_bond(distances)
+        if len(distances) > 1:
+            _, k_calc = boltzmann_inversion_bond(distances)
+        else:
+            k_calc = float("nan")
 
         param_k = None
-        if bond_type == "bond" and (i, j) in bond_params and len(bond_params[(i, j)]) >= 5:
-            param_k = float(bond_params[(i, j)][4])
+        if bond_type == "bond" and pair in bond_params and len(bond_params[pair]) >= 5:
+            param_k = float(bond_params[pair][4])
 
-        mean_dist = np.mean(distances)
-        std_dist = np.std(distances)
-        k_rounded = round(k_calc / 1000) * 1000
-        stats_text = f"mu={mean_dist:.3f}\nsigma={std_dist:.3f}\n"
-        stats_text += f"k={int(k_rounded/1000)}e3"
+        if len(distances) > 0:
+            mean_dist = float(np.mean(distances))
+            std_dist = float(np.std(distances))
+            stats_text = f"mu={mean_dist:.3f}\nsigma={std_dist:.3f}\n"
+        else:
+            stats_text = "(no samples)\n"
+
+        if np.isfinite(k_calc):
+            k_rounded = round(k_calc / 1000) * 1000
+            stats_text += f"k={int(k_rounded/1000)}e3"
         if param_k is not None:
             param_k_rounded = round(param_k / 1000) * 1000
             stats_text += f"\nparam k={int(param_k_rounded/1000)}e3"
@@ -440,11 +514,11 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperatur
 
 def plot_internal_coordinates_overlay(aa_coords, cg_coords, topo, output_file=None):
     """Plot AA and CG histograms for bonds, angles, and dihedrals."""
-    bonds_aa = {k: v for k, v in aa_coords.items() if k[-1] in ["bond", "constraint"]}
+    bonds_aa = _build_bonds_data_for_topo(aa_coords, topo)
     angles_aa = {k: v for k, v in aa_coords.items() if k[-1] == "angle"}
     dihedrals_aa = {k: v for k, v in aa_coords.items() if k[-1] == "dihedral"}
 
-    bonds_cg = {k: v for k, v in cg_coords.items() if k[-1] in ["bond", "constraint"]}
+    bonds_cg = _build_bonds_data_for_topo(cg_coords, topo)
     angles_cg = {k: v for k, v in cg_coords.items() if k[-1] == "angle"}
     dihedrals_cg = {k: v for k, v in cg_coords.items() if k[-1] == "dihedral"}
 
@@ -474,7 +548,6 @@ def _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file):
     constraint_ref = {(int(c[0]), int(c[1])): c[3] for c in topo.constraints}
 
     keys = _resolve_keys(bonds_aa, bonds_cg, topo)
-    keys = [k for k in keys if k in bonds_aa or k in bonds_cg]
     n_plots = len(keys)
     if n_plots == 0:
         return

@@ -176,11 +176,6 @@ class Cg_molecule:
 
             cg_beads = list_cg_beads[attempt]
 
-            # if len(cg_beads) == 11:
-            #     continue
-            # self.partitioning = self.get_partitioning(cg_beads, self.graph)
-            # exit()
-
             logger.info("Trying to partition the atoms between beads")
             try:
                 self.partitioning = self.get_partitioning(cg_beads)

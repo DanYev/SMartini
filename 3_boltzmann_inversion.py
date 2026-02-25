@@ -15,6 +15,7 @@ from lpmath import (
     read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
+from partitioning_patch import patch_topology_partitioning_from_sdf
 
 logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
 logger = get_logger(__name__)
@@ -356,6 +357,11 @@ if __name__ == "__main__":
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
+    # Patch partitioning to match the AA atom order (incl. hydrogens) used in
+    # systems/<molname>/<molname>.sdf and thus in AA topology.pdb.
+    sdf_file = wdir / f"{molname}.sdf"
+    topo = patch_topology_partitioning_from_sdf(topo, sdf_file)
+
     mddir = CFG.aa_dir()
     in_pdb = mddir / "topology.pdb"
     in_xtc = mddir / "samples.xtc"
@@ -364,11 +370,9 @@ if __name__ == "__main__":
 
     logger.info("Calculating internal coordinates from trajectory")
     internal_coords = calculate_internal_coordinates(cg_traj, topo)
-    with open("internal_coords.pkl", "wb") as f:
+    with open(wdir / "internal_coords.pkl", "wb") as f:
         pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    with open("internal_coords.pkl", "rb") as f:
-        internal_coords = pickle.load(f)
     topo = boltzmann_invert_bonds(topo, internal_coords)
     topo = boltzmann_invert_angles(topo, internal_coords)
     topo = boltzmann_invert_dihedrals(topo, internal_coords)

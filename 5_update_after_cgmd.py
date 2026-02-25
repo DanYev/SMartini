@@ -1,4 +1,5 @@
 import copy
+import pickle
 import logging
 from pathlib import Path
 import shutil
@@ -15,6 +16,7 @@ from lpmath import (
     wrap_to_180,
 )
 from plots import plot_internal_coordinates_overlay
+from partitioning_patch import patch_topology_partitioning_from_sdf
 from ligpar_config import CFG, get_logger
 
 logger = get_logger(__name__)
@@ -374,10 +376,10 @@ if __name__ == "__main__":
     wdir = CFG.wdir()
 
     itp_updated = wdir / "mapping" / f"{molname}_updated.itp"
-    itp_default = wdir / "mapping" / f"{molname}.itp"
-    in_itp = itp_updated if itp_updated.exists() else itp_default
+    in_itp = itp_updated 
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
+
     unique_dihedrals = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])) for d in topo.dihedrals}
     logger.info(
         "Loaded %s dihedral terms across %s unique torsions",
@@ -393,9 +395,9 @@ if __name__ == "__main__":
     cg_pdb = cg_dir / CFG.cg_runname / "topology.pdb"
     cg_xtc = cg_dir / CFG.cg_runname / "samples.xtc"
 
-    logger.info("Reading AA trajectory from %s", aa_dir)
-    aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning)
-    aa_internal = calculate_internal_coordinates(aa_traj, topo)
+    logger.info("Reading AA trajectory")
+    with open(wdir / "internal_coords.pkl", "rb") as f:
+        aa_internal = pickle.load(f)
 
     logger.info("Reading CG trajectory from %s", cg_dir)
     cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None)  
