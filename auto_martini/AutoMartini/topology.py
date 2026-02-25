@@ -447,6 +447,15 @@ class Topology:
         """Build dihedrals data structure and return num_ar."""
         logger.debug("Entering Topology.build_dihedrals()")
 
+        def _is_ring_diagonal(entry) -> bool:
+            """Return True if a bond/constraint entry is tagged as ring_diagonal."""
+            # Constraints are typically [i, j, funct, dist, comment]
+            # Bonds are typically [i, j, funct, dist, k, comment]
+            for val in reversed(entry):
+                if isinstance(val, str) and "ring_diagonal" in val:
+                    return True
+            return False
+
         num_ar = 0
         constlist = self.constraints
         
@@ -517,20 +526,32 @@ class Topology:
                             ik_bonded = False
                             jl_bonded = False
                             il_bonded = False
+                            ij_ring_diagonal = False
+                            kl_ring_diagonal = False
                             for b in bondlist:
                                 connectivity = [b[0], b[1]]
                                 if i in connectivity and j in connectivity:
                                     ij_bonded = True
+                                    if _is_ring_diagonal(b):
+                                        ij_ring_diagonal = True
                                 if j in connectivity and k in connectivity:
                                     jk_bonded = True
                                 if k in connectivity and l in connectivity:
                                     kl_bonded = True
+                                    if _is_ring_diagonal(b):
+                                        kl_ring_diagonal = True
                                 if i in connectivity and k in connectivity:
                                     ik_bonded = True
                                 if j in connectivity and l in connectivity:
                                     jl_bonded = True
                                 if i in connectivity and l in connectivity:
                                     il_bonded = True
+
+                            # Exclude dihedrals whose terminal bond is a ring diagonal.
+                            # (These constraints are added to stabilize fused rings and
+                            # should not define torsional terms.)
+                            if ij_ring_diagonal or kl_ring_diagonal:
+                                continue
                             
                             # # Skip if any shortcut bonds exist (not a proper dihedral chain)
                             # if ik_bonded or jl_bonded or il_bonded:

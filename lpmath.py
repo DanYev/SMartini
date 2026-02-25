@@ -496,7 +496,7 @@ def fit_type11_cbt_dihedral(
 
     A = np.column_stack(cols)  # shape (nbins, 5)
     # Weights: emphasize well-sampled/high-probability regions
-    w = np.power(density, 0.3)
+    w = np.power(density, 0.5)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)

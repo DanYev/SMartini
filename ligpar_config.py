@@ -9,17 +9,21 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "FTA"
+    molname: str = "ANP"
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
 
     # AutoMartini / mapping
-    n_beads: int = None # if None, will be determined by AutoMartini
+    n_beads: int = 11 # if None, will be determined by AutoMartini
 
     # Common subfolders
-    aa_sysname: str = "aa_md"
+    aa_sysname: str = "aa_md_pro"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
+
+    # Selections
+    aa_selection: str = "resname ANP"
+    cg_selection: str = "all"
 
     # Sampling defaults
     cg_traj_stop: int = 2000

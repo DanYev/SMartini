@@ -356,16 +356,16 @@ if __name__ == "__main__":
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
-    # mddir = CFG.aa_dir()
-    # in_pdb = mddir / "topology.pdb"
-    # in_xtc = mddir / "samples.xtc"
-    # logger.info("Reading trajectory files from %s", mddir)
-    # cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, stop=2000)
+    mddir = CFG.aa_dir()
+    in_pdb = mddir / "topology.pdb"
+    in_xtc = mddir / "samples.xtc"
+    logger.info("Reading trajectory files from %s", mddir)
+    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, stop=2000, selection=CFG.aa_selection)
 
-    # logger.info("Calculating internal coordinates from trajectory")
-    # internal_coords = calculate_internal_coordinates(cg_traj, topo)
-    # with open("internal_coords.pkl", "wb") as f:
-    #     pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
+    logger.info("Calculating internal coordinates from trajectory")
+    internal_coords = calculate_internal_coordinates(cg_traj, topo)
+    with open("internal_coords.pkl", "wb") as f:
+        pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     with open("internal_coords.pkl", "rb") as f:
         internal_coords = pickle.load(f)
