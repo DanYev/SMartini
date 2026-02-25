@@ -138,6 +138,14 @@ def boltzmann_invert_angles(topo, internal_coords):
 def boltzmann_invert_dihedrals(topo, internal_coords):
     updated_topo = copy.deepcopy(topo)
 
+    angle_lookup = _build_angle_lookup(updated_topo)
+    length_lookup = _build_length_lookup(updated_topo)
+
+    def _eq_angle(i, j, k):
+        if (i, j, k) in angle_lookup:
+            return angle_lookup[(i, j, k)]
+        return _angle_from_triangle(length_lookup, i, j, k)
+
     dihedrals_by_key = {}
     for d in updated_topo.dihedrals:
         key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
@@ -147,23 +155,88 @@ def boltzmann_invert_dihedrals(topo, internal_coords):
     for (i, j, k, l), existing_terms in dihedrals_by_key.items():
         data = internal_coords.get((i, j, k, l, "dihedral"))
 
+        if data is None:
+            raise KeyError(f"Missing dihedral samples for ({i},{j},{k},{l})")
+
         comment = ""
         if existing_terms and len(existing_terms[0]) >= 9:
             comment = existing_terms[0][8]
 
-        fit_terms = fit_type9_dihedral(
+        # If the dihedral is ill-defined due to near-linear adjacent angles,
+        # only fit CBT (funct=11).
+        a1 = _eq_angle(i, j, k)
+        a2 = _eq_angle(j, k, l)
+        ill_defined = (
+            a1 is None
+            or a2 is None
+            or float(a1) >= 160.0
+            or float(a2) >= 160.0
+        )
+
+        if ill_defined:
+            (kphi, a), score11 = fit_type11_cbt_dihedral(
+                data,
+                temperature=CFG.temperature,
+                bins=CFG.type9_bins,
+                min_prob=CFG.type9_min_prob,
+                return_score=True,
+            )
+            new_dihedrals.append(
+                [
+                    i,
+                    j,
+                    k,
+                    l,
+                    11,
+                    float(kphi),
+                    float(a[0]),
+                    float(a[1]),
+                    float(a[2]),
+                    float(a[3]),
+                    float(a[4]),
+                    comment,
+                ]
+            )
+            continue
+
+        fit_terms9, score9 = fit_type9_dihedral(
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
+            return_score=True,
+        )
+        (kphi, a), score11 = fit_type11_cbt_dihedral(
+            data,
+            temperature=CFG.temperature,
+            bins=CFG.type9_bins,
+            min_prob=CFG.type9_min_prob,
+            return_score=True,
         )
 
-        for term in fit_terms:
-            mult, k_term, phi0 = term
+        if score11 < score9:
             new_dihedrals.append(
-                [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
+                [
+                    i,
+                    j,
+                    k,
+                    l,
+                    11,
+                    float(kphi),
+                    float(a[0]),
+                    float(a[1]),
+                    float(a[2]),
+                    float(a[3]),
+                    float(a[4]),
+                    comment,
+                ]
             )
+        else:
+            for mult, k_term, phi0 in fit_terms9:
+                new_dihedrals.append(
+                    [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
+                )
 
     updated_topo.dihedrals = new_dihedrals
 
@@ -224,8 +297,7 @@ def update_angles(
 
 def update_dihedrals(
     topo,
-    internal_coords=None,
-    k_cutoff=5,
+    k_cutoff=0.5,
     angle_linear_cutoff_deg: float = 170.0,
 ):
     """update/post-process dihedral terms.
@@ -233,8 +305,7 @@ def update_dihedrals(
     Notes
     -----
     - k_cutoff/symmetric scaling are applied only to funct=9 terms.
-    - Dihedrals that are ill-defined due to (near-)linear adjacent angles are converted to
-      funct=11 (combined bending-torsion) using trajectory-derived coefficients.
+    - funct=11 dihedrals are produced during inversion; we do not convert types here.
     """
     updated_topo = copy.deepcopy(topo)
 
@@ -272,85 +343,6 @@ def update_dihedrals(
 
     updated_topo.dihedrals = new_dihedrals
 
-    # Convert unstable dihedrals that become ill-defined due to near-linear adjacent angles.
-    angle_lookup = _build_angle_lookup(updated_topo)
-    length_lookup = _build_length_lookup(updated_topo)
-
-    def _eq_angle(i, j, k):
-        if (i, j, k) in angle_lookup:
-            return angle_lookup[(i, j, k)]
-        return _angle_from_triangle(length_lookup, i, j, k)
-
-    kept = []
-    converted_linear = 0
-    converted_undefined = 0
-
-    for d in updated_topo.dihedrals:
-        i, j, k, l = int(d[0]), int(d[1]), int(d[2]), int(d[3])
-        funct = int(d[4])
-
-        # Only convert funct=9 terms; leave other dihedral types alone.
-        if funct != 9:
-            kept.append(d)
-            continue
-
-        a1 = _eq_angle(i, j, k)
-        a2 = _eq_angle(j, k, l)
-        if a1 is None or a2 is None:
-            converted_undefined += 1
-            if internal_coords is None:
-                raise ValueError(
-                    f"Need internal_coords to convert dihedral ({i},{j},{k},{l}) to funct=11"
-                )
-            phi = internal_coords.get((i, j, k, l, "dihedral"))
-            if phi is None:
-                raise KeyError(
-                    f"Missing samples for CBT fit of dihedral ({i},{j},{k},{l}): "
-                    f"phi={phi is not None}"
-                )
-            kphi, a = fit_type11_cbt_dihedral(
-                phi,
-                temperature=CFG.temperature,
-                bins=max(60, int(CFG.type9_bins)),
-                min_prob=float(CFG.type9_min_prob),
-            )
-            comment = d[-1] if (len(d) > 0 and isinstance(d[-1], str)) else ""
-            d2 = [i, j, k, l, 11, float(kphi), float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4]), comment]
-            kept.append(d2)
-            continue
-        if a1 >= angle_linear_cutoff_deg or a2 >= angle_linear_cutoff_deg:
-            converted_linear += 1
-            if internal_coords is None:
-                raise ValueError(
-                    f"Need internal_coords to convert dihedral ({i},{j},{k},{l}) to funct=11"
-                )
-            phi = internal_coords.get((i, j, k, l, "dihedral"))
-            if phi is None:
-                raise KeyError(
-                    f"Missing samples for CBT fit of dihedral ({i},{j},{k},{l}): "
-                    f"phi={phi is not None}"
-                )
-            kphi, a = fit_type11_cbt_dihedral(
-                phi,
-                temperature=CFG.temperature,
-                bins=max(60, int(CFG.type9_bins)),
-                min_prob=float(CFG.type9_min_prob),
-            )
-            comment = d[-1] if (len(d) > 0 and isinstance(d[-1], str)) else ""
-            d2 = [i, j, k, l, 11, float(kphi), float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4]), comment]
-            kept.append(d2)
-            continue
-        kept.append(d)
-
-    updated_topo.dihedrals = kept
-    logger.info(
-        "updated dihedrals: kept=%s, converted_linear=%s (>%s deg), converted_undefined=%s",
-        len(kept),
-        converted_linear,
-        angle_linear_cutoff_deg,
-        converted_undefined,
-    )
-
     return updated_topo
 
 
@@ -383,12 +375,7 @@ if __name__ == "__main__":
 
     topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff)
-    topo = update_dihedrals(
-        topo,
-        internal_coords=internal_coords,
-        k_cutoff=CFG.dihedral_k_cutoff,
-        angle_linear_cutoff_deg=160.0,
-    )
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff)
 
     out_itp = wdir / "mapping" / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
@@ -399,4 +386,5 @@ if __name__ == "__main__":
         topo,
         output_file=wdir / "png" / "aa.png",
         temperature=CFG.temperature,
+        max_gaussians=CFG.type9_max_n,
     )

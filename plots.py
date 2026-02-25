@@ -234,7 +234,7 @@ def _plot_bonds(bonds_data, topo, output_file, max_gaussians, temperature: float
 
         ax.set_xlabel("Distance (nm)", fontsize=9)
         ax.set_title(f"{bond_type.capitalize()}: {i+1}-{j+1}", fontsize=10)
-        ax.legend(fontsize=8)
+        # ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
@@ -378,7 +378,9 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperatur
         i, j, k, l, dihedral_type = key
 
         # Plot in absolute wrapped coordinates so we match the potential definition.
-        dihedrals_wrapped = wrap_to_180(np.asarray(dihedrals, dtype=float))
+        # dihedrals_wrapped = wrap_to_180(np.asarray(dihedrals, dtype=float))
+        shift = float(circular_mean(dihedrals))
+        dihedrals_wrapped = wrap_to_180(dihedrals - shift)
         vmin, vmax = -180.0, 180.0
 
         ax.hist(
@@ -398,31 +400,29 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, max_gaussians, temperatur
         terms11 = dihedral_terms_11.get((i, j, k, l), [])
         terms9 = dihedral_terms.get((i, j, k, l), [])
 
-        x_grid = np.linspace(vmin, vmax, 800)
+        x_shifted = x_grid + shift
         if terms11:
-            U = _dihedral_U_type11(x_grid, terms11)
-            p = _boltzmann_density_from_U(x_grid, U, temperature)
-            if p is not None:
-                ax.plot(
-                    x_grid,
-                    p,
-                    color="black",
-                    linewidth=1.6,
-                    label=r"funct=11: $p\propto e^{-U/kT}$",
-                )
+            U = _dihedral_U_type11(x_shifted, terms11)
+            p = _boltzmann_density_from_U(x_shifted, U, temperature)
+            ax.plot(
+                x_grid,
+                p,
+                color="black",
+                linewidth=1.6,
+                label=r"funct=11: $p\propto e^{-U/kT}$",
+            )
         elif terms9:
-            U = _dihedral_U_type9(x_grid, terms9)
-            p = _boltzmann_density_from_U(x_grid, U, temperature)
-            if p is not None:
-                ax.plot(
-                    x_grid,
-                    p,
-                    color="black",
-                    linewidth=1.6,
-                    label=r"funct=9: $p\propto e^{-U/kT}$",
-                )
+            U = _dihedral_U_type9(x_shifted, terms9)
+            p = _boltzmann_density_from_U(x_shifted, U, temperature)
+            ax.plot(
+                x_grid,
+                p,
+                color="black",
+                linewidth=1.6,
+                label=r"funct=9: $p\propto e^{-U/kT}$",
+            )
 
-        ax.set_xlabel("Dihedral (deg)", fontsize=9)
+        ax.set_xlabel(f"Dihedral (deg) - shift={shift:.1f}", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
         ax.grid(alpha=0.3)
         ax.set_yticks([])

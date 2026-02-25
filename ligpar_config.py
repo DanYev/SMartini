@@ -28,13 +28,13 @@ class LigParConfig:
     temperature: float = 300.0
 
     # Type-9 dihedral (Gromacs) fitting parameters
-    type9_max_n: int = 8
+    type9_max_n: int = 6
     type9_bins: int = 360
     type9_min_prob: float = 1e-6
 
     # Post-fit filtering / topology cleanup
     constraint_k_cutoff: float = 20000.0
-    angle_k_cutoff: float = 10.0
+    angle_k_cutoff: float = 5.0
     dihedral_k_cutoff: float = 0.0
 
     # Refinement guardrails

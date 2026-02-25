@@ -171,7 +171,7 @@ def boltzmann_inversion_angle(angles, temperature=300.0):
 
     residual_rad = np.deg2rad(angles - theta0)
     variance_rad = float(np.var(residual_rad))
-    k = float(kT / variance_rad)
+    k = float(0.8 * kT / variance_rad)
 
     return theta0, k
 
@@ -199,7 +199,7 @@ def gmm_pdf_1d(x, weights, means, variances):
 
 
 def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4, 
-                    min_weight=0.1, min_spacing_std=4.0):
+                    min_weight=0.05, min_spacing_std=2.0):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
     Parameters
@@ -308,7 +308,8 @@ def fit_type9_dihedral(
     temperature=300.0,
     max_n=6,
     bins=360,
-    min_prob=1e-3,
+    min_prob=1e-6,
+    return_score: bool = False,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
 
@@ -363,10 +364,7 @@ def fit_type9_dihedral(
             spacings = np.concatenate([diffs, [wrap_diff]])
             spacing = float(np.median(spacings)) if spacings.size else 360.0
 
-        if not np.isfinite(spacing) or spacing <= 1e-6:
-            optimal_n = 1
-        else:
-            optimal_n = int(np.clip(int(np.round(360.0 / spacing)), 1, int(max_n)))
+        optimal_n = int(np.clip(int(np.round(360.0 / spacing)), 1, int(max_n)))
 
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
@@ -379,9 +377,9 @@ def fit_type9_dihedral(
         raise ValueError("Type-9 dihedral fit failed: invalid density")
 
     optimal_n = int(max(1, min(int(optimal_n), int(max_n))))
-    harmonics_to_fit = [1]
-    if optimal_n != 1:
-        harmonics_to_fit.append(optimal_n)
+    harmonics_to_fit = [] 
+    for n in range(1, max_n + 1):
+        harmonics_to_fit.append(n)
 
     cols = [np.ones_like(phi_rad)]
     for n in harmonics_to_fit:
@@ -394,12 +392,14 @@ def fit_type9_dihedral(
     if len(harmonics_to_fit) == 1:
         w = np.pow(density, 1.0)
     else:
-        w = np.pow(density, 0.2)
+        w = np.pow(density, 0.3)
 
     A = np.column_stack(cols)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    resid = Aw @ coeffs - bw
+    score = float(np.mean(resid**2))
 
     def _k_phi_from_ab(a, b, n: int):
         k = np.hypot(a, b)
@@ -418,8 +418,10 @@ def fit_type9_dihedral(
         a = coeffs[1 + 2 * idx]
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
-        terms.append((int(n), float(k), float(phi)))
+        terms.append((int(n), float(0.8 * k), float(phi)))
 
+    if return_score:
+        return terms, score
     return terms
 
 
@@ -429,6 +431,7 @@ def fit_type11_cbt_dihedral(
     bins=360,
     min_prob=1e-3,
     cos_power_max: int = 4,
+    return_score: bool = False,
 ):
     r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).
 
@@ -493,18 +496,26 @@ def fit_type11_cbt_dihedral(
 
     A = np.column_stack(cols)  # shape (nbins, 5)
     # Weights: emphasize well-sampled/high-probability regions
-    w = np.power(density, 0.2)
+    w = np.power(density, 0.3)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
     coeffs = np.asarray(coeffs, dtype=float)
 
+    resid = Aw @ coeffs - bw
+    score = float(np.mean(resid**2))
+
     scale = float(np.max(np.abs(coeffs)))
     if not np.isfinite(scale) or scale < 1e-12:
+        if return_score:
+            return (0.0, [0.0, 0.0, 0.0, 0.0, 0.0]), score
         return 0.0, [0.0, 0.0, 0.0, 0.0, 0.0]
 
     k_phi = scale
     a = (coeffs / scale).tolist()
     # Ensure length exactly 5
     a = [float(x) for x in a[:5]]
-    return float(k_phi), a
+    result = (float(0.8 * k_phi), a)
+    if return_score:
+        return result, score
+    return result
