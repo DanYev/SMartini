@@ -255,25 +255,21 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
 
 
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
-    """Update dihedrals by shifting phase and rescaling force constants.
-    
+    """Update dihedrals by rescaling force constants (no phase shifting).
+
     Strategy
     --------
-    - Phase shift: phi0_new = phi0_old + mult * (mu_AA - mu_CG)
-      For type-9: V = k[1 + cos(n*phi - phi0)], if dihedral shifts by delta,
-      the phase parameter must shift by n*delta to maintain alignment
-      **Applied to all terms**
-    - Force constants: rescale by (sigma_CG / sigma_AA)^2 with an upper cap of 2.0
-      **Only applied to the highest multiplicity term** (e.g., n=3 not n=1)
-    - Never removes dihedrals; only updates parameters when data exist.
-    
-    Notes
-    -----
-    - Uses circular mean + std of wrapped residuals
-    - All terms are phase-shifted, but only max(n) term is rescaled
+    - No shifting of phi0.
+    - Rescale force constants by (sigma_CG / sigma_AA)^2 (harmonic approximation).
+    - Clamp the scale factor to avoid extreme updates.
+
+    Applied terms
+    ------------
+    - funct=9: scales k (field 6)
+    - funct=11: scales kphi (field 5)
     """
     n_dihedrals_updated = 0
-    
+
     new_dihedrals = []
     dihedrals_by_key = {}
     for dihedral in topo.dihedrals:
@@ -284,44 +280,51 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         key = (i, j, k, l, "dihedral")
         aa_vals = aa_internal.get(key)
         cg_vals = cg_internal.get(key)
-        
+
         if aa_vals is None or cg_vals is None:
-            # No AA or CG data, keep existing terms
             new_dihedrals.extend(terms)
             continue
-        
-        # Calculate circular statistics for AA and CG trajectories
-        mu_aa, sigma_aa = _stats(aa_vals, "dihedral")
-        mu_cg, sigma_cg = _stats(cg_vals, "dihedral")
-        
-        # Phase shift: wrapped difference of circular means
-        delta = wrap_to_180((mu_aa - mu_cg) * CFG.refine_dihedral_shift_scale)
-        
-        # Force constant scale
+
+        _, sigma_aa = _stats(aa_vals, "dihedral")
+        _, sigma_cg = _stats(cg_vals, "dihedral")
+        if not np.isfinite(sigma_aa) or not np.isfinite(sigma_cg) or sigma_aa <= 0 or sigma_cg <= 0:
+            new_dihedrals.extend(terms)
+            continue
+
         scale = float((sigma_cg / sigma_aa) ** 2)
+        if np.isfinite(CFG.refine_max_k_scale) and CFG.refine_max_k_scale and CFG.refine_max_k_scale > 0:
+            max_scale = float(CFG.refine_max_k_scale)
+            scale = float(np.clip(scale, 1.0 / max_scale, max_scale))
 
-        # Find maximum multiplicity among all terms for this dihedral
-        max_mult = max((int(term[7]) for term in terms if len(term) >= 8), default=1)
+        # For funct=9, only rescale the highest-multiplicity term (keep relative weights).
+        max_mult = max((int(term[7]) for term in terms if len(term) >= 8 and int(term[4]) == 9), default=None)
 
-        # Update each term for this dihedral
         for term in terms:
             updated = list(term)
-            phi0_old = float(updated[5])
-            k_old = float(updated[6])
-            mult = int(updated[7])
+            try:
+                funct = int(updated[4])
+            except Exception:
+                funct = None
 
-            # Shift phase for all terms by mult * delta (accounting for n-fold symmetry)
-            updated[5] = float(wrap_to_180(phi0_old - mult * delta))
+            if funct == 9 and len(updated) >= 7:
+                mult = int(updated[7]) if len(updated) >= 8 else None
+                if max_mult is None or mult == max_mult:
+                    k_new = float(updated[6]) * scale
+                    if np.isfinite(CFG.dihedral_k_cutoff) and CFG.dihedral_k_cutoff and CFG.dihedral_k_cutoff > 0:
+                        k_new = min(k_new, float(CFG.dihedral_k_cutoff))
+                    updated[6] = float(k_new)
+                    n_dihedrals_updated += 1
 
-            # Rescale force constant only for the highest multiplicity term
-            if mult == max_mult:
-                updated[6] = float(k_old * scale)
+            elif funct == 11 and len(updated) >= 6:
+                kphi_new = float(updated[5]) * scale
+                if np.isfinite(CFG.dihedral_k_cutoff) and CFG.dihedral_k_cutoff and CFG.dihedral_k_cutoff > 0:
+                    kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
+                updated[5] = float(kphi_new)
+                n_dihedrals_updated += 1
 
             new_dihedrals.append(updated)
-            n_dihedrals_updated += 1
 
     topo.dihedrals = new_dihedrals
-
     return n_dihedrals_updated, 0
 
 
@@ -352,18 +355,18 @@ def refine_topology_from_cg_vs_aa(
     # Update angles
     n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
-    # # Update dihedrals
-    # n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
+    # Update dihedrals
+    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
-    # logger.info(
-    #     "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
-    #     n_bonds_updated,
-    #     n_constraints_updated,
-    #     n_angles_updated,
-    #     n_angles_removed,
-    #     n_dihedrals_updated,
-    #     n_dihedrals_removed,
-    # )
+    logger.info(
+        "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
+        n_bonds_updated,
+        n_constraints_updated,
+        n_angles_updated,
+        n_angles_removed,
+        n_dihedrals_updated,
+        n_dihedrals_removed,
+    )
 
     updated.to_itp(out_file=output_itp)
     logger.info("Wrote refined ITP to %s", output_itp)

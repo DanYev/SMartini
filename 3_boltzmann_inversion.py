@@ -145,6 +145,11 @@ def boltzmann_invert_dihedrals(topo, internal_coords):
     def _eq_angle(i, j, k):
         if (i, j, k) in angle_lookup:
             return angle_lookup[(i, j, k)]
+        # If this angle isn't explicitly defined in the topology, use the
+        # geometric mean from the trajectory (if available).
+        adj = internal_coords.get((i, j, k, "adj_angle"))
+        if adj is not None and len(adj) > 0:
+            return float(np.mean(adj))
         return _angle_from_triangle(length_lookup, i, j, k)
 
     dihedrals_by_key = {}
@@ -215,6 +220,7 @@ def boltzmann_invert_dihedrals(topo, internal_coords):
             min_prob=CFG.type9_min_prob,
             return_score=True,
         )
+        print(f"Dihedral ({i+1},{j+1},{k+1},{l+1}): score9={score9:.4f}, score11={score11:.4f}")
 
         if score11 < score9:
             new_dihedrals.append(
@@ -305,7 +311,8 @@ def update_dihedrals(
 
     Notes
     -----
-    - k_cutoff/symmetric scaling are applied only to funct=9 terms.
+    - k_cutoff is applied only to funct=9 terms.
+    - duplicate scaling is applied to funct=9 and funct=11 terms.
     - funct=11 dihedrals are produced during inversion; we do not convert types here.
     """
     updated_topo = copy.deepcopy(topo)
@@ -316,14 +323,18 @@ def update_dihedrals(
         key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
         dihedrals_by_key.setdefault(key, []).append(d)
 
-    # If both (i,j,k,l) and (i,k,j,l) exist, they represent a symmetric dihedral.
-    # Rescale force constants to avoid double counting.
+    # Some topology generators may emit the same torsion multiple times under
+    # different index permutations (same 4 beads). To avoid double counting,
+    # rescale force constants by 1/N where N is the number of permutations
+    # actually present for that 4-bead set.
     keys = set(dihedrals_by_key)
-    symmetric_keys = {
-        key
-        for key in keys
-        if (key[0], key[2], key[1], key[3]) in keys
-    }
+    perm_group_size = {}
+    groups = {}
+    for key in keys:
+        group = tuple(sorted(key))
+        groups.setdefault(group, set()).add(key)
+    for group, gkeys in groups.items():
+        perm_group_size[group] = len(gkeys)
 
     new_dihedrals = []
     for key, terms in dihedrals_by_key.items():
@@ -334,9 +345,22 @@ def update_dihedrals(
         if not kept_for_key and type9:
             kept_for_key = [max(type9, key=lambda t: abs(float(t[6])))]
 
-        new_dihedrals.extend(other)
+        group = tuple(sorted(key))
+        n_perm = int(perm_group_size.get(group, 1))
+        scale = 1.0 / float(n_perm) if n_perm > 0 else 1.0
 
-        scale = 0.5 if key in symmetric_keys else 1.0
+        # Apply scaling to "other" terms when supported.
+        # - funct=11: scale kphi (index 5)
+        # - other funct: keep as-is (unknown parameter layout)
+        for t in other:
+            tt = t.copy()
+            try:
+                funct = int(tt[4])
+            except Exception:
+                funct = None
+            if funct == 11 and len(tt) >= 6:
+                tt[5] = float(tt[5]) * scale
+            new_dihedrals.append(tt)
         for t in kept_for_key:
             tt = t.copy()
             tt[6] = float(tt[6]) * scale
@@ -362,17 +386,22 @@ if __name__ == "__main__":
     sdf_file = wdir / f"{molname}.sdf"
     topo = patch_topology_partitioning_from_sdf(topo, sdf_file)
 
-    mddir = CFG.aa_dir()
-    in_pdb = mddir / "topology.pdb"
-    in_xtc = mddir / "samples.xtc"
-    logger.info("Reading trajectory files from %s", mddir)
-    cg_traj = read_cog_trajectory(in_pdb, in_xtc, topo.partitioning, stop=2000, selection=CFG.aa_selection)
-
-    logger.info("Calculating internal coordinates from trajectory")
-    internal_coords = calculate_internal_coordinates(cg_traj, topo)
-    with open(wdir / "internal_coords.pkl", "wb") as f:
-        pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
-
+    pickle_file = wdir / "internal_coords.pkl"
+    if pickle_file.exists():
+        logger.info("Loading internal coordinates from %s", pickle_file)
+        with open(pickle_file, "rb") as f:
+            internal_coords = pickle.load(f)
+    else:
+        aa_dir = CFG.aa_dir()
+        aa_pdb = aa_dir / "topology.pdb"
+        aa_xtc = aa_dir / "samples.xtc"
+        logger.info("Reading AA trajectory from %s", aa_dir)
+        aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, selection=CFG.aa_selection)
+        logger.info("Calculating internal coordinates from AA trajectory")
+        internal_coords = calculate_internal_coordinates(aa_traj, topo)
+        with open(pickle_file, "wb") as f:
+            pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
+            
     topo = boltzmann_invert_bonds(topo, internal_coords)
     topo = boltzmann_invert_angles(topo, internal_coords)
     topo = boltzmann_invert_dihedrals(topo, internal_coords)

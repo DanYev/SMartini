@@ -133,6 +133,15 @@ def calculate_internal_coordinates(cg_trajectory, topo):
             cg_trajectory, i, j, k, l
         )
 
+        # Auxiliary adjacent angles for dihedral linearity checks.
+        # These are geometric properties of the trajectory and should be available
+        # even if the topology does not include an explicit [angles] entry.
+        # Use a distinct key tag to avoid changing angle plotting/fitting behavior.
+        if (i, j, k, "angle") not in internal_coords and (i, j, k, "adj_angle") not in internal_coords:
+            internal_coords[(i, j, k, "adj_angle")] = ligpar_cy.angle_series(cg_trajectory, i, j, k)
+        if (j, k, l, "angle") not in internal_coords and (j, k, l, "adj_angle") not in internal_coords:
+            internal_coords[(j, k, l, "adj_angle")] = ligpar_cy.angle_series(cg_trajectory, j, k, l)
+
     return internal_coords
 
 
@@ -378,7 +387,7 @@ def fit_type9_dihedral(
 
     optimal_n = int(max(1, min(int(optimal_n), int(max_n))))
     harmonics_to_fit = [] 
-    for n in range(1, max_n + 1):
+    for n in range(1, optimal_n + 1):
         harmonics_to_fit.append(n)
 
     cols = [np.ones_like(phi_rad)]
