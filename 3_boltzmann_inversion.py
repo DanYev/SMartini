@@ -393,8 +393,8 @@ if __name__ == "__main__":
             internal_coords = pickle.load(f)
     else:
         aa_dir = CFG.aa_dir
-        aa_pdb = aa_dir / "topology.pdb"
-        aa_xtc = aa_dir / "samples.xtc"
+        aa_pdb = aa_dir / "md.pdb"
+        aa_xtc = aa_dir / "md.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
         aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, selection=CFG.aa_selection)
         logger.info("Calculating internal coordinates from AA trajectory")

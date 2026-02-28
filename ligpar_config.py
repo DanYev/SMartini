@@ -26,7 +26,7 @@ class LigParConfig:
     cg_dir: Path = wdir / cg_sysname
 
     # Selections
-    aa_selection: str = "resname ANP"
+    aa_selection: str = "resname UNK"
     cg_selection: str = "all"
 
     # Sampling defaults

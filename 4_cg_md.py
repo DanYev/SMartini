@@ -1,14 +1,14 @@
-
-from pathlib import Path
+import logging
 import shutil
 import MDAnalysis as mda
+from pathlib import Path
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
-from reforge.utils import clean_dir, get_logger
-from reforge.forge.topology import Topology
+from reforge.utils import clean_dir
 
 from ligpar_config import CFG
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Global settings
 INPDB = 'KDA.pdb'
@@ -17,7 +17,7 @@ total_time = 1000  # Total simulation time in nanoseconds
 NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
 
 ligand = CFG.molname
-sysdir = str(CFG.wdir())
+sysdir = CFG.wdir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
 

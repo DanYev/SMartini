@@ -27,10 +27,9 @@ TOTAL_STEPS = int(1e6)
 TRJ_NOUT = 1000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
 CHK_NOUT = 100000 
-OUT_SELECTION = "resname UNK" # "all" "not resname HOH" "protein"
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 # Analysis and trjconv
-SELECTION = OUT_SELECTION 
+SELECTION = CFG.aa_selection 
 #########
 
 ligand_name = CFG.molname
@@ -47,7 +46,7 @@ def process_ligand(ligand_name):
     logger.info("Working directory: %s", wdir)
     logger.info("Processing ligand: %s", ligand_name)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
-    input_file = wdir / f"{ligand_name}_ideal.sdf"
+    input_file = wdir / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
     ligand = Molecule.from_file(str(input_file))
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
@@ -110,8 +109,8 @@ def md_npt():
     simulation.step(10000)
     # MD
     logger.info("Production...")
-    logger.info(f'Saving reference PDB with selection: {OUT_SELECTION}')
-    mda.Universe(system_pdb).select_atoms(OUT_SELECTION).write(str(aa_dir / "md.pdb"))
+    logger.info(f'Saving reference PDB with selection: {SELECTION}')
+    mda.Universe(system_pdb).select_atoms(SELECTION).write(str(aa_dir / "md.pdb"))
     reporters = _get_reporters(append=False, prefix='md')
     simulation.reporters = reporters
     simulation.step(int(TOTAL_STEPS))
@@ -158,13 +157,13 @@ def _get_reporters(append=False, prefix="md"):
         sys.stderr, LOG_NOUT, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
     # Custom trajectory reporter with velocities using MmReporter
-    logger.info(f'Setting up trajectory reporter with selection: {OUT_SELECTION}')
+    logger.info(f'Setting up trajectory reporter with selection: {ELECTION}')
     traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{TRJEXT}"), 
-        reportInterval=TRJ_NOUT, selection=OUT_SELECTION)
+        reportInterval=TRJ_NOUT, selection=SELECTION)
     return log_reporter, err_reporter, traj_reporter
 
 
 if __name__ == "__main__":
-    # process_ligand(ligand_name)
+    process_ligand(ligand_name)
     md_npt()
     trjconv()
