@@ -376,7 +376,7 @@ def refine_topology_from_cg_vs_aa(
 
 if __name__ == "__main__":
     molname = CFG.molname
-    wdir = CFG.wdir()
+    wdir = CFG.wdir
 
     itp_updated = wdir / "mapping" / f"{molname}_updated.itp"
     in_itp = itp_updated 
@@ -390,11 +390,7 @@ if __name__ == "__main__":
         len(unique_dihedrals),
     )
 
-    aa_dir = CFG.aa_dir()
-    aa_pdb = aa_dir / "topology.pdb"
-    aa_xtc = aa_dir / "samples.xtc"
-
-    cg_dir = CFG.cg_dir()
+    cg_dir = CFG.cg_dir
     cg_pdb = cg_dir / CFG.cg_runname / "topology.pdb"
     cg_xtc = cg_dir / CFG.cg_runname / "samples.xtc"
 
