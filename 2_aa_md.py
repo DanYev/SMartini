@@ -1,20 +1,14 @@
 import logging
-from pathlib import Path
-import shutil
 import sys
+import MDAnalysis as mda
 import numpy as np
 import openmm as mm
+from pathlib import Path
 from openmm import app, unit
 from openff.toolkit import ForceField, Molecule, Topology 
 from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
-import MDAnalysis as mda
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from pdbfixer import PDBFixer
-from reforge.mdsystem.mdsystem import MDSystem, MDRun
-from reforge.mdsystem.gmxmd import GmxSystem, GmxRun
-from reforge.mdsystem.mmmd import MmSystem, MmRun, MmReporter, convert_trajectories, get_platform_info
+from reforge.mdsystem.mmmd import MmReporter, convert_trajectories
 
 from ligpar_config import CFG
 
@@ -88,13 +82,12 @@ def process_ligand(ligand_name):
 
 
 def md_npt(): 
-    # Log platform info
-    platform = mm.Platform.getPlatformByName("CUDA")
-    properties = {
-        "CudaDeviceIndex": "0", # IF multiple GPUs
-        "CudaPrecision": "mixed"
-    }
-    get_platform_info()
+    # # Log platform info
+    # platform = mm.Platform.getPlatformByName("CUDA")
+    # platform_properties = {
+    #     "CudaDeviceIndex": "0", # IF multiple GPUs
+    #     "CudaPrecision": "mixed"
+    # }
     # Prep
     logger.info("Preparing the system...")
     logger.info("Loading the PDB file...")
@@ -103,30 +96,25 @@ def md_npt():
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(system_xml)
     # Create simulation object
-    integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
-    simulation = app.Simulation(pdb.topology, system, integrator)
+    integrator = mm.LangevinMiddleIntegrator(TEMPERATURE, GAMMA, 2*unit.femtosecond)  
+    simulation = app.Simulation(pdb.topology, system, integrator) 
+        # platform=platform, platformProperties=platform_properties)
     simulation.context.setPositions(pdb.positions)
     # Minimization
     logger.info("Minimizing energy...")
     simulation.minimizeEnergy(maxIterations=1000)
     # Eqilibration
     logger.info("Equilibrating...")
-    simulation.integrator.setTemperature(TEMPERATURE)
     barostat = mm.MonteCarloBarostat(PRESSURE, TEMPERATURE)
     system.addForce(barostat)
-    simulation.step(5000)
+    simulation.step(10000)
     # MD
     logger.info("Production...")
-    # add_extra_forces(simulation.system) # IF STARING FROM EQ
-    simulation.integrator.setStepSize(TSTEP)
-    # Reporters
     logger.info(f'Saving reference PDB with selection: {OUT_SELECTION}')
     mda.Universe(system_pdb).select_atoms(OUT_SELECTION).write(str(aa_dir / "md.pdb"))
     reporters = _get_reporters(append=False, prefix='md')
     simulation.reporters = reporters
-    # Run
-    nsteps = int(TOTAL_STEPS)
-    simulation.step(nsteps)
+    simulation.step(int(TOTAL_STEPS))
     logger.info("Done!")
 
 
