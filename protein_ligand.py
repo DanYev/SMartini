@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import shutil
 import sys
@@ -15,9 +16,9 @@ from reforge.martini import martini_openmm
 from reforge.mdsystem.mdsystem import MDSystem, MDRun
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun
 from reforge.mdsystem.mmmd import MmSystem, MmRun, MmReporter, convert_trajectories, get_platform_info
-from reforge.utils import clean_dir, get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Global settings
 # Production parameters
@@ -261,63 +262,6 @@ def prepare_protein_ligand_system(
     return system, modeller.topology, modeller.positions
 
 
-def process_ligand(sysdir, sysname, ligand_name):
-    mdsys = MmSystem(sysdir, sysname)
-    logger.info("Processing ligand: %s", ligand_name)
-    wdir = Path("systems") / ligand_name
-    wdir.mkdir(parents=True, exist_ok=True)
-    logger.info("Ligand working directory: %s", wdir)
-    input_file = Path(sysdir) / f"{ligand_name}.sdf"
-    logger.info("Reading ligand file: %s", input_file)
-    ligand = Molecule.from_file(str(input_file))
-    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
-    forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
-    # Ligand FF
-    forcefield.registerTemplateGenerator(smirnoff.generator)
-    ff = ForceField("openff-2.1.0.offxml")
-    interchange = Interchange.from_smirnoff(ff, ligand.to_topology())
-    ligand_topology = interchange.to_openmm_topology()
-    ligand_positions = interchange.positions.to_openmm()
-    model = app.Modeller(ligand_topology, ligand_positions)
-    logger.info("Adding solvent and ions")
-    model.addSolvent(forcefield, 
-        model='tip3p', 
-        boxShape='cube', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.5 * unit.nanometer,
-        ionicStrength=0.1 * unit.molar,
-        positiveIon='Na+',
-        negativeIon='Cl-')    
-    with open(mdsys.syspdb, "w", encoding="utf-8") as file:
-        app.PDBFile.writeFile(model.topology, model.positions, file, keepIds=True)    
-    logger.info("Generating topology...")
-    system = forcefield.createSystem(
-        model.topology,
-        nonbondedMethod=app.PME,
-        nonbondedCutoff=1.0 * unit.nanometer,
-        constraints=app.HBonds,
-        removeCMMotion=False,     # important for strict NVE
-        ewaldErrorTolerance=1e-5
-    )
-    _save_system_to_xml(system, mdsys.sysxml)
-    exit()
-    # forcefield = ForceField("openff-2.2.1.offxml")
-    # topology = ligand.to_topology()
-    # logger.info("Creating interchange (OpenFF -> OpenMM)")
-    # ic = forcefield.create_interchange(topology)
-    # pdb_out = wdir / "ligand.pdb"
-    # logger.info("Writing ligand PDB: %s", pdb_out)
-    # ic.to_pdb(pdb_out)
-    # logger.info("Creating OpenMM System")
-    # mm_sys = ic.to_openmm_system()
-    # xml_out = wdir / "ligand_sys.xml"
-    # logger.info("Writing OpenMM System XML: %s", xml_out)
-    # _save_system_to_xml(mm_sys, xml_out)
-    # ic.to_top(wdir / "ligand.itp")
-    # ic.to_mdp(wdir / "ligand.mdp")
-    # ic.to_gro(wdir / "ligand.gro")
-    # logger.info("Done processing ligand: %s", ligand_name)
-
-
 def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"): 
     mdsys = MmSystem(sysdir, sysname)
     mdrun = MmRun(sysdir, sysname, runname)
@@ -482,6 +426,6 @@ def trjconv(sysdir, sysname, runname):
 
 
 if __name__ == "__main__":
-    # setup(sysdir, sysname)
-    # md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
+    setup(sysdir, sysname)
+    md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
     trjconv(sysdir, sysname, runname)

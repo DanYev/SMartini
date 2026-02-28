@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # mol_am, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
-    sdf_file = wdir / f"{molname}.sdf"
+    sdf_file = wdir / f"{molname}_ideal.sdf"
     mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 

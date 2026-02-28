@@ -436,6 +436,28 @@ class Cg_molecule:
     @staticmethod
     def _distribute_neighbors(trial_comb, atoms):
         """Find acceptable mappings of atoms to beads for given trial combination"""
+
+        def _single_atom_in_mapping(mapping):
+            for ns in mapping:
+                if len(ns) == 1:
+                    return True
+            return False
+
+        def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+            for ns, ring in zip(mapping, bead_is_in_ring):
+                if ring and len(ns) > 2:
+                    return False
+            return True
+
+        def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+            for ns, ring in zip(mapping, bead_is_in_ring):
+                if not ring:
+                    continue
+                for atom in ns:
+                    if not atom_is_in_ring[atom]:
+                        return False
+            return True
+
         bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
         bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
         atom_is_in_ring = [a["is_in_ring"] for a in atoms]
@@ -461,7 +483,7 @@ class Cg_molecule:
         # Filter out mappings with single atoms in beads
         tmp_list = []
         for mapping in mappings:
-            if Cg_molecule._single_atom_in_mapping(mapping):
+            if _single_atom_in_mapping(mapping):
                 continue
             tmp_list.append(mapping)
         mappings = tmp_list
@@ -471,7 +493,7 @@ class Cg_molecule:
         # Prefer keeping ring beads small
         tmp_list = []
         for mapping in mappings:
-            if not Cg_molecule._ring_beads_are_tiny(mapping, bead_is_in_ring):
+            if not _ring_beads_are_tiny(mapping, bead_is_in_ring):
                 continue
             tmp_list.append(mapping)
         if tmp_list:
@@ -482,7 +504,7 @@ class Cg_molecule:
         # Prefer keeping ring beads together (no mixing ring/non-ring)
         tmp_list = []
         for mapping in mappings:
-            if not Cg_molecule._ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+            if not _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
                 continue
             tmp_list.append(mapping)
         if tmp_list:
@@ -494,30 +516,7 @@ class Cg_molecule:
             return mappings[0]
 
         return mappings[0]
-
-    @staticmethod
-    def _single_atom_in_mapping(mapping):
-        for ns in mapping:
-            if len(ns) == 1:
-                return True
-        return False
-
-    @staticmethod
-    def _ring_beads_are_tiny(mapping, bead_is_in_ring):
-        for ns, ring in zip(mapping, bead_is_in_ring):
-            if ring and len(ns) > 2:
-                return False
-        return True
-
-    @staticmethod
-    def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
-        for ns, ring in zip(mapping, bead_is_in_ring):
-            if not ring:
-                continue
-            for atom in ns:
-                if not atom_is_in_ring[atom]:
-                    return False
-        return True
+    
 
     @staticmethod
     def make_mapping_dictionary(partitioning):

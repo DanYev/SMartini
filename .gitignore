@@ -12,6 +12,9 @@ Automartini_M3/
 *.npy
 *.npz
 *.pkl
+*.pdb
+*.gro
+*.sdf
 
 # ---- Python ----
 __pycache__/
