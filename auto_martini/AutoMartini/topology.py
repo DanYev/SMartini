@@ -1297,15 +1297,8 @@ def gen_molecule_sdf(sdf):
     logger.debug("Entering gen_molecule_sdf()")
     logger.info("Input SDF: %s", sdf)
     suppl = Chem.SDMolSupplier(sdf)
-    if len(suppl) > 1:
-        print("Error. Only one molecule may be provided.")
-        exit(1)
     logger.debug("SDF supplier length: %d", len(suppl))
-    molecule = ""
-    for molecule in suppl:
-        if molecule is None:
-            print("Error. Can't read molecule.")
-            exit(1)
+    molecule = suppl[0]
     logger.debug("Sanitizing RDKit Mol from SDF")
     Chem.SanitizeMol(molecule)
     logger.debug("Adding hydrogens + embedding + UFF optimization")

@@ -106,7 +106,7 @@ class Cg_molecule:
         AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
         AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
         if not self.raw_molecule:
-            self.raw_molecule = self.molecule
+            self.raw_molecule = self.molecule  
 
         # Extract features and build all-atom graph structure
         self.feats = self.extract_features()
@@ -358,6 +358,7 @@ class Cg_molecule:
             raise ValueError("Either mol or smiles must be provided")
         
         # Ensure molecule has conformer and extract coordinates
+        mol = Chem.RemoveAllHs(mol)  # Keep Hs for accurate graph, but sanitize to ensure valid molecule
         if mol.GetNumConformers() == 0:
             AllChem.EmbedMolecule(mol, randomSeed=1)
             AllChem.MMFFOptimizeMolecule(mol, maxIters=1000, mmffVariant='MMFF94s')

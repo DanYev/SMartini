@@ -28,7 +28,7 @@ def gen_aa_molecule(molname, from_file=None, from_smiles=None):
     Chem.AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
     Chem.AllChem.UFFOptimizeMolecule(molecule)
     logger.info("Generated molecule with %d atoms", mol.n_atoms)
-    return molecule
+    return molecule, mol.to_rdkit()
 
 
 
@@ -55,22 +55,22 @@ if __name__ == "__main__":
 
     sdf_file = wdir / f"{molname}_ideal.sdf"
     # pdb_file = Path("systems") / "KDA.pdb"
-    # mol = gen_aa_molecule(molname, from_file=sdf_file)
-    # smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
+    mol, raw_mol = gen_aa_molecule(molname, from_file=sdf_file)
+    smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     # mol.to_file(wdir / f"{molname}_aa.sdf", file_format="sdf")
 
-    mol, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
-    smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
-    sdf_path = outdir / f"{molname}_aa.sdf"
-    w = Chem.SDWriter(str(sdf_path))
-    w.write(mol)
-    w.close()
-    logging.info(f"Wrote: {sdf_path}")
+    # mol, raw_mol = am.topology.gen_molecule_sdf(str(sdf_file))
+    # smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
+    # sdf_path = outdir / f"{molname}_aa.sdf"
+    # w = Chem.SDWriter(str(sdf_path))
+    # w.write(mol)
+    # w.close()
+    # logging.info(f"Wrote: {sdf_path}")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname}.itp"
     cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads, raw_molecule=None)
+        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_mol)
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)
