@@ -1,13 +1,36 @@
 import logging
-from pathlib import Path
-import AutoMartini as am
-# import auto_martiniM3 as am
+import MDAnalysis as mda
 import rdkit
+import AutoMartini as am
+
+from pathlib import Path
+from openff.toolkit import ForceField, Molecule, Topology 
 from rdkit import Chem
+from ligpar_config import CFG
 
-from ligpar_config import CFG, get_logger
+logger = logging.getLogger("AutoMartini")
+logger.setLevel(logging.INFO)  # or DEBUG
 
-logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
+
+def gen_aa_molecule(molname, from_file=None, from_smiles=None):
+    if from_file is not None:
+        logger.info("Reading molecule from file: %s", from_file)
+        mol = Molecule.from_file(str(from_file))
+    elif from_smiles is not None:
+        logger.info("Generating molecule from SMILES: %s", from_smiles)
+        mol = Molecule.from_smiles(from_smiles)
+        mol.generate_conformers(n_conformers=1)
+    else:
+        raise ValueError("Must provide either from_file or from_smiles")
+    molecule = mol.to_rdkit()
+    Chem.SanitizeMol(molecule)
+    Chem.AddHs(molecule)
+    Chem.AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
+    Chem.AllChem.UFFOptimizeMolecule(molecule)
+    logger.info("Generated molecule with %d atoms", mol.n_atoms)
+    return molecule
+
+
 
 
 if __name__ == "__main__":
@@ -25,24 +48,29 @@ if __name__ == "__main__":
     # smiles = "CC(=O)OC1=CC=CC=C1C(=O)O" # Aspirin
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"  
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
-    # mol_am, _ = am.topology.gen_molecule_smi(smiles)
+    # smiles = "Nc1ncnc2n(cnc12)[C@@H]3O[C@H](CO[P](O)(=O)O[P](O)(=O)N[P](O)(O)=O)[C@@H](O)[C@H]3O" # ANP
+    # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
-    sdf_file = wdir / f"{molname}_ideal.sdf"
-    mol_am, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
-    smiles = str(Chem.MolToSmiles(mol_am, isomericSmiles=False))
 
-    # Save the atomistic RDKit molecule to SDF
+    sdf_file = wdir / f"{molname}_ideal.sdf"
+    # pdb_file = Path("systems") / "KDA.pdb"
+    # mol = gen_aa_molecule(molname, from_file=sdf_file)
+    # smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
+    # mol.to_file(wdir / f"{molname}_aa.sdf", file_format="sdf")
+
+    mol, raw_molecule = am.topology.gen_molecule_sdf(str(sdf_file))
+    smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
     sdf_path = outdir / f"{molname}_aa.sdf"
     w = Chem.SDWriter(str(sdf_path))
-    w.write(mol_am)
+    w.write(mol)
     w.close()
     logging.info(f"Wrote: {sdf_path}")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname}.itp"
-    cg = am.solver.Cg_molecule(mol_am, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_molecule)
+    cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
+        min_beads=n_beads, max_beads=n_beads, raw_molecule=None)
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)

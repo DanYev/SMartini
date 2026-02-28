@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import shutil
 import sys
@@ -11,15 +12,14 @@ import MDAnalysis as mda
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from pdbfixer import PDBFixer
-from reforge.martini import martini_openmm
 from reforge.mdsystem.mdsystem import MDSystem, MDRun
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun
 from reforge.mdsystem.mmmd import MmSystem, MmRun, MmReporter, convert_trajectories, get_platform_info
-from reforge.utils import clean_dir, get_logger
 
 from ligpar_config import CFG
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Global settings
 # Production parameters
