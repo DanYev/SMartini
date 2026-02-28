@@ -31,12 +31,21 @@ def gen_aa_molecule(molname, from_file=None, from_smiles=None):
     return molecule, mol.to_rdkit()
 
 
+def extract_ligand_from_pdb(pdb_file, selection, out_file="ligand.pdb"):
+    logger.info("Extracting ligand from PDB: %s with selection: %s", pdb_file, selection)
+    u = mda.Universe(str(pdb_file))
+    ligand = u.select_atoms(selection)
+    if len(ligand) == 0:
+        raise ValueError(f"No atoms found for selection: {selection}")
+    ligand.write(out_file)
+    logger.info("Extracted ligand with %d atoms", len(ligand))
+    return ligand
 
 
 if __name__ == "__main__":
     molname = CFG.molname
     n_beads = CFG.n_beads
-    wdir = CFG.wdir()
+    wdir = CFG.wdir
     outdir = wdir / "mapping"
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -52,20 +61,9 @@ if __name__ == "__main__":
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
-
-    sdf_file = wdir / f"{molname}_ideal.sdf"
-    # pdb_file = Path("systems") / "KDA.pdb"
-    mol, raw_mol = gen_aa_molecule(molname, from_file=sdf_file)
+    ligand_sdf = wdir / f"{molname}_ideal.sdf"
+    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
-    # mol.to_file(wdir / f"{molname}_aa.sdf", file_format="sdf")
-
-    # mol, raw_mol = am.topology.gen_molecule_sdf(str(sdf_file))
-    # smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
-    # sdf_path = outdir / f"{molname}_aa.sdf"
-    # w = Chem.SDWriter(str(sdf_path))
-    # w.write(mol)
-    # w.close()
-    # logging.info(f"Wrote: {sdf_path}")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = outdir / f"{molname}.itp"

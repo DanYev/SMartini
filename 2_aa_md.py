@@ -27,9 +27,8 @@ TEMPERATURE = 300 * unit.kelvin  # for equilibration
 GAMMA = 1 / unit.picosecond
 PRESSURE = 1 * unit.bar
 # Either steps or time
-TOTAL_TIME = 1000 * unit.nanoseconds # USED BY DEFAULT. NSTEPS = TOTAL_TIME / TSTEP
 TSTEP = 2 * unit.femtoseconds
-TOTAL_STEPS = 100000 
+TOTAL_STEPS = int(1e6)
 # Reporting: save every NOUT steps
 TRJ_NOUT = 1000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
@@ -40,22 +39,22 @@ TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
 SELECTION = OUT_SELECTION 
 #########
 
-ligand = CFG.molname
-sysdir = str(CFG.wdir())
-sysname = CFG.aa_sysname
+ligand_name = CFG.molname
+sysdir = CFG.systems_dir
+wdir = CFG.wdir
+aa_dir = CFG.aa_dir
+system_pdb = aa_dir / "system.pdb"
+system_xml = aa_dir / "system.xml"
 runname = "."
 
 
-def process_ligand(sysdir, sysname, ligand_name):
+def process_ligand(ligand_name):
     # INPUTS
-    mdsys = MmSystem(sysdir, sysname)
+    logger.info("Working directory: %s", wdir)
     logger.info("Processing ligand: %s", ligand_name)
-    wdir = Path("systems") / ligand_name
-    wdir.mkdir(parents=True, exist_ok=True)
-    logger.info("Ligand working directory: %s", wdir)
-    input_file = CFG.ligands_dir / f"{ligand_name}.sdf"
-    logger.info("Reading ligand file: %s", input_file)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
+    input_file = wdir / f"{ligand_name}_ideal.sdf"
+    logger.info("Reading ligand file: %s", input_file)
     ligand = Molecule.from_file(str(input_file))
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
     forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
@@ -70,11 +69,11 @@ def process_ligand(sysdir, sysname, ligand_name):
     model.addSolvent(forcefield, 
         model='tip3p', 
         boxShape='cube', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.5 * unit.nanometer,
+        padding=1.0 * unit.nanometer,
         ionicStrength=0.0 * unit.molar,
         positiveIon='Na+',
         negativeIon='Cl-')    
-    with open(mdsys.syspdb, "w", encoding="utf-8") as file:
+    with open(system_pdb, "w", encoding="utf-8") as file:
         app.PDBFile.writeFile(model.topology, model.positions, file, keepIds=True)    
     logger.info("Generating topology...")
     system = forcefield.createSystem(
@@ -82,110 +81,68 @@ def process_ligand(sysdir, sysname, ligand_name):
         nonbondedMethod=app.PME,
         nonbondedCutoff=1.0 * unit.nanometer,
         constraints=app.HBonds,
-        removeCMMotion=False,     # important for strict NVE
+        removeCMMotion=True,     
         ewaldErrorTolerance=1e-5
     )
-    _save_system_to_xml(system, mdsys.sysxml)
+    _save_system_to_xml(system, system_xml)
 
 
-def md_npt(sysdir, sysname, runname, CudaDeviceIndex="0"): 
-    mdsys = MmSystem(sysdir, sysname)
-    mdrun = MmRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / runname
-    mdrun.rundir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"WDIR: %s", mdrun.rundir)
+def md_npt(): 
     # Log platform info
     platform = mm.Platform.getPlatformByName("CUDA")
     properties = {
-        "CudaDeviceIndex": CudaDeviceIndex, # IF multiple GPUs
+        "CudaDeviceIndex": "0", # IF multiple GPUs
         "CudaPrecision": "mixed"
     }
     get_platform_info()
     # Prep
     logger.info("Preparing the system...")
     logger.info("Loading the PDB file...")
-    pdb = app.PDBFile(str(mdsys.syspdb))
+    pdb = app.PDBFile(str(system_pdb))
     # Create system object
     logger.info("Loading the XML file...")
-    system = _load_system_from_xml(mdsys.sysxml)
-    _add_bb_restraints(system, pdb, bb_aname='C*')
+    system = _load_system_from_xml(system_xml)
     # Create simulation object
     integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator)
     simulation.context.setPositions(pdb.positions)
-    # Reporters
-    reporters = _get_reporters(mdrun, prefix="eq")
-    simulation.reporters.extend(reporters)
     # Minimization
     logger.info("Minimizing energy...")
     simulation.minimizeEnergy(maxIterations=1000)
-    simulation.saveState(str(mdrun.rundir / "em.xml"))
-    # Heatup
-    logger.info("Heating up the system...")
-    n_cycles = 10
-    steps_per_cycle = 500
-    for i in range(n_cycles):
-        simulation.integrator.setTemperature(TEMPERATURE*i/n_cycles)
-        simulation.step(steps_per_cycle)
-    simulation.saveState(str(mdrun.rundir / "hu.xml"))
-    # NPT Equilibration
-    logger.info("NPT Equilibration")
-    add_extra_forces(simulation.system)
+    # Eqilibration
+    logger.info("Equilibrating...")
     simulation.integrator.setTemperature(TEMPERATURE)
-    simulation.context.reinitialize(preserveState=True)
-    mdrun.eq(simulation, n_cycles=100, steps_per_cycle=1000)
+    barostat = mm.MonteCarloBarostat(PRESSURE, TEMPERATURE)
+    system.addForce(barostat)
+    simulation.step(5000)
     # MD
     logger.info("Production...")
     # add_extra_forces(simulation.system) # IF STARING FROM EQ
-    simulation.integrator.setTemperature(TEMPERATURE)
     simulation.integrator.setStepSize(TSTEP)
-    simulation.loadState(str(mdrun.rundir / "eq.xml"))
     # Reporters
     logger.info(f'Saving reference PDB with selection: {OUT_SELECTION}')
-    mda.Universe(mdsys.syspdb).select_atoms(OUT_SELECTION).write(mdrun.rundir / "md.pdb")
-    simulation.reporters = []  # clear existing reporters
-    reporters = _get_reporters(mdrun, append=False, prefix='md')
-    simulation.reporters.extend(reporters)
+    mda.Universe(system_pdb).select_atoms(OUT_SELECTION).write(str(aa_dir / "md.pdb"))
+    reporters = _get_reporters(append=False, prefix='md')
+    simulation.reporters = reporters
     # Run
-    # simulation.context.reinitialize(preserveState=True) # ONLY FOR TESTING
-    nsteps = int(TOTAL_TIME / TSTEP)
+    nsteps = int(TOTAL_STEPS)
     simulation.step(nsteps)
-    simulation.saveState(str(mdrun.rundir / "md.xml"))
     logger.info("Done!")
 
 
-def trjconv(sysdir, sysname, runname):
-    system = MDSystem(sysdir, sysname)
-    mdrun = MDRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / runname
-    logger.info(f"WDIR: %s", mdrun.rundir)
+def trjconv():
     # INPUT
-    top = mdrun.rundir / "md.pdb"
+    top = aa_dir / "md.pdb"
     # top = mdrun.root / "system.pdb"
-    traj = mdrun.rundir / f"md.{TRJEXT}"
-    ext_trajs = sorted([f for f in mdrun.rundir.glob(f"md_*.{TRJEXT}")])
+    traj = aa_dir / f"md.{TRJEXT}"
+    ext_trajs = sorted([f for f in aa_dir.glob(f"md_*.{TRJEXT}")])
     trajs = [traj] + ext_trajs
     logger.info(f'Input trajectory files: {trajs}')
-    out_top = mdrun.rundir / "topology.pdb"
-    out_traj = mdrun.rundir / f"samples.{TRJEXT}"
+    out_top = aa_dir / "topology.pdb"
+    out_traj = aa_dir / f"samples.{TRJEXT}"
     # CONVERT
     convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0, stop=None, step=1, fit=True)
     logger.info("Done!")
-
-
-def add_extra_forces(system): # for NPT
-    # COM remover
-    com_remover = mm.CMMotionRemover()
-    com_remover.setFrequency(100)
-    system.addForce(com_remover)
-    logger.info("Added center of mass drift remover")
-    # Barostat
-    barostat = mm.MonteCarloBarostat(
-        PRESSURE,          # pressure
-        TEMPERATURE        # temperature
-    )
-    system.addForce(barostat)
-    logger.info("Added barostat")
 
 
 def _save_system_to_xml(system, filename):
@@ -201,12 +158,11 @@ def _load_system_from_xml(filename):
     return system
 
 
-def _get_reporters(mdrun, append=False, prefix="md"):
+def _get_reporters(append=False, prefix="md"):
     """Get reporters for MD simulation using custom MmReporter for velocities"""
-    mdrun.rundir.mkdir(parents=True, exist_ok=True)
     # Log reporter (file)
     log_reporter = app.StateDataReporter(
-        str(mdrun.rundir / f"{prefix}.log"), 
+        str(aa_dir / f"{prefix}.log"), 
         LOG_NOUT, step=True, time=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
     # Error reporter (stderr)
@@ -215,14 +171,12 @@ def _get_reporters(mdrun, append=False, prefix="md"):
         temperature=True, speed=True, append=append)
     # Custom trajectory reporter with velocities using MmReporter
     logger.info(f'Setting up trajectory reporter with selection: {OUT_SELECTION}')
-    traj_reporter = MmReporter(str(mdrun.rundir / f"{prefix}.{TRJEXT}"), 
+    traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{TRJEXT}"), 
         reportInterval=TRJ_NOUT, selection=OUT_SELECTION)
-    # State/checkpoint reporter
-    state_reporter = app.CheckpointReporter(str(mdrun.rundir / f"{prefix}.xml"), CHK_NOUT, writeState=True)
-    return log_reporter, err_reporter, traj_reporter, state_reporter
+    return log_reporter, err_reporter, traj_reporter
 
 
 if __name__ == "__main__":
-    process_ligand(sysdir, sysname, ligand_name)
-    md_npt(sysdir, sysname, runname, CudaDeviceIndex="0")
-    trjconv(sysdir, sysname, runname)
+    # process_ligand(ligand_name)
+    md_npt()
+    trjconv()

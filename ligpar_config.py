@@ -10,16 +10,20 @@ from typing import Optional
 class LigParConfig:
     # Identity / layout
     molname: str = "ANP"
+    n_beads: int = 10 # if None, will be determined by AutoMartini
+
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
 
-    # AutoMartini / mapping
-    n_beads: int = 10 # if None, will be determined by AutoMartini
+    wdir: Path = systems_dir / molname
+    mapping_dir: Path = wdir / "mapping"
 
     # Common subfolders
-    aa_sysname: str = "aa_md_pro"
+    aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
+    aa_dir: Path = wdir / aa_sysname
+    cg_dir: Path = wdir / cg_sysname
 
     # Selections
     aa_selection: str = "resname ANP"
@@ -44,19 +48,6 @@ class LigParConfig:
     # Refinement guardrails
     refine_max_k_scale: float = 25.0
     refine_dihedral_shift_scale: float = 1.0
-
-    def wdir(self) -> Path:
-        return self.systems_dir / self.molname
-
-    def mapping_dir(self) -> Path:
-        return self.wdir() / "mapping"
-
-    def aa_dir(self) -> Path:
-        return self.wdir() / self.aa_sysname
-
-    def cg_dir(self) -> Path:
-        return self.wdir() / self.cg_sysname
-
 
 CFG = LigParConfig()
 

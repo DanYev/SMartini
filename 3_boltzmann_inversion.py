@@ -374,7 +374,7 @@ def update_dihedrals(
 if __name__ == "__main__":
     import pickle
     molname = MOLNAME
-    wdir = CFG.wdir()
+    wdir = CFG.wdir
     logger.info("Starting analysis for molecule: %s", molname)
 
     in_itp = wdir / "mapping" / f"{molname}.itp"
@@ -392,7 +392,7 @@ if __name__ == "__main__":
         with open(pickle_file, "rb") as f:
             internal_coords = pickle.load(f)
     else:
-        aa_dir = CFG.aa_dir()
+        aa_dir = CFG.aa_dir
         aa_pdb = aa_dir / "topology.pdb"
         aa_xtc = aa_dir / "samples.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
