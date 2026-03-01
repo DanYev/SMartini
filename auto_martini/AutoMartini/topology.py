@@ -656,8 +656,6 @@ class Topology:
         ring_atoms = []
         for ra in ringatoms:
             ring_atoms += ra
-        print(ring_atoms)
-        exit()
 
         # Find beads constructing rings
         bead_in_ring_coords = {}
@@ -749,11 +747,8 @@ class Topology:
         )
         return text + info
     
-    def format_atoms(self, trial=False):
+    def format_atoms(self):
         """Format atoms list into ITP text."""
-        if trial:
-            return ""
-        
         text = ""
         for atom in self.atoms:
             text += (
@@ -968,7 +963,7 @@ class Topology:
         
         return "\n".join(lines) + "\n"
     
-    def to_itp(self, out_file=None, trial=False, write_exclusions=True, write_posres=True):
+    def to_itp(self, out_file=None, write_exclusions=True, write_posres=True):
         """Generate complete ITP file content.
         
         Parameters
@@ -981,11 +976,11 @@ class Topology:
             If True, include position restraints section
         """
         text = self.format_header() + "\n"
-        text += self.format_atoms(trial) + "\n"
+        text += self.format_atoms() + "\n"
         text += self.format_bonds() + "\n"
         text += self.format_angles() + "\n"
         text += self.format_dihedrals() + "\n"
-        # text += self.format_virtual_sites()
+        text += self.format_virtual_sites() + "\n"
         if write_exclusions:
             text += self.format_exclusions()
         if write_posres:

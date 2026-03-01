@@ -464,6 +464,12 @@ class Cg_molecule:
                         return False
             return True
 
+        def _beads_are_big(mapping, max_bead_size=4):
+            for ns in mapping:
+                if len(ns) > max_bead_size:
+                    return True
+            return False
+
         bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
         bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
         atom_is_in_ring = [a["is_in_ring"] for a in atoms]
@@ -518,6 +524,18 @@ class Cg_molecule:
         if len(mappings) == 1:
             return mappings[0]
 
+        # Prefer smaller beads overall (e.g. 5+ atoms is too big for Martini)
+        tmp_list = []
+        for mapping in mappings:
+            if _beads_are_big(mapping):
+                continue
+            tmp_list.append(mapping)
+        if tmp_list:
+            mappings = tmp_list
+        if len(mappings) == 1:
+            return mappings[0]
+
+        # TODO: SYMMETRIZE MAPPINGS
         if len(mappings) == 2:
             return mappings[0]
 
@@ -725,7 +743,7 @@ class Cg_molecule:
 
         # Generate formatted outputs using topology methods
         header_write = self.topology.format_header()
-        atoms_write = self.topology.format_atoms(trial=False)
+        atoms_write = self.topology.format_atoms()
         bonds_write = self.topology.format_bonds()
         angles_write = self.topology.format_angles()
         
