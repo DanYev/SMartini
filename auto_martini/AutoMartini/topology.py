@@ -204,13 +204,13 @@ class Topology:
                     if found_connection:
                         break
 
-        # Filter based on distance and add constraints for beads in the same ring
-        for bond in self.constraints:
-            dist = bond[3]
-            if dist > 0.54:
-                self.constraints.remove(bond)
-            if dist < 0.134:
-                raise NameError("Bond too short")
+        # # Filter based on distance and add constraints for beads in the same ring
+        # for bond in self.constraints:
+        #     dist = bond[3]
+        #     if dist > 0.54:
+        #         self.constraints.remove(bond)
+        #     if dist < 0.134:
+        #         raise NameError("Bond too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 
@@ -504,7 +504,8 @@ class Topology:
         the rest of the beads will go the type 3 virtual sites.
         """
         logger.info("Building virtual sites for fused rings...")
-        bonds = self.bonds + self.constraints
+        bonds = self.constraints
+        atoms = self.atoms
         virtual_sites_3 = []
 
         def _has_external_bond(bead, ring):
@@ -536,7 +537,7 @@ class Topology:
                             max_dist = dist
                             furthest_bead = bead
                     anchor_beads.append(furthest_bead)                
-            return anchor_beads 
+            return sorted(anchor_beads)
 
         def _make_vs3_fad_entry(site: int, i: int, j: int, k: int) -> dict:
             """Create a `virtual_sites3` funct=3 (3fad) entry.
@@ -577,22 +578,49 @@ class Topology:
             theta_deg = math.degrees(math.atan2(v2, v1))
             d_nm = d_angstrom * 0.1
 
-            return [site,i, j, k, 3, theta_deg, d_nm]
+            return [site, i, j, k, 3, theta_deg, d_nm]
+        
+        def _sanitize_atoms(atoms, vsites):
+            # vsites must have 0 mass
+            for vs in vsites:
+                vs_site = vs[0]
+                for atom in atoms:
+                    if atom['id'] == vs_site + 1:  # atom ids are 1-indexed
+                        atom['mass'] = int(0)
+                        break
+        
+        def _sanitize_bonds(bonds, ring, anchor_beads):
+            # Remove any within the ring and make bonds involving the anchor beads 
+            for bead_i in ring:
+                for bead_j in ring:
+                    if bead_i == bead_j:
+                        continue
+                    for bond in bonds:
+                        if bead_i in bond[:2] and bead_j in bond[:2]:
+                            print(f"removing bond {bond} between {bead_i} and {bead_j} in ring {ring}")
+                            bonds.remove(bond)
+            for i in range(len(anchor_beads)):
+                anchor = anchor_beads[i]
+                bead = anchor_beads[(i + 1) % len(anchor_beads)]
+                dist = np.linalg.norm(self.cgbead_coords[anchor] - self.cgbead_coords[bead]) * 0.1
+                bond_entry = [anchor, bead, 1, dist, "ring_anchor"]
+                bonds.append(bond_entry)
         
         # For now check if we have rings with 5+ beads 
         for ring in self.ringbeads:
             if len(ring) < 5:
                 continue
+            print(ring)
             anchor_beads = _find_anchor_beads(ring)
-
-            # Select first three anchors as constructing atoms.
             i, j, k = anchor_beads[0], anchor_beads[1], anchor_beads[2]
             for bead in ring:
                 if bead in anchor_beads:
                     continue
                 vs3_entry = _make_vs3_fad_entry(bead, i, j, k)
                 virtual_sites_3.append(vs3_entry)
+            _sanitize_bonds(bonds, ring, anchor_beads)
 
+        _sanitize_atoms(atoms, virtual_sites_3)
         return virtual_sites_3
 
     def build_vs_2(self) -> list:

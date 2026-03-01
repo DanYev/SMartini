@@ -685,16 +685,17 @@ class Cg_molecule:
         self.topology.build_bonds(
             ha_neighbors=self.ha_neighbors,
         )
+
+        # Build virtual sites.
+        # Gotta do this before angles and dihedrals so that they can include virtual sites if needed.
+        self.topology.build_virtual_sites()
         
         # Build angles
         self.topology.build_angles()
         
         # Build dihedrals (unless simple model)
-        if not self.simple_model:
-            self.topology.build_dihedrals()
-        
-        # Build virtual sites if needed
-        self.topology.build_virtual_sites()
+        self.topology.build_dihedrals()
+
         
     def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""

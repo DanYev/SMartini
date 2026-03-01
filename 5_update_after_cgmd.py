@@ -17,9 +17,9 @@ from lpmath import (
 )
 from plots import plot_internal_coordinates_overlay
 from partitioning_patch import patch_topology_partitioning_from_sdf
-from ligpar_config import CFG, get_logger
+from ligpar_config import CFG
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
@@ -377,8 +377,9 @@ def refine_topology_from_cg_vs_aa(
 if __name__ == "__main__":
     molname = CFG.molname
     wdir = CFG.wdir
+    outdir = CFG.out_dir
 
-    itp_updated = wdir / "mapping" / f"{molname}_updated.itp"
+    itp_updated = outdir / f"{molname}_updated.itp"
     in_itp = itp_updated 
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
@@ -404,7 +405,7 @@ if __name__ == "__main__":
 
     # Refine the CG topology based on CG-vs-AA distribution mismatch.
     # Writes a new file and leaves the original ITP unchanged.
-    tmp_itp = wdir / "mapping" / f"{molname}_updated_tmp.itp"
+    tmp_itp = outdir / f"{molname}_updated_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
