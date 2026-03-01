@@ -504,8 +504,8 @@ class Topology:
         the rest of the beads will go the type 3 virtual sites.
         """
         logger.info("Building virtual sites for fused rings...")
-        self.virtual_sites_type3 = []
         bonds = self.bonds + self.constraints
+        virtual_sites_3 = []
 
         def _has_external_bond(bead, ring):
             for b in bonds:
@@ -537,15 +537,63 @@ class Topology:
                             furthest_bead = bead
                     anchor_beads.append(furthest_bead)                
             return anchor_beads 
+
+        def _make_vs3_fad_entry(site: int, i: int, j: int, k: int) -> dict:
+            """Create a `virtual_sites3` funct=3 (3fad) entry.
+
+            Parameters are derived from the current `cgbead_coords` so that the
+            virtual site reproduces the present position of `site` from (i, j, k).
+
+            Returns a dict compatible with `format_virtual_sites()`.
+            """
+            ri = np.asarray(self.cgbead_coords[i], dtype=float)
+            rj = np.asarray(self.cgbead_coords[j], dtype=float)
+            rk = np.asarray(self.cgbead_coords[k], dtype=float)
+            rs = np.asarray(self.cgbead_coords[site], dtype=float)
+
+            rij = rj - ri
+            n_rij = float(np.linalg.norm(rij))
+            if n_rij == 0.0:
+                raise ValueError("Invalid 3fad definition: i and j are coincident")
+
+            rjk = rk - rj
+            denom = float(np.dot(rij, rij))
+            if denom == 0.0:
+                raise ValueError("Invalid 3fad definition: r_ij has zero length")
+
+            r_perp = rjk - (float(np.dot(rij, rjk)) / denom) * rij
+            n_rperp = float(np.linalg.norm(r_perp))
+            if n_rperp == 0.0:
+                raise ValueError("Invalid 3fad definition: i, j, k are collinear")
+
+            e1 = rij / n_rij
+            e2 = r_perp / n_rperp
+
+            v = rs - ri
+            v1 = float(np.dot(v, e1))
+            v2 = float(np.dot(v, e2))
+
+            d_angstrom = math.sqrt(v1 * v1 + v2 * v2)
+            theta_deg = math.degrees(math.atan2(v2, v1))
+            d_nm = d_angstrom * 0.1
+
+            return [site,i, j, k, 3, theta_deg, d_nm]
         
         # For now check if we have rings with 5+ beads 
         for ring in self.ringbeads:
             if len(ring) < 5:
                 continue
             anchor_beads = _find_anchor_beads(ring)
-            print(anchor_beads)
-            exit()
 
+            # Select first three anchors as constructing atoms.
+            i, j, k = anchor_beads[0], anchor_beads[1], anchor_beads[2]
+            for bead in ring:
+                if bead in anchor_beads:
+                    continue
+                vs3_entry = _make_vs3_fad_entry(bead, i, j, k)
+                virtual_sites_3.append(vs3_entry)
+
+        return virtual_sites_3
 
     def build_vs_2(self) -> list:
         return []
@@ -681,58 +729,175 @@ class Topology:
         return text
     
     def format_virtual_sites(self):
-        """Format virtual sites data for .itp output."""
+        """Format all virtual-site sections for .itp output."""
         if not self.virtual_sites:
             return ""
 
-        sections_order = ("virtual_sites2", "virtual_sites3", "virtual_sites4", "virtual_sitesn")
-        header_lines = {
-            "virtual_sites2": "; site  from  funct  a  b",
-            "virtual_sites3": "; site  from  funct  a  b  c",
-            "virtual_sites4": "; site  from  funct  a  b  c  d",
-            "virtual_sitesn": "; site  funct  constructing atom indices",
-        }
+        text = ""
+        text += self.format_virtual_sites2()
+        text += self.format_virtual_sites3()
+        text += self.format_virtual_sites4()
+        text += self.format_virtual_sitesn()
+        return text
 
-        def _format_entry(section: str, entry):
-            if isinstance(entry, dict):
-                comment = entry.get("comment", "")
-                params = entry.get("params", []) or []
-                atoms = entry.get("atoms", []) or []
-
-                if section in ("virtual_sites2", "virtual_sites3", "virtual_sites4"):
-                    site = int(entry["site"]) + 1
-                    from_atom = int(entry.get("from", entry["site"])) + 1
-                    funct = int(entry.get("funct", 1))
-                    idxs = [int(a) + 1 for a in atoms]
-                    fields = [site, from_atom, funct, *idxs, *params]
-                else:
-                    site = int(entry["site"]) + 1
-                    funct = int(entry.get("funct", 1))
-                    idxs = [int(a) + 1 for a in atoms]
-                    fields = [site, funct, *idxs, *params]
-
-                line = "  " + " ".join(str(f) for f in fields)
-                if comment:
-                    line += f" ; {comment}"
-                return line
-
-            return "  " + " ".join(str(x) for x in entry)
-
-        lines = []
-        wrote_any = False
-        for section in sections_order:
-            entries = self.virtual_sites.get(section, [])
-            if not entries:
-                continue
-            wrote_any = True
-            lines.append("")
-            lines.append(f"[{section}]")
-            lines.append(header_lines.get(section, "; virtual sites"))
-            for entry in entries:
-                lines.append(_format_entry(section, entry))
-
-        if not wrote_any:
+    def format_virtual_sites2(self):
+        """Format the `[virtual_sites2]` section."""
+        entries = (self.virtual_sites or {}).get("virtual_sites2", [])
+        if not entries:
             return ""
+        lines = [
+            "",
+            "[virtual_sites2]",
+            "; site  i  j  funct  params...",
+        ]
+        for entry in entries:
+            # Expected list format (0-based indices): [site, i, j, funct, <float params...>, <optional comment str>]
+            comment = ""
+            if len(entry) > 0 and isinstance(entry[-1], str) and entry[-1]:
+                comment = entry[-1]
+                entry = entry[:-1]
+
+            if len(entry) < 4:
+                continue
+
+            site = int(entry[0]) + 1
+            i = int(entry[1]) + 1
+            j = int(entry[2]) + 1
+            funct = int(entry[3])
+            params = entry[4:]
+            formatted_params = []
+            for p in params:
+                try:
+                    formatted_params.append(f"{float(p):.3f}")
+                except (TypeError, ValueError):
+                    formatted_params.append(str(p))
+
+            fields = [str(site), str(i), str(j), str(funct), *formatted_params]
+            line = "  " + " ".join(fields).rstrip()
+            if comment:
+                line += f" ; {comment}"
+            lines.append(line)
+        return "\n".join(lines) + "\n"
+
+    def format_virtual_sites3(self):
+        """Format the `[virtual_sites3]` section."""
+        entries = (self.virtual_sites or {}).get("virtual_sites3", [])
+        if not entries:
+            return ""
+        lines = [
+            "",
+            "[virtual_sites3]",
+            "; site  i  j  k  funct  params...",
+        ]
+        for entry in entries:
+            # Expected list format (0-based indices): [site, i, j, k, funct, <float params...>, <optional comment str>]
+            comment = ""
+            if len(entry) > 0 and isinstance(entry[-1], str) and entry[-1]:
+                comment = entry[-1]
+                entry = entry[:-1]
+
+            if len(entry) < 5:
+                continue
+
+            site = int(entry[0]) + 1
+            i = int(entry[1]) + 1
+            j = int(entry[2]) + 1
+            k = int(entry[3]) + 1
+            funct = int(entry[4])
+            params = entry[5:]
+            formatted_params = []
+            for p in params:
+                try:
+                    formatted_params.append(f"{float(p):.3f}")
+                except (TypeError, ValueError):
+                    formatted_params.append(str(p))
+
+            fields = [str(site), str(i), str(j), str(k), str(funct), *formatted_params]
+            line = "  " + " ".join(fields).rstrip()
+            if comment:
+                line += f" ; {comment}"
+            lines.append(line)
+        return "\n".join(lines) + "\n"
+
+    def format_virtual_sites4(self):
+        """Format the `[virtual_sites4]` section."""
+        entries = (self.virtual_sites or {}).get("virtual_sites4", [])
+        if not entries:
+            return ""
+        lines = [
+            "",
+            "[virtual_sites4]",
+            "; site  i  j  k  l  funct  params...",
+        ]
+        for entry in entries:
+            # Expected list format (0-based indices): [site, i, j, k, l, funct, <float params...>, <optional comment str>]
+            comment = ""
+            if len(entry) > 0 and isinstance(entry[-1], str) and entry[-1]:
+                comment = entry[-1]
+                entry = entry[:-1]
+
+            if len(entry) < 6:
+                continue
+
+            site = int(entry[0]) + 1
+            i = int(entry[1]) + 1
+            j = int(entry[2]) + 1
+            k = int(entry[3]) + 1
+            l = int(entry[4]) + 1
+            funct = int(entry[5])
+            params = entry[6:]
+            formatted_params = []
+            for p in params:
+                try:
+                    formatted_params.append(f"{float(p):.3f}")
+                except (TypeError, ValueError):
+                    formatted_params.append(str(p))
+
+            fields = [str(site), str(i), str(j), str(k), str(l), str(funct), *formatted_params]
+            line = "  " + " ".join(fields).rstrip()
+            if comment:
+                line += f" ; {comment}"
+            lines.append(line)
+        return "\n".join(lines) + "\n"
+
+    def format_virtual_sitesn(self):
+        """Format the `[virtual_sitesn]` section."""
+        entries = (self.virtual_sites or {}).get("virtual_sitesn", [])
+        if not entries:
+            return ""
+        lines = [
+            "",
+            "[virtual_sitesn]",
+            "; site  funct  constructing atom indices",
+        ]
+        for entry in entries:
+            # Expected list format (0-based indices): [site, funct, <atom indices...>, <optional comment str>]
+            comment = ""
+            if len(entry) > 0 and isinstance(entry[-1], str) and entry[-1]:
+                comment = entry[-1]
+                entry = entry[:-1]
+
+            if len(entry) < 2:
+                continue
+
+            site = int(entry[0]) + 1
+            funct = int(entry[1])
+
+            rest = []
+            for x in entry[2:]:
+                if isinstance(x, (int, np.integer)):
+                    rest.append(str(int(x) + 1))
+                    continue
+                try:
+                    rest.append(f"{float(x):.3f}")
+                except (TypeError, ValueError):
+                    rest.append(str(x))
+
+            fields = [str(site), str(funct), *rest]
+            line = "  " + " ".join(fields).rstrip()
+            if comment:
+                line += f" ; {comment}"
+            lines.append(line)
         return "\n".join(lines) + "\n"
     
     def format_exclusions(self):
@@ -1078,22 +1243,24 @@ def read_itp(itp_file):
                 site = int(parts[0]) - 1
                 funct = int(parts[1])
                 atoms = [int(p) - 1 for p in parts[2:]]
-                topo.virtual_sites['virtual_sitesn'].append(
-                    {'site': site, 'funct': funct, 'atoms': atoms, 'params': [], 'comment': comment}
-                )
+                entry = [site, funct, *atoms]
+                if comment:
+                    entry.append(comment)
+                topo.virtual_sites['virtual_sitesn'].append(entry)
             else:
                 required = {
                     'virtual_sites2': 2,
                     'virtual_sites3': 3,
                     'virtual_sites4': 4,
                 }[current_section]
-                if len(parts) < 3 + required:
+
+                # Expected order: site i j [k [l]] funct params...
+                if len(parts) < 2 + required + 1:
                     continue
                 site = int(parts[0]) - 1
-                from_atom = int(parts[1]) - 1
-                funct = int(parts[2])
-                atoms = [int(p) - 1 for p in parts[3:3 + required]]
-                raw_params = parts[3 + required:]
+                atoms = [int(p) - 1 for p in parts[1:1 + required]]
+                funct = int(parts[1 + required])
+                raw_params = parts[2 + required:]
                 parsed_params = []
                 for p in raw_params:
                     try:
@@ -1107,16 +1274,10 @@ def read_itp(itp_file):
                     except ValueError:
                         parsed_params.append(p)
 
-                topo.virtual_sites[current_section].append(
-                    {
-                        'site': site,
-                        'from': from_atom,
-                        'funct': funct,
-                        'atoms': atoms,
-                        'params': parsed_params,
-                        'comment': comment,
-                    }
-                )
+                entry = [site, *atoms, funct, *parsed_params]
+                if comment:
+                    entry.append(comment)
+                topo.virtual_sites[current_section].append(entry)
         
     return topo
 
