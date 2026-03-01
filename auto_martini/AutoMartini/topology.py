@@ -176,17 +176,13 @@ class Topology:
                 self.atoms.append(atom_dict)
                 self.beadtypes.append(bead_type)
     
-    def build_bonds(self, mapping, ha_neighbors, cgbead_coords, ringatoms, cutoff=1e4):
+    def build_bonds(self, mapping, ha_neighbors, cgbead_coords):
         """Build bonds and constraints data."""
-        logger.debug("Entering Topology.build_bonds()")
+        logger.info("Building bonds and constraints...")
 
         nbeads = len(mapping)
         if nbeads <= 1:
             return
-
-        cpt_ringatoms = 0    
-        if ringatoms != []:
-            cpt_ringatoms = len(sum(ringatoms, []))
         
         # First make list of bonds based on connectivity of the original molecule
         for i in range(nbeads):
@@ -202,11 +198,11 @@ class Topology:
                     if found_connection:
                         break
 
-        # Filter based oin distance and add constraints for beads in the same ring
-        for bond in self.bonds:
+        # Filter based on distance and add constraints for beads in the same ring
+        for bond in self.constraints:
             dist = bond[3]
             if dist > 0.54:
-                self.bonds.remove(bond)
+                self.constraints.remove(bond)
             if dist < 0.134:
                 raise NameError("Bond too short")
 
@@ -231,91 +227,8 @@ class Topology:
                             min_pair = pair
                 if n_bonds == 4: 
                     self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
-
-            # added_to_constraints = False
-            # for ring in ringatoms:
-            #     if cgbeads[i] in ring and cgbeads[j] in ring:
-            #         self.constraints.append([i, j, 1, dist])
-            #         added_to_constraints = True
-            #         break
-            # if added_to_constraints:
-            #     continue
-           
-        #         if not found_connection:
-        #             if cpt_ringatoms < 7 and len(cgbeads) < 5 and [i, j, 1, dist] not in self.constraints:
-        #                 self.constraints.append([i, j, 1, dist])
-        #                 continue
-
-        #         # Create beadlist for read_params
-        #         beadlist = []
-        #         for bead in self.beadtypes:
-        #             if not bead.startswith('T') and not bead.startswith('S'):
-        #                 beadlist.append('R')
-        #             else:
-        #                 beadlist.append(bead[0])
-                
-        #         # Get force constant from database or use default
-        #         if len(beadlist) > max(i, j):
-        #             fc = read_params(dist, beadlist[i] + "-" + beadlist[j])
-        #             if fc is None:
-        #                 fc = 10000
-        #         else:
-        #             fc = 10000
-                
-        #         self.bonds.append([i, j, 1, dist, fc])
-
-        # # Ring beads check
-        # for ir in range(len(cgbeads_ring)):
-        #     for jr in range(ir + 1, len(cgbeads_ring)):
-        #         distr = np.linalg.norm(cgbead_coords[ir] - cgbead_coords[jr]) * 0.1
-        #         if distr < 0.65:
-        #             for ring in ringatoms:
-        #                 if ( cgbeads_ring[ir] in ring and cgbeads_ring[jr] in ring and distr <= 0.45 
-        #                     ) and ([ir, jr, 1, distr] not in self.constraints and [ir, jr, 1, distr] not in  self.bonds ):
-        #                     self.constraints.append([ir, jr, 1, distr])
-
-        # # Go through list of constraints. If we find an extra
-        # # possible constraint between beads that have constraints, add it.
-        # beads_with_const = []
-        # for c in self.constraints:
-        #     if c[0] not in beads_with_const:
-        #         beads_with_const.append(c[0])
-        #     if c[1] not in beads_with_const:
-        #         beads_with_const.append(c[1])
-
-        # beads_with_const = sorted(beads_with_const)
-        # for i in range(len(beads_with_const)):
-        #     for j in range(1 + i, len(beads_with_const)):
-        #         const_exists = False
-        #         for c in self.constraints:
-        #             if (c[0] == i and c[1] == j) or (c[0] == j and c[1] == i):
-        #                 const_exists = True
-        #                 break
-        #         if not const_exists:
-        #             dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-        #             if any(dist  != bl[2] for bl in self.bonds):
-        #                 # Check that it's not in the bond list
-        #                 in_bond_list = False
-        #                 for b in self.bonds:
-        #                     if (b[0] == i and b[1] == j) or (b[0] == j and b[0] == i):
-        #                         in_bond_list = True
-        #                         break
-        #                 # Are atoms part of the same ring
-        #                 in_ring = False
-        #                 for ring in ringatoms:
-        #                     if cgbeads[i] in ring and cgbeads[j] in ring and len(ring)<5:
-        #                         in_ring = True
-        #                         break
-        #                 # If not in bondlist and in the same ring, add the constraint
-        #                 if not in_bond_list and in_ring and [i, j, 1, dist] not in self.constraints:
-        #                     self.constraints.append([i, j, 1, dist])
-
-        # for c in self.constraints:
-        #     if c not in self.bonds:
-        #         if cpt_ringatoms > 18 and c[3] > 0.415:
-        #                 self.constraints.remove(c)
-    
-    def build_angles(self, mapping, cgbeads, molecule, partitioning, cgbead_coords, ringatoms, type_2_cutoff=160.0):
+              
+    def build_angles(self, mapping, cgbeads, molecule, partitioning, cgbead_coords, ringatoms):
         """Build angles data structure."""
         logger.debug("Entering Topology.build_angles()")
 
@@ -432,15 +345,12 @@ class Topology:
                             beadlist.append(bead[0])
                     
                     funct = 1
-                    if angle > type_2_cutoff:
-                        force_const = 250.0
-                    else:
-                        # Try to get force from database
-                        if len(beadlist) > max(i, j, k):
-                            db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k])
-                            if db_force is not None:
-                                force_const = db_force
-                    
+                    force_const = 250.0
+                    # Try to get force from database
+                    if len(beadlist) > max(i, j, k):
+                        db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k])
+                        if db_force is not None:
+                            force_const = db_force
                     self.angles.append([i, j, k, funct, angle, force_const, ""])
     
     def build_dihedrals(self, cgbeads, ringatoms, cgbead_coords):
@@ -621,9 +531,9 @@ class Topology:
         self.num_ar = num_ar
         return num_ar
     
-    def build_virtual_sites(self, ringatoms, cg_bead_coords, partitioning, molecule):
+    def build_virtual_sites(self, cgbeads, ringatoms, cgbead_coords):
         """Build virtual sites data structure."""
-        logger.debug("Entering Topology.build_virtual_sites()")
+        logger.info("Building virtual sites for fused rings if needed...")
 
         # Get number of bonds for each atom
         atom_bond_counts = {atom.GetIdx(): 0 for atom in molecule.GetAtoms()}
@@ -730,7 +640,7 @@ class Topology:
     # Format methods - return formatted strings
     def format_header(self):
         """Format Topology header section."""
-        text = "; GENERATED WITH Auto_Martini M3FF for {}\n".format(self.molname)
+        text = "; GENERATED WITH Auto_Martini for {}\n".format(self.molname)
         info = (
             "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
             + "; updated to Martini 3 force field by Magdalena Szczuka\n"

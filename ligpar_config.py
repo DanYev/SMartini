@@ -16,7 +16,7 @@ class LigParConfig:
     ligands_dir: Path = Path("ligands")
 
     wdir: Path = systems_dir / molname
-    mapping_dir: Path = wdir / "mapping"
+    out_dir: Path = wdir / "molecule"
 
     # Common subfolders
     aa_sysname: str = "aa_md"

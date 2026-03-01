@@ -686,7 +686,6 @@ class Cg_molecule:
             mapping=self.mapping,
             ha_neighbors=self.ha_neighbors,
             cgbead_coords=self.cg_bead_coords,
-            ringatoms=self.ring_atoms
         )
         
         # Build angles
@@ -710,10 +709,9 @@ class Cg_molecule:
         # Build virtual sites if needed
         if self.ring_atoms and len(sum(self.ring_atoms, [])) > 6:
             self.topology.build_virtual_sites(
+                cgbeads=cg_beads,
                 ringatoms=self.ring_atoms,
                 cg_bead_coords=self.cg_bead_coords,
-                partitioning=self.partitioning,
-                molecule=self.molecule
             )
         
     def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
