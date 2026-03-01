@@ -18,6 +18,7 @@ NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
 
 ligand = CFG.molname
 sysdir = CFG.wdir
+outdir = CFG.out_dir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
 
@@ -29,8 +30,8 @@ def setup_martini(sysdir, sysname):
     shutil.copy("md_cg.mdp", mdsys.mdpdir / "md_cg.mdp")
    
     # LIGANDS 
-    pdb_file = Path(sysdir) / "mapping" / f"{ligand}.pdb"
-    itp_file = Path(sysdir) / "mapping" / f"{ligand}_updated.itp"
+    pdb_file = outdir / f"{ligand}.pdb"
+    itp_file = outdir / f"{ligand}_updated.itp"
     shutil.copy(itp_file, mdsys.topdir / f"ligand_{ligand}.itp") # copy .itp to mdsys.itpdir so it can be included in the system topology
     shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
     shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure

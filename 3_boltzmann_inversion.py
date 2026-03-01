@@ -5,7 +5,7 @@ from pathlib import Path
 import AutoMartini as am
 import numpy as np
 
-from ligpar_config import CFG, get_logger
+from ligpar_config import CFG
 from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
@@ -17,8 +17,7 @@ from lpmath import (
 from plots import plot_internal_coordinates
 from partitioning_patch import patch_topology_partitioning_from_sdf
 
-logging.getLogger("AutoMartini").setLevel(logging.INFO)  # or DEBUG
-logger = get_logger(__name__)
+logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)
 
 
@@ -375,9 +374,10 @@ if __name__ == "__main__":
     import pickle
     molname = MOLNAME
     wdir = CFG.wdir
+    out_dir = CFG.out_dir
     logger.info("Starting analysis for molecule: %s", molname)
 
-    in_itp = wdir / "mapping" / f"{molname}.itp"
+    in_itp = out_dir / f"{molname}.itp"
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff)
     topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff)
 
-    out_itp = wdir / "mapping" / f"{molname}_updated.itp"
+    out_itp = out_dir / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 

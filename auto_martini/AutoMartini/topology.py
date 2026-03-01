@@ -357,18 +357,15 @@ class Topology:
             return False
 
         constlist = self.constraints
-        
-        # Store for later use
         cgbeads = self.cgbeads
         cgbead_coords = self.cgbead_coords
         nbeads = len(self.cgbeads)
+        self.dihedrals = []
 
         if nbeads <= 3:
             return 
 
         # Dihedrals
-        dihed_list = []
-        # Three ring atoms and one non ring
         for i in range(nbeads):
             for j in range(nbeads):
                 for k in range(nbeads):
@@ -376,13 +373,12 @@ class Topology:
                         if i != j and i != k and i != l and j != k and j != l and k != l:
 
                             three_in_ring = False
-                            for ring in ringatoms:
-                                num_ar += len(ring)
+                            for ring in self.ringbeads:
                                 if [
-                                    [cgbeads[i] in ring],
-                                    [cgbeads[j] in ring],
-                                    [cgbeads[k] in ring],
-                                    [cgbeads[l] in ring],
+                                    [i in ring],
+                                    [j in ring],
+                                    [k in ring],
+                                    [l in ring],
                                 ].count([True]) >= 3:
                                     three_in_ring = True
                                     break
@@ -410,7 +406,7 @@ class Topology:
                                 continue
 
                             stop_iteration = False
-                            for dih in dihed_list:
+                            for dih in self.dihedrals:
                                 if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
                                     stop_iteration = True
                                     break
@@ -476,153 +472,24 @@ class Topology:
                             angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
                             angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
                             
-                            # Create beadlist for read_params
-                            beadlist = []
-                            for bead in self.beadtypes:
-                                if not bead.startswith('T') and not bead.startswith('S'):
-                                    beadlist.append('R')
-                                else:
-                                    beadlist.append(bead[0])
-                            
-                            # Compute force constant from database or default
-                            bead_in_ring_coords = {}
-                            for nb, bead_nb in enumerate(cgbeads):
-                                for ring in ringatoms:
-                                    if bead_nb in ring:
-                                        bead_in_ring_coords[nb] = cgbead_coords[nb]
                             
                             forc_const = 10.0
-                            if len(beadlist) > max(i, j, k, l):
-                                db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k] + "-" + beadlist[l])
-                                if db_force is not None:
-                                    forc_const = db_force
-                                    # Adjust for non-ring beads
-                                    if num_ar > 0 and (i not in bead_in_ring_coords or j not in bead_in_ring_coords or 
-                                                        k not in bead_in_ring_coords or l not in bead_in_ring_coords):
-                                        forc_const = forc_const / 2
                             angle = (180 + angle) % 360
                             multiplicity = 1  # Default multiplicity
-                            dihed_list.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
-                            
-                            # if angle_ijk < 145.0 and angle_jkl < 145.0:
-                            #     dihed_list.append([i, j, k, l, 2, angle, forc_const])
+                            self.dihedrals.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
 
-        # if len(dihed_list) > 0:
-        #     for dl in dihed_list:
-        #         for di in dihed_list[1:]:
-        #             if dl != di:
-        #                 # Check if beads are repeating
-        #                 if  dl[0:2]==di[0:2] or dl[0:2]==di[2:4] or dl[2:4]==di[0:2] or dl[2:4]==di[2:4] or sorted(dl[:4])==sorted(di[:4]):
-        #                     if di in dihed_list:
-        #                         dihed_list.remove(di)
-        
-        self.dihedrals = dihed_list
     
-    def build_virtual_sites(self, cgbeads, ringatoms, cgbead_coords):
+    def build_virtual_sites(self):
         """Build virtual sites data structure."""
         logger.info("Building virtual sites for fused rings if needed...")
 
-        # Get number of bonds for each atom
-        atom_bond_counts = {atom.GetIdx(): 0 for atom in molecule.GetAtoms()}
+        constlist = self.constraints
+        cgbeads = self.cgbeads
+        cgbead_coords = self.cgbead_coords
+        nbeads = len(self.cgbeads)
+        self.virtual_sites = []
+
         
-        for bond in molecule.GetBonds():
-            begin_atom_idx = bond.GetBeginAtomIdx()
-            end_atom_idx = bond.GetEndAtomIdx()
-            
-            if (molecule.GetAtomWithIdx(begin_atom_idx).GetSymbol() != "H" and 
-                molecule.GetAtomWithIdx(end_atom_idx).GetSymbol() != "H") and \
-               (partitioning[begin_atom_idx] != partitioning[end_atom_idx]):
-                if begin_atom_idx not in atom_bond_counts:
-                    atom_bond_counts[begin_atom_idx] = 1
-                else:
-                    atom_bond_counts[begin_atom_idx] += 1
-                
-                if end_atom_idx not in atom_bond_counts:
-                    atom_bond_counts[end_atom_idx] = 1
-                else:
-                    atom_bond_counts[end_atom_idx] += 1
-        
-        bead_bond_counts = {}
-        for a, b in partitioning.items():
-            if b not in bead_bond_counts: 
-                bead_bond_counts[b] = 0
-            for at, cpt in atom_bond_counts.items():
-                if at == a: 
-                    bead_bond_counts[b] += cpt
-
-        ring_atoms = []
-        for ra in ringatoms:
-            ring_atoms += ra
-
-        # Find beads constructing rings
-        bead_in_ring_coords = {}
-        for atom, bead in partitioning.items():
-            if atom in ring_atoms and bead not in bead_in_ring_coords:
-                bead_in_ring_coords[bead] = cg_bead_coords[bead]
-        
-        # Count distances between each pair of beads
-        distances = {}
-        for bead, coord in bead_in_ring_coords.items():
-            distances[bead] = {}
-            for other_bead, other_coord in bead_in_ring_coords.items():
-                if bead != other_bead:
-                    distance = np.linalg.norm(coord - other_coord) 
-                    distances[bead][other_bead] = distance
-        
-        def find_more_vs(num_vs, bead_bond_counts_sorted, cg_bead_coords, distances):
-            virtual_sites = {}
-            vs_list = []
-            # Only select beads that are in rings (i.e., in distances dict)
-            ring_beads = [bead for bead in bead_bond_counts_sorted.keys() if bead in distances]
-            for i in range(min(num_vs, len(ring_beads))):
-                vs_bead = int(ring_beads[i])
-                vs_list.append(vs_bead)
-            
-            for vs in vs_list:
-                constructing_beads_dist = dict(sorted(distances[vs].items(), key=lambda item: item[1]))
-                constructing_beads = [bead for bead in constructing_beads_dist.keys()]
-                for bead in constructing_beads:
-                    if bead in vs_list:
-                        constructing_beads.remove(bead)
-                
-                if vs not in virtual_sites.keys():
-                    virtual_sites[vs] = constructing_beads[:4]
-            return virtual_sites
-
-        # Find number of fused cycles = number of needed virtual sites    
-        bead_bond_counts_sorted = dict(sorted(bead_bond_counts.items(), key=lambda item: item[1], reverse=True))
-        cpt_ringatoms = len(sum(ringatoms, []))
-
-        for r_nb in range(len(ringatoms)):
-            if cpt_ringatoms > 6 and cpt_ringatoms < 19: 
-                self.virtual_sites = find_more_vs(1, bead_bond_counts_sorted, cg_bead_coords, distances)
-
-            if cpt_ringatoms > 18:  # more than 4 fused cycles
-                self.virtual_sites = find_more_vs(3, bead_bond_counts_sorted, cg_bead_coords, distances)
-
-        # Calculate rigid dihedrals for 4-atom virtual sites
-        for vs, cb in self.virtual_sites.items():
-            if len(cb) == 4:
-                # Find dihedral from constructing beads
-                i = cb[0]
-                j = cb[1]
-                k = cb[2]
-                l = cb[3]
-                r1 = cg_bead_coords[j] - cg_bead_coords[i]
-                r2 = cg_bead_coords[k] - cg_bead_coords[j]
-                r3 = cg_bead_coords[l] - cg_bead_coords[k]
-                p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-                p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-                r2 /= np.linalg.norm(r2)
-                cosphi = np.dot(p1, p2)
-                sinphi = np.dot(r2, np.cross(p1, p2))
-                angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-                force = 100
-                self.rigid_dihedrals.append({
-                    'atoms': [cb[0], cb[1], cb[2], cb[3]],
-                    'angle': round(angle, 2),
-                    'force': force
-                })
     
     # Format methods - return formatted strings
     def format_header(self):
@@ -1758,194 +1625,194 @@ def run_bartender(header_write, atoms_write, bonds_write, angles_write, dihedral
     return _, bartender_out
 
 
-# def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###
+def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, virtual_sites, vs_write, rigid_dih, simple_model): ### AutoM3 ###
 
-#     """AutoM3 : Prints whole .itp file with all bonded and nonbonded parameters. """
-#     text = ""
-#     bartender_input_info = {}
-#     nb_beads = 0
-#     molname=""
-#     for line in list(atoms_write.split("\n")):
-#         if line != "":
-#             x = line.split()
-#             molname=x[3]
-#             nb_beads=int(x[0])
+    """AutoM3 : Prints whole .itp file with all bonded and nonbonded parameters. """
+    text = ""
+    bartender_input_info = {}
+    nb_beads = 0
+    molname=""
+    for line in list(atoms_write.split("\n")):
+        if line != "":
+            x = line.split()
+            molname=x[3]
+            nb_beads=int(x[0])
 
-#     #Atoms: add bead VS
-#     vs_bead_names=""
-#     #Atoms: change mass of VS to 0 and divide it between constructing beads
-#     modified_lines_atoms = list(atoms_write.split("\n"))
-#     vs_mass={}
-#     for vs, cb in virtual_sites.items():
-#         for i, line in enumerate(modified_lines_atoms):
-#             if line:
-#                 atom_line = line.split()
-#                 if str(vs+1) == atom_line[0] and atom_line[7] != '0': 
-#                     vs_bead_names+=atom_line[1]
-#                     vs_mass[vs]=int(atom_line[7])
-#                     fields = line.split()
-#                     comments = line.split('   ;   ')[1]
-#                     modified_lines_atoms[i] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}     0   ;   {:24s}".format(
-#                         int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]), comments)
+    #Atoms: add bead VS
+    vs_bead_names=""
+    #Atoms: change mass of VS to 0 and divide it between constructing beads
+    modified_lines_atoms = list(atoms_write.split("\n"))
+    vs_mass={}
+    for vs, cb in virtual_sites.items():
+        for i, line in enumerate(modified_lines_atoms):
+            if line:
+                atom_line = line.split()
+                if str(vs+1) == atom_line[0] and atom_line[7] != '0': 
+                    vs_bead_names+=atom_line[1]
+                    vs_mass[vs]=int(atom_line[7])
+                    fields = line.split()
+                    comments = line.split('   ;   ')[1]
+                    modified_lines_atoms[i] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}     0   ;   {:24s}".format(
+                        int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]), comments)
 
-#     for vs, cb in virtual_sites.items():
-#         for vs_env in cb:
-#             for j, line2 in enumerate(modified_lines_atoms):
-#                 if line2 :
-#                     atom_line2 = line2.split()
-#                     if str(vs_env+1) == atom_line2[0]:
-#                         new_mass = int(int(atom_line2[7]) + vs_mass[vs] / len(cb) ) #add 1/cb mass of VS
-#                         fields = line2.split()
-#                         comments = line2.split('   ;   ')[1]
-#                         modified_lines_atoms[j] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:24s}".format(
-#                             int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]),
-#                             int(new_mass), comments
-# )
-#     modified_atoms_write = "\n".join(modified_lines_atoms)
+    for vs, cb in virtual_sites.items():
+        for vs_env in cb:
+            for j, line2 in enumerate(modified_lines_atoms):
+                if line2 :
+                    atom_line2 = line2.split()
+                    if str(vs_env+1) == atom_line2[0]:
+                        new_mass = int(int(atom_line2[7]) + vs_mass[vs] / len(cb) ) #add 1/cb mass of VS
+                        fields = line2.split()
+                        comments = line2.split('   ;   ')[1]
+                        modified_lines_atoms[j] = "   {:<5d}   {:5s}   1   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:24s}".format(
+                            int(fields[0]), fields[1],  str(fields[3]), fields[4], int(fields[5]), int(fields[6]),
+                            int(new_mass), comments
+)
+    modified_atoms_write = "\n".join(modified_lines_atoms)
 
-#     modified_lines_header=[]
-#     for line in list(header_write.split("\n")):
-#         if ("  "+molname) not in line: modified_lines_header.append(line)
-#         else:
-#             lineH = line.split("         ")
-#             txt = lineH[0] + "         1"
-#             modified_lines_header.append(txt)
-#     modified_header_write = "\n".join(modified_lines_header)
+    modified_lines_header=[]
+    for line in list(header_write.split("\n")):
+        if ("  "+molname) not in line: modified_lines_header.append(line)
+        else:
+            lineH = line.split("         ")
+            txt = lineH[0] + "         1"
+            modified_lines_header.append(txt)
+    modified_header_write = "\n".join(modified_lines_header)
 
-#     # Adding force to constraints
-#     modified_lines_bonds = []
-#     bonds_list = []
-#     for line in list(bonds_write.split("\n")):
-#         if '1' in line:
-#             bonds_list.append(f"{line.split('   ')[1]},{line.split('   ')[2]}")
-#         if '1' in line and len(line.split("   ")) < 7:
-#             modified_lines_bonds.append(line + "    1000000")
-#         else:
-#             modified_lines_bonds.append(line)
-#         if line == "[constraints]":
-#             if line in modified_lines_bonds: modified_lines_bonds.remove(line)
-#             txt = "#ifndef FLEXIBLE\n[constraints]\n#endif"
-#             modified_lines_bonds.append(txt)
-#     modified_bonds_write = "\n".join(modified_lines_bonds)
+    # Adding force to constraints
+    modified_lines_bonds = []
+    bonds_list = []
+    for line in list(bonds_write.split("\n")):
+        if '1' in line:
+            bonds_list.append(f"{line.split('   ')[1]},{line.split('   ')[2]}")
+        if '1' in line and len(line.split("   ")) < 7:
+            modified_lines_bonds.append(line + "    1000000")
+        else:
+            modified_lines_bonds.append(line)
+        if line == "[constraints]":
+            if line in modified_lines_bonds: modified_lines_bonds.remove(line)
+            txt = "#ifndef FLEXIBLE\n[constraints]\n#endif"
+            modified_lines_bonds.append(txt)
+    modified_bonds_write = "\n".join(modified_lines_bonds)
     
-#     #Bonds / Constraints: delete lines describing interactions with VS
-#     bond_with_vs={}
-#     for line in list(modified_bonds_write.split("\n")):
-#         if line !="":
-#             bond_line = line.split()
-#             if len(bond_line)>2 and not line.startswith(";"):
-#                 for vs, cb in virtual_sites.items():
-#                     if str(vs+1) in bond_line[:2]:
-#                         # memorizing atom bonded with VS = vs_bond
-#                         if str(vs+1) == bond_line[0] : vs_bond = bond_line[1] 
-#                         if str(vs+1) == bond_line[1] : vs_bond = bond_line[0]
+    #Bonds / Constraints: delete lines describing interactions with VS
+    bond_with_vs={}
+    for line in list(modified_bonds_write.split("\n")):
+        if line !="":
+            bond_line = line.split()
+            if len(bond_line)>2 and not line.startswith(";"):
+                for vs, cb in virtual_sites.items():
+                    if str(vs+1) in bond_line[:2]:
+                        # memorizing atom bonded with VS = vs_bond
+                        if str(vs+1) == bond_line[0] : vs_bond = bond_line[1] 
+                        if str(vs+1) == bond_line[1] : vs_bond = bond_line[0]
 
-#                         #memorize VS bond count
-#                         if str(vs+1) not in bond_with_vs:
-#                             bond_with_vs[str(vs+1)]=[]
-#                         if vs_bond not in bond_with_vs.values():
-#                             bond_with_vs[str(vs+1)].append(vs_bond) #beads bounded to VS
+                        #memorize VS bond count
+                        if str(vs+1) not in bond_with_vs:
+                            bond_with_vs[str(vs+1)]=[]
+                        if vs_bond not in bond_with_vs.values():
+                            bond_with_vs[str(vs+1)].append(vs_bond) #beads bounded to VS
 
-#                         #Check if bond between bead B and VS is the only bond connecting B to the rest of the molecule: if yes, don't remove it
-#                         nb_occ=0
-#                         if str(vs+1) == bond_line[0]:
-#                             for i in bonds_list:
-#                                 if bond_line[1] in i: nb_occ+=1
-#                         else:
-#                             for i in bonds_list:
-#                                 if bond_line[0] in i: nb_occ+=1
-#                         if line in modified_lines_bonds and nb_occ>1: modified_lines_bonds.remove(line)
-#     modified_bonds_write = "\n".join(modified_lines_bonds)
+                        #Check if bond between bead B and VS is the only bond connecting B to the rest of the molecule: if yes, don't remove it
+                        nb_occ=0
+                        if str(vs+1) == bond_line[0]:
+                            for i in bonds_list:
+                                if bond_line[1] in i: nb_occ+=1
+                        else:
+                            for i in bonds_list:
+                                if bond_line[0] in i: nb_occ+=1
+                        if line in modified_lines_bonds and nb_occ>1: modified_lines_bonds.remove(line)
+    modified_bonds_write = "\n".join(modified_lines_bonds)
 
-#     #Angles: delete lines describing interactions with VS 
-#     modified_lines_angles = []
-#     for line in list(angles_write.split("\n")):
-#         if line !="":
-#             angle_line = line.split()
-#             if line not in modified_lines_angles: 
-#                 modified_lines_angles.append(line)
-#             if len(angle_line)>2 and not line.startswith(";"):
-#                 for vs, cb in virtual_sites.items():
-#                     #if str(vs+1) == angle_line[0] or str(vs+1) == angle_line[1] or str(vs+1) == angle_line[2] :
-#                     if str(vs+1) in angle_line[:3] :
-#                         if line in modified_lines_angles : modified_lines_angles.remove(line)
+    #Angles: delete lines describing interactions with VS 
+    modified_lines_angles = []
+    for line in list(angles_write.split("\n")):
+        if line !="":
+            angle_line = line.split()
+            if line not in modified_lines_angles: 
+                modified_lines_angles.append(line)
+            if len(angle_line)>2 and not line.startswith(";"):
+                for vs, cb in virtual_sites.items():
+                    #if str(vs+1) == angle_line[0] or str(vs+1) == angle_line[1] or str(vs+1) == angle_line[2] :
+                    if str(vs+1) in angle_line[:3] :
+                        if line in modified_lines_angles : modified_lines_angles.remove(line)
 
-#     #Clean angles already described by dihedrals 
-#     for lineA in modified_lines_angles:
-#         for lineD in list(dihedrals_write.split("\n")):
-#             angle_line = lineA.split()
-#             dihed_line = lineD.split()
-#             if len(dihed_line)>2 and not lineD.startswith(";") and len(angle_line)>2 and not lineA.startswith(";"):
-#                 if angle_line[0] in dihed_line[:4] and angle_line[1] in dihed_line[:4] and angle_line[2] in dihed_line[:4]:
-#                     if lineA in modified_lines_angles : modified_lines_angles.remove(lineA)
-#     modified_angles_write = "\n".join(modified_lines_angles)
+    #Clean angles already described by dihedrals 
+    for lineA in modified_lines_angles:
+        for lineD in list(dihedrals_write.split("\n")):
+            angle_line = lineA.split()
+            dihed_line = lineD.split()
+            if len(dihed_line)>2 and not lineD.startswith(";") and len(angle_line)>2 and not lineA.startswith(";"):
+                if angle_line[0] in dihed_line[:4] and angle_line[1] in dihed_line[:4] and angle_line[2] in dihed_line[:4]:
+                    if lineA in modified_lines_angles : modified_lines_angles.remove(lineA)
+    modified_angles_write = "\n".join(modified_lines_angles)
 
-#     if not simple_model:
-#         #Dihedrals: delete lines describing interactions with VS
-#         modified_lines_dihedrals = []
-#         dih_list = []
-#         for line in list(dihedrals_write.split("\n")):
-#             if line !="":
-#                 dihed_line = line.split()
-#                 if line not in modified_lines_dihedrals: modified_lines_dihedrals.append(line)
-#                 if len(dihed_line)>2 and not line.startswith(";"):
-#                     dih_list.append(dihed_line[:4])
-#                     for vs, cb in virtual_sites.items():
-#                         if str(vs+1) in dihed_line[:4] :
-#                             if line in modified_lines_dihedrals : modified_lines_dihedrals.remove(line)
-#         for i in rigid_dih:
-#             modified_lines_dihedrals.append(i)
+    if not simple_model:
+        #Dihedrals: delete lines describing interactions with VS
+        modified_lines_dihedrals = []
+        dih_list = []
+        for line in list(dihedrals_write.split("\n")):
+            if line !="":
+                dihed_line = line.split()
+                if line not in modified_lines_dihedrals: modified_lines_dihedrals.append(line)
+                if len(dihed_line)>2 and not line.startswith(";"):
+                    dih_list.append(dihed_line[:4])
+                    for vs, cb in virtual_sites.items():
+                        if str(vs+1) in dihed_line[:4] :
+                            if line in modified_lines_dihedrals : modified_lines_dihedrals.remove(line)
+        for i in rigid_dih:
+            modified_lines_dihedrals.append(i)
         
-#         modified_dihedrals_write = "\n".join(modified_lines_dihedrals)
-#     else:
-#         modified_dihedrals_write = dihedrals_write
+        modified_dihedrals_write = "\n".join(modified_lines_dihedrals)
+    else:
+        modified_dihedrals_write = dihedrals_write
 
-#     exclusions_net=""
-#     exclusions_net = exclusions_net + "\n[exclusions]\n"
-#     for i in range(1,nb_beads):
-#         row = " ".join(map(str, range(i, nb_beads + 1)))
-#         exclusions_net="   "+exclusions_net+row+"\n"
+    exclusions_net=""
+    exclusions_net = exclusions_net + "\n[exclusions]\n"
+    for i in range(1,nb_beads):
+        row = " ".join(map(str, range(i, nb_beads + 1)))
+        exclusions_net="   "+exclusions_net+row+"\n"
     
 
-#     # bartender info search
-#     bartender_input_info["VSITES"] = []
-#     for line in list(vs_write.split("\n")):
-#         if ";" not in line and len(line.split()) > 3:
-#             info_vs = f"{line.split()[0]} {','.join(line.split()[2:])} 1"
-#             bartender_input_info["VSITES"].append(info_vs)
+    # bartender info search
+    bartender_input_info["VSITES"] = []
+    for line in list(vs_write.split("\n")):
+        if ";" not in line and len(line.split()) > 3:
+            info_vs = f"{line.split()[0]} {','.join(line.split()[2:])} 1"
+            bartender_input_info["VSITES"].append(info_vs)
 
-#     bartender_input_info["BONDS"] = []
-#     for line in list(modified_bonds_write.split("\n")):
-#         if ";" not in line and len(line.split()) > 4:
-#             bartender_input_info["BONDS"].append(line.split()[:2])
+    bartender_input_info["BONDS"] = []
+    for line in list(modified_bonds_write.split("\n")):
+        if ";" not in line and len(line.split()) > 4:
+            bartender_input_info["BONDS"].append(line.split()[:2])
 
-#     bartender_input_info["ANGLES"] = []
-#     for line in list(modified_angles_write.split("\n")):
-#         if ";" not in line and len(line.split()) > 5:
-#             bartender_input_info["ANGLES"].append(line.split()[:3])
+    bartender_input_info["ANGLES"] = []
+    for line in list(modified_angles_write.split("\n")):
+        if ";" not in line and len(line.split()) > 5:
+            bartender_input_info["ANGLES"].append(line.split()[:3])
 
-#     bartender_input_info["IMPROPERS"] = []
-#     for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write
-#         if ";" not in line and len(line.split()) > 6:
-#             bartender_input_info["IMPROPERS"].append(line.split()[:4])
+    bartender_input_info["IMPROPERS"] = []
+    for line in list(dihedrals_write.split("\n")): # not modified_dihedrals_write
+        if ";" not in line and len(line.split()) > 6:
+            bartender_input_info["IMPROPERS"].append(line.split()[:4])
 
-#     position_restraints = write_position_restraints(range(1, nb_beads + 1))
-#     text = (
-#         modified_header_write
-#         + "\n"
-#         + modified_atoms_write
-#         + "\n"
-#         + modified_bonds_write
-#         + "\n"
-#         + modified_angles_write
-#         + "\n"
-#         + modified_dihedrals_write
-#         + "\n"
-#         + vs_write
-#         + exclusions_net
-#         + position_restraints
-#     )
-#     return text, vs_bead_names, bartender_input_info
+    position_restraints = write_position_restraints(range(1, nb_beads + 1))
+    text = (
+        modified_header_write
+        + "\n"
+        + modified_atoms_write
+        + "\n"
+        + modified_bonds_write
+        + "\n"
+        + modified_angles_write
+        + "\n"
+        + modified_dihedrals_write
+        + "\n"
+        + vs_write
+        + exclusions_net
+        + position_restraints
+    )
+    return text, vs_bead_names, bartender_input_info
 
 
 def bartender_input(mol, molname, atoms_in_beads, bart_info_dict): ### AutoM3 ###
