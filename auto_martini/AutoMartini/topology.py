@@ -87,14 +87,15 @@ class Topology:
     exclusions: list = field(default_factory=list)
     
     # Build methods - update topology data
-    def build_atoms(self, cgbeads, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
-                    ringatoms, ringatoms_flat, logp_file, trial=False):
+    def build_atoms(self, cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
+                    ringatoms, logp_file):
         """Build atoms data structure."""
         logger.debug("Entering Topology.build_atoms()")
         
         self.mapping = mapping
         self.partitioning = partitioning
         self.cgbeads = cgbeads
+        self.cgbead_coords = cgbead_coords
         self.ringatoms = ringatoms
         
         # Identify which beads are in rings and store them in self.ringbeads
@@ -138,49 +139,52 @@ class Topology:
             mol_frag, errval = gen_molecule_smi(smi_frag)
             charge_frag = get_charge(mol_frag)
 
-            if errval == 0:
-                try:
-                    if charge_frag == 0:
-                        alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file, trial)
-                    else:
-                        alogps = 0.0
-                        logp_origin = "; Charged fragment"
-                except (NameError, TypeError, ValueError):
-                    return
+            try:
+                if charge_frag == 0:
+                    alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file)
+                else:
+                    alogps = 0.0
+                    logp_origin = "; Charged fragment"
+            except (NameError, TypeError, ValueError):
+                return
 
-                hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
-                hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
-                in_ring = cgbeads[bead] in ringatoms_flat
+            hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
+            hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
 
-                bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
-                atom_name = ""
-                name_index = bead + 1
-                atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
-                self.atomnames.append(atom_name)
-                
-                mass = get_standard_mass(bead_type)
+            ringbeads_flat = [bead for ring in self.ringbeads for bead in ring]
+            in_ring = bead in ringbeads_flat
 
-                atom_dict = {
-                    'id': bead + 1,
-                    'type': bead_type,
-                    'resnr': 1,
-                    'residue': self.molname[:4] if len(self.molname) > 4 else self.molname,
-                    'atom': atom_name,
-                    'cgnr': bead + 1,
-                    'charge': charge,
-                    'mass': mass,
-                    'smiles': smi_frag,
-                    'atoms_in_smi': atoms_in_smi,
-                    'logp_origin': logp_origin
-                }
-                self.atoms.append(atom_dict)
-                self.beadtypes.append(bead_type)
+            bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
+            atom_name = ""
+            name_index = bead + 1
+            atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
+            self.atomnames.append(atom_name)
+            
+            mass = get_standard_mass(bead_type)
+
+            atom_dict = {
+                'id': bead + 1,
+                'type': bead_type,
+                'resnr': 1,
+                'residue': self.molname[:4] if len(self.molname) > 4 else self.molname,
+                'atom': atom_name,
+                'cgnr': bead + 1,
+                'charge': charge,
+                'mass': mass,
+                'smiles': smi_frag,
+                'atoms_in_smi': atoms_in_smi,
+                'logp_origin': logp_origin
+            }
+            self.atoms.append(atom_dict)
+            self.beadtypes.append(bead_type)
     
-    def build_bonds(self, mapping, ha_neighbors, cgbead_coords):
+    def build_bonds(self, ha_neighbors):
         """Build bonds and constraints data."""
         logger.info("Building bonds and constraints...")
 
-        nbeads = len(mapping)
+        mapping = self.mapping
+        cgbead_coords = self.cgbead_coords
+        nbeads = len(self.cgbeads)
         if nbeads <= 1:
             return
         
@@ -228,19 +232,23 @@ class Topology:
                 if n_bonds == 4: 
                     self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
               
-    def build_angles(self, mapping, cgbeads, molecule, partitioning, cgbead_coords, ringatoms):
+    def build_angles(self):
         """Build angles data structure."""
-        logger.debug("Entering Topology.build_angles()")
+        logger.info("Building angles...")
 
-        if len(cgbeads) <= 2:
-            return
-
+        cgbeads = self.cgbeads
         bondlist = self.bonds
         constlist = self.constraints
+        partitioning = self.partitioning
+        cgbead_coords = self.cgbead_coords
 
-        for i in range(len(cgbeads)):
-            for j in range(len(cgbeads)): 
-                for k in range(len(cgbeads)):     
+        nbeads = len(self.cgbeads)
+        if nbeads <= 2:
+            return
+
+        for i in range(nbeads):
+            for j in range(nbeads): 
+                for k in range(nbeads):     
 
                     # Check if all indices are different
                     if i == j or j == k or i == k:
@@ -257,8 +265,8 @@ class Topology:
                         continue
 
                     # Check if all of them are in one ring
-                    for ring in ringatoms:
-                        if cgbeads[i] in ring and cgbeads[j] in ring and cgbeads[k] in ring:
+                    for ring in self.ringbeads:
+                        if i in ring and j in ring and k in ring:
                             stop_iteration = True
                             break
                     if stop_iteration:
@@ -317,24 +325,6 @@ class Topology:
                         if partitioning[aa] == j:
                             atoms_in_fragment.append(aa)
                     force_const = 100.0
-                    for ib in range(len(molecule.GetBonds())):
-                        abond = molecule.GetBondWithIdx(ib)
-                        if (
-                            abond.GetBeginAtomIdx() in atoms_in_fragment
-                            and abond.GetEndAtomIdx() in atoms_in_fragment
-                        ):
-                            bondtype = molecule.GetBondBetweenAtoms(
-                                abond.GetBeginAtomIdx(), abond.GetEndAtomIdx()
-                            ).GetBondType()
-                            if bondtype == rdchem.BondType.DOUBLE:
-                                force_const = 45.0
-
-                    ### AutoM3 ###
-                    if len(partitioning) > 15:
-                        for a1 in range(len(self.angles)):
-                            for a2 in range(len(self.angles)):
-                                if i in self.angles[a1] and j in self.angles[a1] and j in self.angles[a2] and k in self.angles[a2]:
-                                    break
                     
                     # Create beadlist for read_params
                     beadlist = []
@@ -353,9 +343,9 @@ class Topology:
                             force_const = db_force
                     self.angles.append([i, j, k, funct, angle, force_const, ""])
     
-    def build_dihedrals(self, cgbeads, ringatoms, cgbead_coords):
+    def build_dihedrals(self):
         """Build dihedrals data structure and return num_ar."""
-        logger.debug("Entering Topology.build_dihedrals()")
+        logger.info("Building dihedrals...")
 
         def _is_ring_diagonal(entry) -> bool:
             """Return True if a bond/constraint entry is tagged as ring_diagonal."""
@@ -366,24 +356,23 @@ class Topology:
                     return True
             return False
 
-        num_ar = 0
         constlist = self.constraints
         
         # Store for later use
-        self.cgbeads = cgbeads
-        self.ringatoms = ringatoms
-        self.cgbead_coords = cgbead_coords
+        cgbeads = self.cgbeads
+        cgbead_coords = self.cgbead_coords
+        nbeads = len(self.cgbeads)
 
-        if len(cgbeads) <= 3:
-            return num_ar
+        if nbeads <= 3:
+            return 
 
         # Dihedrals
         dihed_list = []
         # Three ring atoms and one non ring
-        for i in range(len(cgbeads)):
-            for j in range(len(cgbeads)):
-                for k in range(len(cgbeads)):
-                    for l in range(len(cgbeads)):
+        for i in range(nbeads):
+            for j in range(nbeads):
+                for k in range(nbeads):
+                    for l in range(nbeads):
                         if i != j and i != k and i != l and j != k and j != l and k != l:
 
                             three_in_ring = False
@@ -528,8 +517,6 @@ class Topology:
         #                         dihed_list.remove(di)
         
         self.dihedrals = dihed_list
-        self.num_ar = num_ar
-        return num_ar
     
     def build_virtual_sites(self, cgbeads, ringatoms, cgbead_coords):
         """Build virtual sites data structure."""

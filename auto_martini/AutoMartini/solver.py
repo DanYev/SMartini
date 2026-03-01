@@ -223,6 +223,7 @@ class Cg_molecule:
             temp_topo = Topology(molname=self.molname, mol_smi=self.smiles)
             temp_topo.build_atoms(
                 cgbeads=cg_beads,
+                cgbead_coords=self.cg_bead_coords,
                 forcepred=self.forcepred,
                 molecule=self.molecule,
                 hbonda=self.hbond_a,
@@ -230,9 +231,7 @@ class Cg_molecule:
                 mapping=self.mapping,
                 partitioning=self.partitioning,
                 ringatoms=self.ring_atoms,
-                ringatoms_flat=self.ring_atoms_flat,
                 logp_file=self.logp_file,
-                trial=True
             )
             self.cg_bead_names = temp_topo.atomnames
             bead_types = temp_topo.beadtypes
@@ -242,6 +241,7 @@ class Cg_molecule:
                 continue
             
             logger.info("Success mapping found on attempt %d", attempt)
+            self.topology = temp_topo
             self.build_topology(cg_beads, cg_beads_rings, bead_types)
             self.update_topology(cg_beads, cg_beads_rings, bead_types, attempt)
             self.write_topology()
@@ -663,56 +663,38 @@ class Cg_molecule:
     def build_topology(self, cg_beads, cg_beads_rings, bead_types):
         """Build topology data using Topology instance methods."""
         
-        # Build atoms data
-        self.topology.build_atoms(
-            cgbeads=cg_beads,
-            forcepred=self.forcepred,
-            molecule=self.molecule,
-            hbonda=self.hbond_a,
-            hbondd=self.hbond_d,
-            mapping=self.mapping,
-            partitioning=self.partitioning,
-            ringatoms=self.ring_atoms,
-            ringatoms_flat=self.ring_atoms_flat,
-            logp_file=self.logp_file,
-            trial=False
-        )
+        # # Build atoms data
+        # self.topology.build_atoms(
+        #     cgbeads=cg_beads,
+        #     cgbead_coords=self.cg_bead_coords,
+        #     forcepred=self.forcepred,
+        #     molecule=self.molecule,
+        #     hbonda=self.hbond_a,
+        #     hbondd=self.hbond_d,
+        #     mapping=self.mapping,
+        #     partitioning=self.partitioning,
+        #     ringatoms=self.ring_atoms,
+        #     logp_file=self.logp_file,
+        # )
+
         # Override beadtypes if provided
         if bead_types is not None:
             self.topology.beadtypes = bead_types
         
         # Build bonds and constraints
         self.topology.build_bonds(
-            mapping=self.mapping,
             ha_neighbors=self.ha_neighbors,
-            cgbead_coords=self.cg_bead_coords,
         )
         
         # Build angles
-        self.topology.build_angles(
-            mapping=self.mapping,
-            cgbeads=cg_beads,
-            molecule=self.molecule,
-            partitioning=self.partitioning,
-            cgbead_coords=self.cg_bead_coords,
-            ringatoms=self.ring_atoms
-        )
+        self.topology.build_angles()
         
         # Build dihedrals (unless simple model)
         if not self.simple_model:
-            self.topology.build_dihedrals(
-                cgbeads=cg_beads,
-                ringatoms=self.ring_atoms,
-                cgbead_coords=self.cg_bead_coords
-            )
+            self.topology.build_dihedrals()
         
         # Build virtual sites if needed
-        if self.ring_atoms and len(sum(self.ring_atoms, [])) > 6:
-            self.topology.build_virtual_sites(
-                cgbeads=cg_beads,
-                ringatoms=self.ring_atoms,
-                cg_bead_coords=self.cg_bead_coords,
-            )
+        self.topology.build_virtual_sites()
         
     def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
