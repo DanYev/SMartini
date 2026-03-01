@@ -498,10 +498,56 @@ class Topology:
             "virtual_sitesn": [],
         }
 
-    def build_vs_2(self) -> list:
-        return []
-
     def build_vs_3(self):
+        """Build type 3 virtual sites for fused rings.
+        For rings of 5 or more beads, we select 3 beads as anchors to be connected with bonds or constaints, 
+        the rest of the beads will go the type 3 virtual sites.
+        """
+        logger.info("Building virtual sites for fused rings...")
+        self.virtual_sites_type3 = []
+        bonds = self.bonds + self.constraints
+
+        def _has_external_bond(bead, ring):
+            for b in bonds:
+                if bead in b[:2]:
+                    other_bead = b[1] if b[0] == bead else b[0]
+                    if other_bead not in ring:
+                        return True
+            return False
+
+        def _find_anchor_beads(ring): 
+            anchor_beads = [] # beads that are bonded to beads in the ring but are not in the ring themselves
+            for bead in ring:
+                if _has_external_bond(bead, ring):
+                    anchor_beads.append(bead)
+            if not anchor_beads:
+                anchor_beads = [ring[0]] # if no anchor beads, just pick one bead in the ring to be the anchor
+
+            if len(anchor_beads) < 3:
+                # if we have less than 3 then the furthest bead in the ring from the anchor beads will be added as an anchor until we have 3
+                while len(anchor_beads) < 3:
+                    max_dist = -1
+                    furthest_bead = None
+                    for bead in ring:
+                        if bead in anchor_beads:
+                            continue
+                        dist = min(np.linalg.norm(self.cgbead_coords[bead] - self.cgbead_coords[anchor]) for anchor in anchor_beads)
+                        if dist > max_dist:
+                            max_dist = dist
+                            furthest_bead = bead
+                    anchor_beads.append(furthest_bead)                
+            return anchor_beads 
+        
+        # For now check if we have rings with 5+ beads 
+        for ring in self.ringbeads:
+            if len(ring) < 5:
+                continue
+            anchor_beads = _find_anchor_beads(ring)
+            print(anchor_beads)
+            exit()
+
+
+    def build_vs_2(self) -> list:
         return []
 
     def build_vs_4(self) -> list:
