@@ -68,7 +68,9 @@ class Topology:
     dihedrals: list = field(default_factory=list)
     
     # Virtual sites (if any)
-    virtual_sites: dict = field(default_factory=dict)
+    # Stored as a dict of Gromacs virtual-site section -> list of entries.
+    # Supported keys: virtual_sites2, virtual_sites3, virtual_sites4, virtual_sitesn
+    virtual_sites: dict[str, list] = field(default_factory=dict)
     
     # Rigid dihedrals (for virtual sites)
     rigid_dihedrals: list = field(default_factory=list)
@@ -478,18 +480,36 @@ class Topology:
                             multiplicity = 1  # Default multiplicity
                             self.dihedrals.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
 
-    
+
     def build_virtual_sites(self):
-        """Build virtual sites data structure."""
-        logger.info("Building virtual sites for fused rings if needed...")
 
-        constlist = self.constraints
-        cgbeads = self.cgbeads
-        cgbead_coords = self.cgbead_coords
-        nbeads = len(self.cgbeads)
-        self.virtual_sites = []
+        self.virtual_sites = self._init_virtual_sites_dict()
+        self.virtual_sites["virtual_sites2"] = self.build_vs_2()
+        self.virtual_sites["virtual_sites3"] = self.build_vs_3()
+        self.virtual_sites["virtual_sites4"] = self.build_vs_4()
+        self.virtual_sites["virtual_sitesn"] = self.build_vs_n()
 
-        
+    @staticmethod
+    def _init_virtual_sites_dict() -> dict[str, list]:
+        return {
+            "virtual_sites2": [],
+            "virtual_sites3": [],
+            "virtual_sites4": [],
+            "virtual_sitesn": [],
+        }
+
+    def build_vs_2(self) -> list:
+        return []
+
+    def build_vs_3(self):
+        return []
+
+    def build_vs_4(self) -> list:
+        return []
+
+    def build_vs_n(self) -> list:
+        return []
+
     
     # Format methods - return formatted strings
     def format_header(self):
@@ -618,25 +638,56 @@ class Topology:
         """Format virtual sites data for .itp output."""
         if not self.virtual_sites:
             return ""
-        
-        text = "\n[virtual_sitesn]\n"
-        text += "; site funct  constructing atom indices"
-        
-        for vs, cb in self.virtual_sites.items():
-            if len(cb) == 4:
-                text += "\n   {:d}       1     {:d} {:d} {:d} {:d}".format(
-                    vs+1, cb[0]+1, cb[1]+1, cb[2]+1, cb[3]+1
-                )
-            elif len(cb) == 3:
-                text += "\n   {:d}       1     {:d} {:d} {:d}".format(
-                    vs+1, cb[0]+1, cb[1]+1, cb[2]+1
-                )
-            elif len(cb) == 2:
-                text += "\n   {:d}       1     {:d} {:d}".format(
-                    vs+1, cb[0]+1, cb[1]+1
-                )
-        
-        return text + "\n"
+
+        sections_order = ("virtual_sites2", "virtual_sites3", "virtual_sites4", "virtual_sitesn")
+        header_lines = {
+            "virtual_sites2": "; site  from  funct  a  b",
+            "virtual_sites3": "; site  from  funct  a  b  c",
+            "virtual_sites4": "; site  from  funct  a  b  c  d",
+            "virtual_sitesn": "; site  funct  constructing atom indices",
+        }
+
+        def _format_entry(section: str, entry):
+            if isinstance(entry, dict):
+                comment = entry.get("comment", "")
+                params = entry.get("params", []) or []
+                atoms = entry.get("atoms", []) or []
+
+                if section in ("virtual_sites2", "virtual_sites3", "virtual_sites4"):
+                    site = int(entry["site"]) + 1
+                    from_atom = int(entry.get("from", entry["site"])) + 1
+                    funct = int(entry.get("funct", 1))
+                    idxs = [int(a) + 1 for a in atoms]
+                    fields = [site, from_atom, funct, *idxs, *params]
+                else:
+                    site = int(entry["site"]) + 1
+                    funct = int(entry.get("funct", 1))
+                    idxs = [int(a) + 1 for a in atoms]
+                    fields = [site, funct, *idxs, *params]
+
+                line = "  " + " ".join(str(f) for f in fields)
+                if comment:
+                    line += f" ; {comment}"
+                return line
+
+            return "  " + " ".join(str(x) for x in entry)
+
+        lines = []
+        wrote_any = False
+        for section in sections_order:
+            entries = self.virtual_sites.get(section, [])
+            if not entries:
+                continue
+            wrote_any = True
+            lines.append("")
+            lines.append(f"[{section}]")
+            lines.append(header_lines.get(section, "; virtual sites"))
+            for entry in entries:
+                lines.append(_format_entry(section, entry))
+
+        if not wrote_any:
+            return ""
+        return "\n".join(lines) + "\n"
     
     def format_exclusions(self):
         """Format exclusions section based on ring atoms.
@@ -961,13 +1012,65 @@ def read_itp(itp_file):
                     multiplicity = int(parts[7]) if len(parts) >= 8 else 1
                     topo.dihedrals.append([i, j, k, l, funct, angle, force_const, multiplicity, comment])
         
-        elif current_section == 'virtual_sitesn':
-            parts = stripped.split()
-            if len(parts) >= 3 and parts[0].isdigit():
-                vs_id = int(parts[0]) - 1  # Convert to 0-based
+        elif current_section in {'virtual_sites2', 'virtual_sites3', 'virtual_sites4', 'virtual_sitesn'}:
+            pre_comment, _, comment_text = line.partition(';')
+            parts = pre_comment.split()
+            if not parts or not parts[0].isdigit():
+                continue
+
+            if not topo.virtual_sites:
+                topo.virtual_sites = Topology._init_virtual_sites_dict()
+            else:
+                for k in ("virtual_sites2", "virtual_sites3", "virtual_sites4", "virtual_sitesn"):
+                    topo.virtual_sites.setdefault(k, [])
+
+            comment = comment_text.strip() if comment_text else ""
+
+            if current_section == 'virtual_sitesn':
+                if len(parts) < 3:
+                    continue
+                site = int(parts[0]) - 1
                 funct = int(parts[1])
-                constructing_atoms = [int(parts[i]) - 1 for i in range(2, len(parts))]
-                topo.virtual_sites[vs_id] = constructing_atoms
+                atoms = [int(p) - 1 for p in parts[2:]]
+                topo.virtual_sites['virtual_sitesn'].append(
+                    {'site': site, 'funct': funct, 'atoms': atoms, 'params': [], 'comment': comment}
+                )
+            else:
+                required = {
+                    'virtual_sites2': 2,
+                    'virtual_sites3': 3,
+                    'virtual_sites4': 4,
+                }[current_section]
+                if len(parts) < 3 + required:
+                    continue
+                site = int(parts[0]) - 1
+                from_atom = int(parts[1]) - 1
+                funct = int(parts[2])
+                atoms = [int(p) - 1 for p in parts[3:3 + required]]
+                raw_params = parts[3 + required:]
+                parsed_params = []
+                for p in raw_params:
+                    try:
+                        parsed_params.append(int(p))
+                        continue
+                    except ValueError:
+                        pass
+                    try:
+                        parsed_params.append(float(p))
+                        continue
+                    except ValueError:
+                        parsed_params.append(p)
+
+                topo.virtual_sites[current_section].append(
+                    {
+                        'site': site,
+                        'from': from_atom,
+                        'funct': funct,
+                        'atoms': atoms,
+                        'params': parsed_params,
+                        'comment': comment,
+                    }
+                )
         
     return topo
 
@@ -1643,6 +1746,13 @@ def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_wr
     #Atoms: change mass of VS to 0 and divide it between constructing beads
     modified_lines_atoms = list(atoms_write.split("\n"))
     vs_mass={}
+    if virtual_sites and any(isinstance(k, str) for k in virtual_sites.keys()):
+        legacy_vs = {}
+        for entry in virtual_sites.get('virtual_sitesn', []):
+            if isinstance(entry, dict) and 'site' in entry and 'atoms' in entry:
+                legacy_vs[int(entry['site'])] = list(entry['atoms'])
+        virtual_sites = legacy_vs
+
     for vs, cb in virtual_sites.items():
         for i, line in enumerate(modified_lines_atoms):
             if line:
