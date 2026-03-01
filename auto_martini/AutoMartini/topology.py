@@ -656,6 +656,8 @@ class Topology:
         ring_atoms = []
         for ra in ringatoms:
             ring_atoms += ra
+        print(ring_atoms)
+        exit()
 
         # Find beads constructing rings
         bead_in_ring_coords = {}

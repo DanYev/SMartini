@@ -61,7 +61,7 @@ if __name__ == "__main__":
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
-    ligand_sdf = wdir / f"{molname}_ideal.sdf"
+    ligand_sdf = wdir / f"{molname}.sdf"
     mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     
