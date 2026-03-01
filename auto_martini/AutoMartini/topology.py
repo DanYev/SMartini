@@ -588,7 +588,39 @@ class Topology:
                     if atom['id'] == vs_site + 1:  # atom ids are 1-indexed
                         atom['mass'] = int(0)
                         break
-        
+
+        def _sanitize_exclusions(vsite_entry, bonds):
+            # add exclusions between the virtual site and all the beads withing self.nrexcl of it 
+            # since we are removing it from the bonds
+            def _remove_duplicates(lst):
+                seen = []
+                tmp = lst.copy()
+                for item in tmp:
+                    if item not in seen:
+                        seen.append(item)
+                    else:
+                        for i in range(lst.count(item)):
+                            lst.remove(item)
+
+            site = vsite_entry[0]
+            conn = [b[:2] for b in bonds]
+            ext_conn = [b[:2] for b in bonds if site in b[:2]]
+            init_ext_conn = ext_conn.copy()
+            for eb in init_ext_conn:
+                for n in range(1, self.nrexcl):
+                    for b in conn:
+                        if b == eb:
+                            continue
+                        x = eb + b
+                        _remove_duplicates(x)
+                        if len(x) != 2:
+                            continue
+                        if x not in ext_conn:
+                            ext_conn.append(sorted(x))
+            for conn in ext_conn:
+                if conn not in self.exclusions and conn[::-1] not in self.exclusions:
+                    self.exclusions.append(conn)
+
         def _sanitize_bonds(bonds, ring, anchor_beads):
             # Remove any within the ring and make bonds involving the anchor beads 
             for bead_i in ring:
@@ -606,11 +638,11 @@ class Topology:
                 bond_entry = [anchor, bead, 1, dist, "ring_anchor"]
                 bonds.append(bond_entry)
         
+        
         # For now check if we have rings with 5+ beads 
         for ring in self.ringbeads:
             if len(ring) < 5:
                 continue
-            print(ring)
             anchor_beads = _find_anchor_beads(ring)
             i, j, k = anchor_beads[0], anchor_beads[1], anchor_beads[2]
             for bead in ring:
@@ -618,9 +650,10 @@ class Topology:
                     continue
                 vs3_entry = _make_vs3_fad_entry(bead, i, j, k)
                 virtual_sites_3.append(vs3_entry)
+                _sanitize_exclusions(vs3_entry, bonds)
             _sanitize_bonds(bonds, ring, anchor_beads)
-
         _sanitize_atoms(atoms, virtual_sites_3)
+
         return virtual_sites_3
 
     def build_vs_2(self) -> list:
@@ -631,6 +664,16 @@ class Topology:
 
     def build_vs_n(self) -> list:
         return []
+
+    def build_exclusions(self):
+        # For all the beads within a ring add all of them to the exclusion list with each other
+        for ring in self.ringbeads:
+            for i in ring:
+                for j in ring:
+                    if i >= j:
+                        continue
+                    if [i, j] not in self.exclusions and [j, i] not in self.exclusions:
+                        self.exclusions.append([i, j])
 
     
     # Format methods - return formatted strings
@@ -929,50 +972,26 @@ class Topology:
         return "\n".join(lines) + "\n"
     
     def format_exclusions(self):
-        """Format exclusions section based on ring atoms.
-        
-        For rings with 5-9 atoms and total molecule < 6 beads,
-        add exclusion between the two most distant beads.
+        """Format `[exclusions]` section.
+
+        `self.exclusions` is expected to be a list of pairs of 0-based bead indices,
+        e.g. `[[0, 3], [1, 4]]`.
         """
-        if not self.ringatoms or len(self.ringatoms) == 0:
+        if not self.exclusions:
             return ""
-        
-        ring_atoms = self.ringatoms[0] if self.ringatoms else []
-        
-        # Only add exclusions for specific ring sizes and molecule sizes
-        if not (len(ring_atoms) > 4 and len(ring_atoms) < 10 and len(self.cgbeads) < 6):
+
+        lines = ["", "[exclusions]"]
+        for pair in self.exclusions:
+            if pair is None or len(pair) < 2:
+                continue
+            i = int(pair[0]) + 1
+            j = int(pair[1]) + 1
+            lines.append(f"  {i} {j}")
+
+        # If everything was malformed and we emitted no pairs, emit nothing.
+        if len(lines) <= 2:
             return ""
-        
-        # Need at least 4 beads to compute distances
-        if len(self.cgbeads) <= 3:
-            return ""
-        
-        # Find the two most distant beads in the ring
-        bead_in_ring_coords = {}
-        for nb, bead_nb in enumerate(self.cgbeads):
-            bead_in_ring_coords[nb + 1] = self.cgbead_coords[nb]
-        
-        remote_dist = 0
-        remote_beads = []
-        
-        for nb_bead1, coord1 in bead_in_ring_coords.items():
-            for nb_bead2, coord2 in bead_in_ring_coords.items():
-                dist = math.sqrt(
-                    (coord1[0] - coord2[0]) ** 2 +
-                    (coord1[1] - coord2[1]) ** 2 +
-                    (coord1[2] - coord2[2]) ** 2
-                )
-                if dist > remote_dist and nb_bead1 != nb_bead2:
-                    remote_beads = [nb_bead1, nb_bead2]
-                    remote_dist = dist
-        
-        if not remote_beads:
-            return ""
-        
-        text = "\n[exclusions]\n"
-        text += f"  {remote_beads[0]} {remote_beads[1]}\n"
-        
-        return text
+        return "\n".join(lines) + "\n"
     
     def format_position_restraints(
         self,
@@ -1202,6 +1221,30 @@ def read_itp(itp_file):
                 comment = comment_text.strip() if comment_text else ""
                 # Store as [i, j, funct, length, comment]
                 topo.constraints.append([i, j, funct, length, comment])
+
+        elif current_section == 'exclusions':
+            # Gromacs allows either pair-wise lines (i j) or multi-column (i j k ...)
+            pre_comment, _, _comment_text = line.partition(';')
+            parts = pre_comment.split()
+            if len(parts) < 2 or not parts[0].isdigit():
+                continue
+
+            i = int(parts[0]) - 1
+            # Deduplicate while preserving file order
+            if not hasattr(topo, "_exclusions_seen"):
+                topo._exclusions_seen = set()
+
+            for pj in parts[1:]:
+                if not pj.isdigit():
+                    continue
+                j = int(pj) - 1
+                if i == j:
+                    continue
+                key = (i, j)
+                if key in topo._exclusions_seen:
+                    continue
+                topo._exclusions_seen.add(key)
+                topo.exclusions.append([i, j])
         
         elif current_section == 'angles':
             # Parse data and comment separately
@@ -1307,6 +1350,9 @@ def read_itp(itp_file):
                     entry.append(comment)
                 topo.virtual_sites[current_section].append(entry)
         
+    # Clean up any parser-only attributes
+    if hasattr(topo, "_exclusions_seen"):
+        delattr(topo, "_exclusions_seen")
     return topo
 
 

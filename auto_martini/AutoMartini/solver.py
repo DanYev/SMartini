@@ -696,6 +696,9 @@ class Cg_molecule:
         # Build dihedrals (unless simple model)
         self.topology.build_dihedrals()
 
+        # Build exclusions 
+        self.topology.build_exclusions()
+
         
     def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
