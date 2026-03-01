@@ -237,8 +237,8 @@ class Cg_molecule:
                 continue
             
             logger.info("Success mapping found on attempt %d", attempt)
-            num_ar = self.build_topology(cg_beads, cg_beads_rings, bead_types)
-            self.update_topology(cg_beads, cg_beads_rings, bead_types, attempt, num_ar)
+            self.build_topology(cg_beads, cg_beads_rings, bead_types)
+            self.update_topology(cg_beads, cg_beads_rings, bead_types, attempt)
             self.write_topology()
             break
 
@@ -677,9 +677,8 @@ class Cg_molecule:
         )
         
         # Build dihedrals (unless simple model)
-        num_ar = 0
         if not self.simple_model:
-            num_ar = self.topology.build_dihedrals(
+            self.topology.build_dihedrals(
                 cgbeads=cg_beads,
                 ringatoms=self.ring_atoms,
                 cgbead_coords=self.cg_bead_coords
@@ -694,10 +693,7 @@ class Cg_molecule:
                 molecule=self.molecule
             )
         
-        return num_ar
-
-
-    def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt, num_ar=0):
+    def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
         
         # Store convenience references

@@ -1503,47 +1503,213 @@ def get_standard_mass(bead_type): # AutoM3
         else: return 72
 
 
-def write_position_restraints(
-    atom_indices,
-    force_constant: str = "POSRES_FC",
-    funct: int = 1,
-    ifdef: str = "POSRES",
-    include_end_if: bool = True,
-):
-    """Return a position restraints section for the provided atom indices.
 
-    Parameters
-    ----------
-    atom_indices : iterable of int
-        Atom indices (1-based) to restrain.
-    force_constant : str
-        Force constant label written for x/y/z (default: POSRES_FC).
-    funct : int
-        Gromacs function type (default: 1).
-    ifdef : str
-        Preprocessor symbol used for conditional inclusion.
-    include_end_if : bool
-        Whether to append a matching #endif line.
+def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_file=None, trial=False): 
     """
-    if not atom_indices:
-        return ""
+    Returns water/octanol partitioning free energy according to ALOGPS
+    AutoM3 : Returns water/octanol partitioning free energy defined empiricaly from customized database
+    """
+    logger.debug("Entering smi2alogps()")
 
-    lines = [
-        "#ifndef POSRES_FC",
-        "#define POSRES_FC 1000.0",
-        "#endif",
-        "[ position_restraints ]",
-        f"#ifdef {ifdef}",
-    ]
-    for atom_index in atom_indices:
-        atom_id = int(atom_index)
-        lines.append(
-            f"{atom_id:5d} {funct:d} {force_constant} {force_constant} {force_constant}"
-        )
-    if include_end_if:
-        lines.append("#endif")
-    return "\n".join(lines) + "\n"
+    ## AutoM3 ###
+    if not logp_file:
+        logp_file = os.path.join(os.path.dirname(__file__), 'logP_smi_extended.dat')
+    found_smi = False
+    if bead != "MOL":
+        logP_data = {}
+        if converted_smi:
+            smi=real_smi
 
+        # Check if logp_file is a valid file name
+        if isinstance(logp_file, str) and logp_file:
+            try:
+                with open(logp_file) as f:
+                    for line in f:
+                        (key, val) = line.rstrip().split()
+                        logP_data[key] = float(val)
+            except Exception as e:
+                logger.error(f"An error occurred while reading the logP file: {e}")
+        else:
+            logger.error(f"Invalid file name: {logp_file}")
+        
+        log_p = 0.0
+        for smiles, logp in logP_data.items():
+            if smiles == smi:
+                log_p = float(logp)
+                found_smi = True
+                return (log_p, "")
+                #break
+
+    if not found_smi:
+        if converted_smi:
+            smi=real_smi
+        req = ""
+        soup = ""
+        try:
+            session = requests.session()
+            logger.debug("Calling http://vcclab.org/web/alogps/calc?SMILES=" + str(smi))
+            req = session.get(
+                "http://vcclab.org/web/alogps/calc?SMILES=" + str(smi.replace("#", "%23"))
+            )
+        except:
+            print("Error. Can't reach vcclab.org to estimate free energy.")
+            exit(1)
+        try:
+            doc = BeautifulSoup(req.content, "lxml")
+        except Exception:
+            raise
+        try:
+            soup = doc.prettify()
+        except:
+            print("Error with BeautifulSoup prettify")
+            exit(1)
+        found_mol_1 = False
+        log_p = None
+        for line in soup.split("\n"):
+            line = line.split()
+            if "mol_1" in line:
+                log_p = float(line[line.index("mol_1") + 1])
+                found_mol_1 = True
+                break
+        if not found_mol_1:
+            # If we're forcing a prediction, use Wildman-Crippen
+            if forcepred:
+                if trial:
+                    wrn = (
+                        "; Warning: bead ID "
+                        + str(bead)
+                        + " predicted from Wildman-Crippen. Fragment "
+                        + str(smi)
+                        + "\n"
+                    )
+                    sys.stderr.write(wrn)
+                log_p = wc_log_p
+            else:
+                log_p = 0.0
+                # print("ALOGPS can't predict fragment: %s" % smi)
+                # exit(1)
+        logger.debug("logp value: %7.4f" % log_p)
+        return (convert_log_k(log_p),"; ALOGPS defined bead")
+
+
+def convert_log_k(log_k):
+    """Convert log_{10}K to free energy (in kJ/mol)"""
+    val = 0.008314 * 300.0 * log_k / math.log10(math.exp(1))
+    logger.debug("free energy %7.4f kJ/mol" % val)
+    return val
+
+
+def mad(bead_type, delta_f, in_ring=False):
+    """Mean absolute difference between bead type and delta_f"""
+    # logger.debug('Entering mad()')
+    delta_f_types = read_delta_f_types()
+    return math.fabs(delta_f_types[bead_type] - delta_f)
+
+
+def count_letters(s): ### AutoM3 ###
+    """ Counting atoms in SMILES code """
+    count = 0
+    i = 0
+    while i < len(s):
+        if s[i:i+2] in ["Cl", "Br"]:
+            count += 1
+            i += 2
+        elif s[i].isalpha():
+            count += 1
+            i += 1
+        else:
+            i += 1
+    return count
+
+
+def find_closest_logPvalue(value, keyslist, in_ring): ### AutoM3 ###
+    closest_key = None
+    closest_diff = float('inf')
+    dict=read_delta_f_types()
+    for key in keyslist:
+        if key in dict:
+            diff = mad(key,value,in_ring)
+            #diff = abs(value - dict[key])
+            if diff < closest_diff:
+                closest_key = key
+                closest_diff = diff
+    return closest_key
+
+
+def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ### AutoM3 ###
+    """Determine CG bead type from delta_f value, charge,
+    and hbond acceptor, and donor"""
+    if charge < -2 or charge > +2:
+        logger.error("Charge is too large: %s" % charge)
+        exit(1)
+    # bead_type = None
+    #smi_frag = ''.join(char for char in smi_frag if char.isalpha() and char!='H')
+    if charge != 0:
+        if charge == -2 or charge == -2:
+            if count_letters(str(smi_frag)) == 2:
+                bead_type = "TD"
+            if count_letters(str(smi_frag)) == 3:
+                bead_type = "SD"
+            if count_letters(str(smi_frag)) > 3:
+                bead_type = " D"
+        else:
+            # The compound has a +/- charge -> Q type
+            if count_letters(str(smi_frag)) == 2:
+                other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
+            if count_letters(str(smi_frag)) == 3:
+                othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
+            if count_letters(str(smi_frag)) > 3:
+                othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5",]
+            bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
+
+    else:
+        # Neutral group
+        if hbonda > 0 or hbondd > 0:
+            if count_letters(str(smi_frag)) == 2:
+                other_types_NPa = ["TN1a", "TN2a", "TN3a", "TN4a", "TN5a", "TN6a", "TP1a", "TP2a", "TP3a", "TP4a", "TP5a", "TP6a"]
+                other_types_NPd = ["TN1d", "TN2d", "TN3d", "TN4d", "TN5d", "TN6d", "TP1d", "TP2d", "TP3d", "TP4d", "TP5d", "TP6d"]
+            if count_letters(str(smi_frag)) == 3:
+                other_types_NPa = ["SN1a", "SN2a", "SN3a", "SN4a", "SN5a", "SN6a", "SP1a", "SP2a", "SP3a", "SP4a", "SP5a", "SP6a"]
+                other_types_NPd = ["SN1d", "SN2d", "SN3d", "SN4d", "SN5d", "SN6d", "SP1d", "SP2d", "SP3d", "SP4d", "SP5d", "SP6d"]
+            if count_letters(str(smi_frag)) > 3:
+                other_types_NPa = ["N1a", "N2a", "N3a", "N4a", "N5a", "N6a", "P1a", "P2a", "P3a", "P4a", "P5a", "P6a"]
+                other_types_NPd = ["N1d", "N2d", "N3d", "N4d", "N5d", "N6d", "P1d", "P2d", "P3d", "P4d", "P5d", "P6d"]
+
+            if hbonda > 0 and hbondd == 0:
+                bead_type = find_closest_logPvalue(delta_f, other_types_NPa, in_ring)
+            if hbonda >= 0 and hbondd > 0:
+                bead_type = find_closest_logPvalue(delta_f, other_types_NPd, in_ring)
+
+        else:
+            # all other cases. Simply find the atom type that's closest in
+            # free energy.
+            
+            if count_letters(str(smi_frag)) == 2:
+                other_types = ["TP6", "TP5", "TP4", "TP3", "TP2", "TP1", "TC6", "TC5", "TC4", "TC3", "TC2", "TC1", "TN6", "TN5", "TN4", "TN3", "TN2", "TN1"]
+                if not in_ring: other_types.remove("TC5")
+
+            if count_letters(str(smi_frag)) == 3:
+                other_types = ["SP6", "SP5", "SP4", "SP3", "SP2", "SP1", "SC6", "SC5", "SC4", "SC3", "SC2", "SC1", "SN6", "SN5", "SN4", "SN3", "SN2", "SN1"]
+
+            if count_letters(str(smi_frag)) > 3:
+                other_types = ["P6", "P5", "P4", "P3", "P2", "P1", "C6", "C5", "C4", "C3", "C2", "C1", "N6", "N5", "N4", "N3", "N2", "N1"]
+
+            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
+            #logger.debug("closest type: %s; error %7.4f" % (bead_type, min_error))
+    
+    for hal in ["Cl", "Br", "F", "I"]:
+        if hal in str(smi_frag):
+            if count_letters(str(smi_frag)) == 2: other_types = ["TX4", "TX3", "TX2", "TX1"]
+            if count_letters(str(smi_frag)) == 3: other_types = ["SX4", "SX3", "SX2", "SX1"]
+            if count_letters(str(smi_frag)) > 3: other_types = ["X4", "X3", "X2", "X1"]
+            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
+
+    return bead_type
+
+
+###################################################################################
+### OLD STUFF
+###################################################################################
 
 def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, bead_coords, ring_atoms, cg_beads, 
     write_exclusions=True): ### AutoM3 ###
@@ -1928,206 +2094,3 @@ def bartender_input(mol, molname, atoms_in_beads, bart_info_dict): ### AutoM3 ##
                 for i in info:
                     text+=f"{','.join(i)}\n"
     return text
-
-
-def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_file=None, trial=False): 
-    """
-    Returns water/octanol partitioning free energy according to ALOGPS
-    AutoM3 : Returns water/octanol partitioning free energy defined empiricaly from customized database
-    """
-    logger.debug("Entering smi2alogps()")
-
-    ## AutoM3 ###
-    if not logp_file:
-        logp_file = os.path.join(os.path.dirname(__file__), 'logP_smi_extended.dat')
-    found_smi = False
-    if bead != "MOL":
-        logP_data = {}
-        if converted_smi:
-            smi=real_smi
-
-        # Check if logp_file is a valid file name
-        if isinstance(logp_file, str) and logp_file:
-            try:
-                with open(logp_file) as f:
-                    for line in f:
-                        (key, val) = line.rstrip().split()
-                        logP_data[key] = float(val)
-            except Exception as e:
-                logger.error(f"An error occurred while reading the logP file: {e}")
-        else:
-            logger.error(f"Invalid file name: {logp_file}")
-        
-        log_p = 0.0
-        for smiles, logp in logP_data.items():
-            if smiles == smi:
-                log_p = float(logp)
-                found_smi = True
-                return (log_p, "")
-                #break
-
-    if not found_smi:
-        if converted_smi:
-            smi=real_smi
-        req = ""
-        soup = ""
-        try:
-            session = requests.session()
-            logger.debug("Calling http://vcclab.org/web/alogps/calc?SMILES=" + str(smi))
-            req = session.get(
-                "http://vcclab.org/web/alogps/calc?SMILES=" + str(smi.replace("#", "%23"))
-            )
-        except:
-            print("Error. Can't reach vcclab.org to estimate free energy.")
-            exit(1)
-        try:
-            doc = BeautifulSoup(req.content, "lxml")
-        except Exception:
-            raise
-        try:
-            soup = doc.prettify()
-        except:
-            print("Error with BeautifulSoup prettify")
-            exit(1)
-        found_mol_1 = False
-        log_p = None
-        for line in soup.split("\n"):
-            line = line.split()
-            if "mol_1" in line:
-                log_p = float(line[line.index("mol_1") + 1])
-                found_mol_1 = True
-                break
-        if not found_mol_1:
-            # If we're forcing a prediction, use Wildman-Crippen
-            if forcepred:
-                if trial:
-                    wrn = (
-                        "; Warning: bead ID "
-                        + str(bead)
-                        + " predicted from Wildman-Crippen. Fragment "
-                        + str(smi)
-                        + "\n"
-                    )
-                    sys.stderr.write(wrn)
-                log_p = wc_log_p
-            else:
-                log_p = 0.0
-                # print("ALOGPS can't predict fragment: %s" % smi)
-                # exit(1)
-        logger.debug("logp value: %7.4f" % log_p)
-        return (convert_log_k(log_p),"; ALOGPS defined bead")
-
-
-def convert_log_k(log_k):
-    """Convert log_{10}K to free energy (in kJ/mol)"""
-    val = 0.008314 * 300.0 * log_k / math.log10(math.exp(1))
-    logger.debug("free energy %7.4f kJ/mol" % val)
-    return val
-
-
-def mad(bead_type, delta_f, in_ring=False):
-    """Mean absolute difference between bead type and delta_f"""
-    # logger.debug('Entering mad()')
-    delta_f_types = read_delta_f_types()
-    return math.fabs(delta_f_types[bead_type] - delta_f)
-
-
-def count_letters(s): ### AutoM3 ###
-    """ Counting atoms in SMILES code """
-    count = 0
-    i = 0
-    while i < len(s):
-        if s[i:i+2] in ["Cl", "Br"]:
-            count += 1
-            i += 2
-        elif s[i].isalpha():
-            count += 1
-            i += 1
-        else:
-            i += 1
-    return count
-
-
-def find_closest_logPvalue(value, keyslist, in_ring): ### AutoM3 ###
-    closest_key = None
-    closest_diff = float('inf')
-    dict=read_delta_f_types()
-    for key in keyslist:
-        if key in dict:
-            diff = mad(key,value,in_ring)
-            #diff = abs(value - dict[key])
-            if diff < closest_diff:
-                closest_key = key
-                closest_diff = diff
-    return closest_key
-
-
-def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ### AutoM3 ###
-    """Determine CG bead type from delta_f value, charge,
-    and hbond acceptor, and donor"""
-    if charge < -2 or charge > +2:
-        logger.error("Charge is too large: %s" % charge)
-        exit(1)
-    # bead_type = None
-    #smi_frag = ''.join(char for char in smi_frag if char.isalpha() and char!='H')
-    if charge != 0:
-        if charge == -2 or charge == -2:
-            if count_letters(str(smi_frag)) == 2:
-                bead_type = "TD"
-            if count_letters(str(smi_frag)) == 3:
-                bead_type = "SD"
-            if count_letters(str(smi_frag)) > 3:
-                bead_type = " D"
-        else:
-            # The compound has a +/- charge -> Q type
-            if count_letters(str(smi_frag)) == 2:
-                other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
-            if count_letters(str(smi_frag)) == 3:
-                othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
-            if count_letters(str(smi_frag)) > 3:
-                othertypes_Q = ["Q1", "Q2", "Q3", "Q4", "Q5",]
-            bead_type = find_closest_logPvalue(delta_f, othertypes_Q, in_ring)
-
-    else:
-        # Neutral group
-        if hbonda > 0 or hbondd > 0:
-            if count_letters(str(smi_frag)) == 2:
-                other_types_NPa = ["TN1a", "TN2a", "TN3a", "TN4a", "TN5a", "TN6a", "TP1a", "TP2a", "TP3a", "TP4a", "TP5a", "TP6a"]
-                other_types_NPd = ["TN1d", "TN2d", "TN3d", "TN4d", "TN5d", "TN6d", "TP1d", "TP2d", "TP3d", "TP4d", "TP5d", "TP6d"]
-            if count_letters(str(smi_frag)) == 3:
-                other_types_NPa = ["SN1a", "SN2a", "SN3a", "SN4a", "SN5a", "SN6a", "SP1a", "SP2a", "SP3a", "SP4a", "SP5a", "SP6a"]
-                other_types_NPd = ["SN1d", "SN2d", "SN3d", "SN4d", "SN5d", "SN6d", "SP1d", "SP2d", "SP3d", "SP4d", "SP5d", "SP6d"]
-            if count_letters(str(smi_frag)) > 3:
-                other_types_NPa = ["N1a", "N2a", "N3a", "N4a", "N5a", "N6a", "P1a", "P2a", "P3a", "P4a", "P5a", "P6a"]
-                other_types_NPd = ["N1d", "N2d", "N3d", "N4d", "N5d", "N6d", "P1d", "P2d", "P3d", "P4d", "P5d", "P6d"]
-
-            if hbonda > 0 and hbondd == 0:
-                bead_type = find_closest_logPvalue(delta_f, other_types_NPa, in_ring)
-            if hbonda >= 0 and hbondd > 0:
-                bead_type = find_closest_logPvalue(delta_f, other_types_NPd, in_ring)
-
-        else:
-            # all other cases. Simply find the atom type that's closest in
-            # free energy.
-            
-            if count_letters(str(smi_frag)) == 2:
-                other_types = ["TP6", "TP5", "TP4", "TP3", "TP2", "TP1", "TC6", "TC5", "TC4", "TC3", "TC2", "TC1", "TN6", "TN5", "TN4", "TN3", "TN2", "TN1"]
-                if not in_ring: other_types.remove("TC5")
-
-            if count_letters(str(smi_frag)) == 3:
-                other_types = ["SP6", "SP5", "SP4", "SP3", "SP2", "SP1", "SC6", "SC5", "SC4", "SC3", "SC2", "SC1", "SN6", "SN5", "SN4", "SN3", "SN2", "SN1"]
-
-            if count_letters(str(smi_frag)) > 3:
-                other_types = ["P6", "P5", "P4", "P3", "P2", "P1", "C6", "C5", "C4", "C3", "C2", "C1", "N6", "N5", "N4", "N3", "N2", "N1"]
-
-            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
-            #logger.debug("closest type: %s; error %7.4f" % (bead_type, min_error))
-    
-    for hal in ["Cl", "Br", "F", "I"]:
-        if hal in str(smi_frag):
-            if count_letters(str(smi_frag)) == 2: other_types = ["TX4", "TX3", "TX2", "TX1"]
-            if count_letters(str(smi_frag)) == 3: other_types = ["SX4", "SX3", "SX2", "SX1"]
-            if count_letters(str(smi_frag)) > 3: other_types = ["X4", "X3", "X2", "X1"]
-            bead_type = find_closest_logPvalue(delta_f, other_types, in_ring)
-
-    return bead_type

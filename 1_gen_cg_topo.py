@@ -76,11 +76,6 @@ if __name__ == "__main__":
     cg.output_cg_pdb(str(pdb_path))
     logging.info(f"Wrote: {pdb_path}")
 
-    # Save AA structure (.gro)
-    gro_path = outdir / f"{molname}_aa.gro"
-    cg.output_aa_gro(str(gro_path))
-    logging.info(f"Wrote: {gro_path}")
-
     # Make .map file
     map_path = outdir / f"{molname}.map"
     am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname)

@@ -59,6 +59,3 @@ logging.basicConfig(
 )
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Get a configured logger for a module."""
-    return logging.getLogger(name)
