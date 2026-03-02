@@ -381,11 +381,6 @@ if __name__ == "__main__":
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
-    # Patch partitioning to match the AA atom order (incl. hydrogens) used in
-    # systems/<molname>/<molname>.sdf and thus in AA topology.pdb.
-    sdf_file = wdir / f"{molname}.sdf"
-    topo = patch_topology_partitioning_from_sdf(topo, sdf_file)
-
     pickle_file = wdir / "internal_coords.pkl"
     if pickle_file.exists():
         logger.info("Loading internal coordinates from %s", pickle_file)

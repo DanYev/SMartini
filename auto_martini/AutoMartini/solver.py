@@ -96,8 +96,11 @@ class Cg_molecule:
         logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
 
         # INITIALIZE THE AA MOLECULE
+        # TODO: HA and AA / RAW and MOLECULE are messy now
         self.ha_graph = self.build_ha_graph()  # Heavy atom graph for partitioning
         self.ha_neighbors = [a["neighbors"] for a in self.ha_graph["atoms"]]  # Precompute neighbors for partitioning
+        self.list_ha = [a for a in self.ha_graph["atoms"]]
+        self.ha_coords = self.ha_graph["ha_coords"]
 
         ## AutoM3 : MINIMIZATION with RDkit ###
         self.molecule = Chem.Mol(self.molecule)
@@ -113,10 +116,9 @@ class Cg_molecule:
         self.aa_graph = self.build_aa_graph()
         
         # Populate attributes from aa_graph
-        self.list_ha = self.aa_graph["list_ha"]
-        self.list_ha_names = self.aa_graph["list_ha_names"]
+        self.list_aa = self.aa_graph["list_aa"]
+        self.list_aa_names = self.aa_graph["list_aa_names"]
         self.conf = self.aa_graph["conf"]
-        self.ha_coords = self.ha_graph["ha_coords"]
         self.aa_coords = self.aa_graph["aa_coords"]
         self.ring_atoms = self.aa_graph["ring_atoms"]
         self.ring_atoms_flat = self.aa_graph["ring_atoms_flat"]
@@ -140,24 +142,27 @@ class Cg_molecule:
         # Find coarse-grained bead positions 
         # -- keep all possibilities in case something goes wrong later in the code.
         import pickle
-        # list_cg_beads = optimization.find_bead_pos(
-        #     self.molecule,
-        #     self.conf,
-        #     self.ha_graph,
-        #     self.list_ha,
-        #     self.ha_coords,
-        #     self.aa_coords,
-        #     self.ring_atoms,
-        #     self.ring_atoms_flat,
-        #     self.force_map,  # AutoM3 new argument
-        #     min_beads=self.min_beads,
-        #     max_beads=self.max_beads,
-        # )
-        # logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
-        # with open(f"{self.molname}_candidate_mappings.pkl", "wb") as f:
-        #     pickle.dump(list_cg_beads, f)
-        with open(f"{self.molname}_candidate_mappings.pkl", "rb") as f:
-            list_cg_beads = pickle.load(f)
+        mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
+        if not mapping_pickle.exists():
+            list_cg_beads = optimization.find_bead_pos(
+                self.molecule,
+                self.conf,
+                self.ha_graph,
+                self.list_ha,
+                self.ha_coords,
+                self.aa_coords,
+                self.ring_atoms,
+                self.ring_atoms_flat,
+                self.force_map,  # AutoM3 new argument
+                min_beads=self.min_beads,
+                max_beads=self.max_beads,
+            )
+            logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
+            with open(mapping_pickle, "wb") as f:
+                pickle.dump(list_cg_beads, f)
+        else:
+            with open(mapping_pickle, "rb") as f:
+                list_cg_beads = pickle.load(f)
 
         self.max_attempts = len(list_cg_beads) 
         logger.info("Going through the candidate mappings")
@@ -173,6 +178,7 @@ class Cg_molecule:
                 self.partitioning = self.get_partitioning(cg_beads)
             except Exception:
                 continue
+
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 
@@ -230,6 +236,7 @@ class Cg_molecule:
             logger.info("Success mapping found on attempt %d", attempt)
             self.topology = temp_topo
             self.build_topology(cg_beads, cg_beads_rings, bead_types)
+            self.topology.partitioning = self._get_aa_partitioning() # make aa_partitioning available in topology for later use in refinement
             self.update_topology(cg_beads, cg_beads_rings, bead_types, attempt)
             self.write_topology()
             break
@@ -247,28 +254,19 @@ class Cg_molecule:
         # Get list of heavy atoms and their names
         conformer = self.molecule.GetConformer()
         num_atoms = conformer.GetNumAtoms()
-        list_ha = []
-        list_ha_names = []
+        list_aa = []
+        list_aa_names = []
         atoms = range(num_atoms)
         for i in np.nditer(atoms):
             atom_name = self.molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
-            if atom_name != "H":
-                list_ha.append(atoms[i])
-                list_ha_names.append(f"{atom_name}{i+1}")
-        if len(list_ha) == 0:
-            print("Error. No heavy atom found.")
-            exit(1)
+            list_aa.append(atoms[i])
+            list_aa_names.append(f"{atom_name}{i+1}")
         
         # Get coordinates - heavy atoms and all atoms
-        ha_coords = []
         aa_coords = []
         for i in range(num_atoms):
             coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
-            if self.molecule.GetAtomWithIdx(i).GetSymbol() != "H":
-                ha_coords.append(coord)
-                aa_coords.append(coord)
-            else:
-                aa_coords.append(coord)
+            aa_coords.append(coord)
         
         # Get ring atoms (systems of joined rings)
         rings = self.molecule.GetRingInfo().AtomRings()
@@ -310,16 +308,15 @@ class Cg_molecule:
         
         # Get bonds between heavy atoms
         bonds = []
-        for i in range(len(list_ha)):
-            for j in range(i + 1, len(list_ha)):
-                if self.molecule.GetBondBetweenAtoms(int(list_ha[i]), int(list_ha[j])) is not None:
-                    bonds.append([list_ha[i], list_ha[j]])
+        for i in range(len(list_aa)):
+            for j in range(i + 1, len(list_aa)):
+                if self.molecule.GetBondBetweenAtoms(int(list_aa[i]), int(list_aa[j])) is not None:
+                    bonds.append([list_aa[i], list_aa[j]])
         
         return {
-            "list_ha": list_ha,
-            "list_ha_names": list_ha_names,
+            "list_aa": list_aa,
+            "list_aa_names": list_aa_names,
             "conf": conformer,
-            "ha_coords": ha_coords,
             "aa_coords": aa_coords,
             "ring_atoms": ring_atoms,
             "ring_atoms_flat": ring_atoms_flat,
@@ -553,65 +550,46 @@ class Cg_molecule:
                 partitioning[atom_idx] = bead_idx
         return dict(sorted(partitioning.items()))
 
-    def get_bead_coords(self):
-        partitioning = self.partitioning
-        # if raw_molecule is provided, use its coordinates instead of the original molecule's coordinates
-        if self.raw_molecule:
-            bead_coord = {}
-            for atom in range(len(self.ha_coords)):
-                bead = partitioning[atom]
-                if bead not in bead_coord.keys():
-                    bead_coord[bead] = []
-                bead_coord[bead].append(self.ha_coords[atom])
-            bead_cog = []
-            for bead, coords in sorted(bead_coord.items()):
-                cog = np.mean(coords, axis=0)
-                bead_cog.append(cog)
-            return bead_cog
-
-        # compute COG while taking into account hydrogens
-        # find all bonds between atoms in molecule
-        bonds = []
-        for b in range(len(self.molecule.GetBonds())):
-            abond = self.molecule.GetBondWithIdx(b)
-            at1 = abond.GetBeginAtomIdx()
-            at2 = abond.GetEndAtomIdx()
-            if f"{at1}-{at2}" not in bonds and f"{at2}-{at1}" not in bonds:
-                bonds.append(f"{at1}-{at2}")
-
-        # create partitioning including hydrogens inside beads
+    def _get_aa_partitioning(self):
+        """Update HA partitioning to include hydrogens in the same bead as their heavy atom neighbors"""
         aa_partitioning = self.partitioning.copy()
         for at in range(len(self.aa_coords)):
             if at not in aa_partitioning.keys():
                 hbead = None
-                for b in bonds:
-                    bond = b.split('-')
-                    if str(at) in bond:
-                        at1 = int(bond[0])
-                        at2 = int(bond[-1])
-                        if at == at1 and at2 in partitioning.keys():
-                            hbead = partitioning[at2]
+                for bond in self.aa_graph["bonds"]:
+                    if at in bond:
+                        at1 = bond[0]
+                        at2 = bond[-1]
+                        if at == at1 and at2 in self.partitioning.keys():
+                            hbead = self.partitioning[at2]
                             hydrogen = at1
-                        if at == at2 and at1 in partitioning.keys():
-                            hbead = partitioning[at1]
+                        if at == at2 and at1 in self.partitioning.keys():
+                            hbead = self.partitioning[at1]
                             hydrogen = at2
-
                         if hbead is not None:
                             aa_partitioning[hydrogen] = hbead
+        return aa_partitioning
 
-        # compute COG while taking into account hydrogens
+    def get_bead_coords(self):
+        partitioning = self._get_aa_partitioning()
+        # Extract tom coordinates
+        aa_coords = []
+        mol = self.raw_molecule
+        conformer = mol.GetConformer()
+        for i in range(mol.GetNumAtoms()):
+            coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
+            aa_coords.append(coord)
+        # Map
         bead_coord = {}
-        for atom in range(len(self.aa_coords)):
-            bead = aa_partitioning[atom]
+        for atom in range(len(aa_coords)):
+            bead = partitioning[atom]
             if bead not in bead_coord.keys():
                 bead_coord[bead] = []
-            bead_coord[bead].append(self.aa_coords[atom])
-
+            bead_coord[bead].append(aa_coords[atom])
         bead_cog = []
         for bead, coords in sorted(bead_coord.items()):
             cog = np.mean(coords, axis=0)
             bead_cog.append(cog)
-
         return bead_cog
 
     def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument

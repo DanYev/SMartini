@@ -447,7 +447,7 @@ class Topology:
         """
         logger.info("Building virtual sites for fused rings...")
         atoms = self.atoms
-        bonds = self.bonds + self.constraints
+        bonds = self.constraints
         vsites = []
 
         def _has_external_bond(bead, ring):
