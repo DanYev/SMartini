@@ -135,7 +135,10 @@ def boltzmann_invert_angles(topo, internal_coords):
     return updated_topo
 
 
-def boltzmann_invert_dihedrals(topo, internal_coords):
+def boltzmann_invert_dihedrals(topo, 
+    internal_coords, 
+    angle_cutoff: float = 150.0, 
+    ):
     updated_topo = copy.deepcopy(topo)
 
     angle_lookup = _build_angle_lookup(updated_topo)
@@ -174,8 +177,8 @@ def boltzmann_invert_dihedrals(topo, internal_coords):
         ill_defined = (
             a1 is None
             or a2 is None
-            or float(a1) >= 160.0
-            or float(a2) >= 160.0
+            or float(a1) >= angle_cutoff
+            or float(a2) >= angle_cutoff
         )
 
         if ill_defined:
@@ -287,7 +290,7 @@ def update_bonds(
 def update_angles(
     topo,
     k_cutoff=25.0,
-    theta_cutoff=165.0
+    angle_cutoff=150.0
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
@@ -295,7 +298,9 @@ def update_angles(
 
     # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
     for angle in updated_topo.angles:
-        if float(angle[4]) > float(theta_cutoff):
+        if float(angle[4]) > float(angle_cutoff):
+            angle[3] = 1
+        if float(angle[5]) < float(k_cutoff):
             angle[3] = 1
 
     return updated_topo
@@ -304,7 +309,7 @@ def update_angles(
 def update_dihedrals(
     topo,
     k_cutoff=0.5,
-    angle_linear_cutoff_deg: float = 170.0,
+    angle_cutoff: float = 150.0,
 ):
     """update/post-process dihedral terms.
 
@@ -397,14 +402,15 @@ if __name__ == "__main__":
         internal_coords = calculate_internal_coordinates(aa_traj, topo)
         with open(pickle_file, "wb") as f:
             pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
-            
+    # BOONDS        
     topo = boltzmann_invert_bonds(topo, internal_coords)
-    topo = boltzmann_invert_angles(topo, internal_coords)
-    topo = boltzmann_invert_dihedrals(topo, internal_coords)
-
     topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
-    topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff)
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff)
+    # ANGLES
+    topo = boltzmann_invert_angles(topo, internal_coords)
+    topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    # DIHEDRALS
+    topo = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     out_itp = out_dir / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
