@@ -81,16 +81,6 @@ def _get_masses(molecule):
     return np.array(masses).astype(np.float32)
 
 
-def _get_heavy_atom_bonds(molecule, list_heavy_atoms, **kwargs):
-    # List of bonds between heavy atoms
-    list_bonds = []
-    for i in range(len(list_heavy_atoms)):
-        for j in range(i + 1, len(list_heavy_atoms)):
-            if molecule.GetBondBetweenAtoms(int(list_heavy_atoms[i]), int(list_heavy_atoms[j])) is not None:
-                list_bonds.append([list_heavy_atoms[i], list_heavy_atoms[j]])
-    return list_bonds
-
-
 def _filter_chunk(args):
     """Multiprocessing worker: generate one chunk and return acceptable combos.
 
@@ -356,16 +346,15 @@ def find_bead_pos(
 
     if len(list_heavy_atoms) == 1:
         # Put one CG bead on the one heavy atom.
-        best_trial_comb = np.array(list(itertools.combinations(range(len(list_heavy_atoms)), 1)))
-        avg_pos = [[conformer.GetAtomPosition(best_trial_comb[0])[j] for j in range(3)]]
-        return best_trial_comb, avg_pos
+        best_trial_comb = [np.array([0], dtype=dtype)]
+        return best_trial_comb
 
     if len(list_heavy_atoms) > 50:
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
 
-
-    list_bonds = _get_heavy_atom_bonds(molecule, list_heavy_atoms, dtype=dtype)
+    list_bonds = [a["ij"] for a in graph["bonds"]]
+    list_bonds = np.array(list_bonds, dtype=dtype)
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms, dtype=dtype)
     atoms_and_neighbors = [a["neighbors"] + [a["idx"]] for a in graph["atoms"]]
 

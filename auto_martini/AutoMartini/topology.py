@@ -590,7 +590,9 @@ class Topology:
                 vsites.append(vs3_entry)
                 _sanitize_exclusions(vs3_entry, bonds)
             _sanitize_bonds(bonds, ring, anchors)
-        _sanitize_atoms(atoms, vsites, anchors)
+
+        if vsites and anchors:
+            _sanitize_atoms(atoms, vsites, anchors)
 
         return vsites
 

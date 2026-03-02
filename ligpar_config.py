@@ -9,8 +9,8 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
-    n_beads: int = 12 # if None, will be determined by AutoMartini
+    molname: str = "FTA"
+    n_beads: int = None # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
@@ -19,14 +19,14 @@ class LigParConfig:
     out_dir: Path = wdir / "molecule"
 
     # Common subfolders
-    aa_sysname: str = "aa_md_pro"
+    aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
     aa_dir: Path = wdir / aa_sysname
     cg_dir: Path = wdir / cg_sysname
 
     # Selections
-    aa_selection: str = "resname ANP"
+    aa_selection: str = "resname UNK"
     cg_selection: str = "all"
 
     # Sampling defaults
