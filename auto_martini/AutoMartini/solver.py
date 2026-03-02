@@ -140,37 +140,24 @@ class Cg_molecule:
         # Find coarse-grained bead positions 
         # -- keep all possibilities in case something goes wrong later in the code.
         import pickle
-        # list_cg_beads = optimization.find_bead_pos(
-        #     self.molecule,
-        #     self.conf,
-        #     self.ha_graph,
-        #     self.list_ha,
-        #     self.ha_coords,
-        #     self.aa_coords,
-        #     self.ring_atoms,
-        #     self.ring_atoms_flat,
-        #     self.force_map,  # AutoM3 new argument
-        #     min_beads=self.min_beads,
-        #     max_beads=self.max_beads,
-        # )
-        # logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
-        # with open(f"{self.molname}_candidate_mappings.pkl", "wb") as f:
-        #     pickle.dump(list_cg_beads, f)
+        list_cg_beads = optimization.find_bead_pos(
+            self.molecule,
+            self.conf,
+            self.ha_graph,
+            self.list_ha,
+            self.ha_coords,
+            self.aa_coords,
+            self.ring_atoms,
+            self.ring_atoms_flat,
+            self.force_map,  # AutoM3 new argument
+            min_beads=self.min_beads,
+            max_beads=self.max_beads,
+        )
+        logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
+        with open(f"{self.molname}_candidate_mappings.pkl", "wb") as f:
+            pickle.dump(list_cg_beads, f)
         with open(f"{self.molname}_candidate_mappings.pkl", "rb") as f:
             list_cg_beads = pickle.load(f)
-
-        # # Remove mappings with bead numbers less than most optimal mapping.
-        # self.cg_beads_list = []
-        # for cg_beads in list_cg_beads:
-        #     if (
-        #         len(cg_beads) == len(list_cg_beads[0])
-        #         # and (len(self.list_ha) - (5 * len(cg_beads))) > 3
-        #     )::1
-        #         self.cg_beads_list.append(cg_beads)
-        # logger.info("Removed suboptimal candidate bead mappings with bead number < %d", len(list_cg_beads[0]))
-
-        # Loop through best 1% cg_beads and avg_pos
-        # max_attempts = int(math.ceil(0.5 * len(list_cg_beads)))
 
         self.max_attempts = len(list_cg_beads) 
         logger.info("Going through the candidate mappings")
@@ -178,10 +165,10 @@ class Cg_molecule:
 
             if attempt % 1000 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
+                logger.info("Trying to partition the atoms between beads")
 
             cg_beads = list_cg_beads[attempt]
 
-            logger.info("Trying to partition the atoms between beads")
             try:
                 self.partitioning = self.get_partitioning(cg_beads)
             except Exception:

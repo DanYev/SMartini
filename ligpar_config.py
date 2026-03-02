@@ -19,14 +19,14 @@ class LigParConfig:
     out_dir: Path = wdir / "molecule"
 
     # Common subfolders
-    aa_sysname: str = "aa_md"
+    aa_sysname: str = "aa_md_pro"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
     aa_dir: Path = wdir / aa_sysname
     cg_dir: Path = wdir / cg_sysname
 
     # Selections
-    aa_selection: str = "resname UNK"
+    aa_selection: str = "resname ANP"
     cg_selection: str = "all"
 
     # Sampling defaults

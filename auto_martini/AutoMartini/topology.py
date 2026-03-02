@@ -204,13 +204,13 @@ class Topology:
                     if found_connection:
                         break
 
-        # # Filter based on distance and add constraints for beads in the same ring
-        # for bond in self.constraints:
-        #     dist = bond[3]
-        #     if dist > 0.54:
-        #         self.constraints.remove(bond)
-        #     if dist < 0.134:
-        #         raise NameError("Bond too short")
+        # Filter based on distance and add constraints for beads in the same ring
+        for bond in self.constraints:
+            dist = bond[3]
+            if dist > 0.54:
+                self.constraints.remove(bond)
+            if dist < 0.134:
+                raise NameError("Bond too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 
@@ -482,7 +482,6 @@ class Topology:
 
 
     def build_virtual_sites(self):
-
         self.virtual_sites = self._init_virtual_sites_dict()
         self.virtual_sites["virtual_sites2"] = self.build_vs_2()
         self.virtual_sites["virtual_sites3"] = self.build_vs_3()
@@ -500,7 +499,7 @@ class Topology:
 
     def build_vs_3(self):
         """Build type 3 virtual sites for fused rings.
-        For rings of 5 or more beads, we select 3 beads as anchors to be connected with bonds or constaints, 
+        For rings of 5 or 6 beads, we select 3 beads as anchors to be connected with bonds or constaints, 
         the rest of the beads will go the type 3 virtual sites.
         """
         logger.info("Building virtual sites for fused rings...")
@@ -643,6 +642,8 @@ class Topology:
         for ring in self.ringbeads:
             if len(ring) < 5:
                 continue
+            if len(ring) > 6:
+                continue
             anchor_beads = _find_anchor_beads(ring)
             i, j, k = anchor_beads[0], anchor_beads[1], anchor_beads[2]
             for bead in ring:
@@ -674,6 +675,7 @@ class Topology:
                         continue
                     if [i, j] not in self.exclusions and [j, i] not in self.exclusions:
                         self.exclusions.append([i, j])
+        self.exclusions.sort()
 
     
     # Format methods - return formatted strings
@@ -1062,10 +1064,6 @@ class Topology:
             with open(out_file, 'w') as f:
                 f.write(text)
         return text
-
-
-def get_distance(coord1, coord2):
-    return np.linalg.norm(np.array(coord1) - np.array(coord2)) * 0.1
 
 
 def read_itp(itp_file):
