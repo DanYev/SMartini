@@ -238,13 +238,11 @@ class Topology:
         """Build angles data structure."""
         logger.info("Building angles...")
 
-        cgbeads = self.cgbeads
-        bondlist = self.bonds
-        constlist = self.constraints
+        bondlist = self.bonds + self.constraints
         partitioning = self.partitioning
         cgbead_coords = self.cgbead_coords
 
-        nbeads = len(self.cgbeads)
+        nbeads = len(self.cgbead_coords)
         if nbeads <= 2:
             return
 
@@ -281,9 +279,9 @@ class Topology:
                     ij_ring_diagonal = False
                     jk_ring_diagonal = False
                     ik_ring_diagonal = False
-                    for b in bondlist + constlist:
-                        connectivity = [b[0], b[1]]
-                        is_ring_diag = len(b) >= 5 and b[4] == "ring_diagonal"
+                    for b in bondlist:
+                        connectivity = b[:2]
+                        is_ring_diag = b[-1] == "ring_diagonal"
                         if i in connectivity and j in connectivity:
                             ij_bonded = True
                             if is_ring_diag:
@@ -296,6 +294,7 @@ class Topology:
                             ik_bonded = True
                             if is_ring_diag:
                                 ik_ring_diagonal = True
+
                     # Skip angles involving ring_diagonal constraints
                     if ij_ring_diagonal or jk_ring_diagonal or ik_ring_diagonal:
                         continue
@@ -321,28 +320,9 @@ class Topology:
                             )
                         )
                     )
-                    # Look for any double bond between atoms belonging to these CG beads.
-                    atoms_in_fragment = []
-                    for aa in partitioning.keys():
-                        if partitioning[aa] == j:
-                            atoms_in_fragment.append(aa)
-                    force_const = 100.0
-                    
-                    # Create beadlist for read_params
-                    beadlist = []
-                    for bead in self.beadtypes:
-                        if not bead.startswith('T') and not bead.startswith('S'):
-                            beadlist.append('R')
-                        else:
-                            beadlist.append(bead[0])
                     
                     funct = 1
                     force_const = 250.0
-                    # Try to get force from database
-                    if len(beadlist) > max(i, j, k):
-                        db_force = read_params(angle, beadlist[i] + "-" + beadlist[j] + "-" + beadlist[k])
-                        if db_force is not None:
-                            force_const = db_force
                     self.angles.append([i, j, k, funct, angle, force_const, ""])
     
     def build_dihedrals(self):
@@ -358,13 +338,11 @@ class Topology:
                     return True
             return False
 
-        constlist = self.constraints
-        cgbeads = self.cgbeads
         cgbead_coords = self.cgbead_coords
         bondlist = self.bonds + self.constraints
         self.dihedrals = []
 
-        nbeads = len(cgbeads)
+        nbeads = len(cgbead_coords)
         if nbeads <= 3:
             return 
 
@@ -374,9 +352,11 @@ class Topology:
                 for k in range(nbeads):
                     for l in range(nbeads):
 
+                        # Check if all indices are different
                         if  i == j or i == k or i == l or j == k or j == l or k == l:
                             continue
 
+                        # Check if dihedral already exists (in either direction)
                         stop_iteration = False
                         for dih in self.dihedrals:
                             if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
@@ -466,8 +446,8 @@ class Topology:
         the rest of the beads will go the type 3 virtual sites.
         """
         logger.info("Building virtual sites for fused rings...")
-        bonds = self.constraints
         atoms = self.atoms
+        bonds = self.bonds + self.constraints
         virtual_sites_3 = []
 
         def _has_external_bond(bead, ring):
@@ -585,20 +565,19 @@ class Topology:
                         continue
                     for bond in bonds:
                         if bead_i in bond[:2] and bead_j in bond[:2]:
-                            print(f"removing bond {bond} between {bead_i} and {bead_j} in ring {ring}")
                             bonds.remove(bond)
+                            logger.info(f"Removed bond between {bead_i} and {bead_j} in ring {ring}")
             for i in range(len(anchor_beads)):
                 anchor = anchor_beads[i]
                 bead = anchor_beads[(i + 1) % len(anchor_beads)]
                 dist = np.linalg.norm(self.cgbead_coords[anchor] - self.cgbead_coords[bead]) * 0.1
                 bond_entry = [anchor, bead, 1, dist, "ring_anchor"]
                 bonds.append(bond_entry)
+                logger.info(f"Added bond between {anchor} and {bead} in ring {ring}")
         
         # For now check if we have rings with 5+ beads 
         for ring in self.ringbeads:
-            if len(ring) < 5:
-                continue
-            if len(ring) > 6:
+            if len(ring) < 5 or len(ring) > 6:
                 continue
             anchor_beads = _find_anchor_beads(ring)
             i, j, k = anchor_beads[0], anchor_beads[1], anchor_beads[2]
