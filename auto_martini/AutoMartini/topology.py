@@ -107,7 +107,7 @@ class Topology:
                 for bead_idx, atom_indices in mapping.items():
                     if atom_idx in atom_indices:
                         bead_ring.append(bead_idx)
-            self.ringbeads.append(list(set(bead_ring)))
+            self.ringbeads.append(sorted(list(set(bead_ring))))
         
         # Create global atom name map (PDB-style: N1, C1, C2, etc.)
         atom_name_map = {}
@@ -361,9 +361,10 @@ class Topology:
         constlist = self.constraints
         cgbeads = self.cgbeads
         cgbead_coords = self.cgbead_coords
-        nbeads = len(self.cgbeads)
+        bondlist = self.bonds + self.constraints
         self.dihedrals = []
 
+        nbeads = len(cgbeads)
         if nbeads <= 3:
             return 
 
@@ -372,113 +373,75 @@ class Topology:
             for j in range(nbeads):
                 for k in range(nbeads):
                     for l in range(nbeads):
-                        if i != j and i != k and i != l and j != k and j != l and k != l:
 
-                            three_in_ring = False
-                            for ring in self.ringbeads:
-                                if [
-                                    [i in ring],
-                                    [j in ring],
-                                    [k in ring],
-                                    [l in ring],
-                                ].count([True]) >= 3:
-                                    three_in_ring = True
-                                    break
+                        if  i == j or i == k or i == l or j == k or j == l or k == l:
+                            continue
 
-                            for b in constlist:
-                                if i in [b[0], b[1]] and j in [b[0], b[1]]:
-                                    pass
-                                if j in [b[0], b[1]] and k in [b[0], b[1]]:
-                                    pass
-                                if k in [b[0], b[1]] and l in [b[0], b[1]]:
-                                    pass
-                            # Distance criterion--beads can't be far apart
-                            disthres = 0.5
-                            close_enough = False
-                            if (
-                                np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[j] - cgbead_coords[k]) * 0.1
-                                < disthres
-                                and np.linalg.norm(cgbead_coords[k] - cgbead_coords[l]) * 0.1
-                                < disthres
-                            ):
-                                close_enough = True
-                            if not close_enough:
-                                continue
+                        stop_iteration = False
+                        for dih in self.dihedrals:
+                            if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
+                                stop_iteration = True
+                                break
+                        if stop_iteration:
+                            continue
 
-                            stop_iteration = False
-                            for dih in self.dihedrals:
-                                if dih[0] == l and dih[1] == k and dih[2] == j and dih[3] == i:
-                                    stop_iteration = True
-                                    break
-                            if stop_iteration:
-                                continue
+                        # Check if all are bonded (for proper dihedral chains)
+                        ij_bonded = False
+                        jk_bonded = False
+                        kl_bonded = False
+                        ik_bonded = False
+                        jl_bonded = False
+                        il_bonded = False
+                        ij_ring_diagonal = False
+                        kl_ring_diagonal = False
+                        for b in bondlist:
+                            connectivity = b[:2]
+                            if i in connectivity and j in connectivity:
+                                ij_bonded = True
+                                if _is_ring_diagonal(b):
+                                    ij_ring_diagonal = True
+                            if j in connectivity and k in connectivity:
+                                jk_bonded = True
+                            if k in connectivity and l in connectivity:
+                                kl_bonded = True
+                                if _is_ring_diagonal(b):
+                                    kl_ring_diagonal = True
+                            if i in connectivity and k in connectivity:
+                                ik_bonded = True
+                            if j in connectivity and l in connectivity:
+                                jl_bonded = True
+                            if i in connectivity and l in connectivity:
+                                il_bonded = True
 
-                            # Check if all are bonded (for proper dihedral chains)
-                            bondlist = self.bonds + self.constraints
-                            ij_bonded = False
-                            jk_bonded = False
-                            kl_bonded = False
-                            ik_bonded = False
-                            jl_bonded = False
-                            il_bonded = False
-                            ij_ring_diagonal = False
-                            kl_ring_diagonal = False
-                            for b in bondlist:
-                                connectivity = [b[0], b[1]]
-                                if i in connectivity and j in connectivity:
-                                    ij_bonded = True
-                                    if _is_ring_diagonal(b):
-                                        ij_ring_diagonal = True
-                                if j in connectivity and k in connectivity:
-                                    jk_bonded = True
-                                if k in connectivity and l in connectivity:
-                                    kl_bonded = True
-                                    if _is_ring_diagonal(b):
-                                        kl_ring_diagonal = True
-                                if i in connectivity and k in connectivity:
-                                    ik_bonded = True
-                                if j in connectivity and l in connectivity:
-                                    jl_bonded = True
-                                if i in connectivity and l in connectivity:
-                                    il_bonded = True
+                        # Exclude dihedrals whose terminal bond is a ring diagonal.
+                        # (These constraints are added to stabilize rings and
+                        # should not define torsional terms.)
+                        if ij_ring_diagonal or kl_ring_diagonal:
+                            continue
+                        
+                        # # Skip if any shortcut bonds exist (not a proper dihedral chain)
+                        if il_bonded:
+                            continue
 
-                            # Exclude dihedrals whose terminal bond is a ring diagonal.
-                            # (These constraints are added to stabilize fused rings and
-                            # should not define torsional terms.)
-                            if ij_ring_diagonal or kl_ring_diagonal:
-                                continue
-                            
-                            # # Skip if any shortcut bonds exist (not a proper dihedral chain)
-                            # if ik_bonded or jl_bonded or il_bonded:
-                            #     continue
-                            if il_bonded:
-                                continue
-                            # Skip if they do not form a chain (i-j-k-l)
-                            if not (ij_bonded and jk_bonded and kl_bonded):
-                                continue
+                        # Skip if they do not form a chain (i-j-k-l)
+                        if not (ij_bonded and jk_bonded and kl_bonded):
+                            continue
 
-                            # Measure dihedral angle between i, j, k, and l.    
-                            r1 = cgbead_coords[j] - cgbead_coords[i]
-                            r2 = cgbead_coords[k] - cgbead_coords[j]
-                            r3 = cgbead_coords[l] - cgbead_coords[k]
-                            p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
-                            p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
-                            r2 /= np.linalg.norm(r2)
-                            cosphi = np.dot(p1, p2)
-                            sinphi = np.dot(r2, np.cross(p1, p2))
-                            angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)
-                            r1_1 = cgbead_coords[i] - cgbead_coords[j]
-                            r2_2 = cgbead_coords[j] - cgbead_coords[k]
-                            angle_ijk = 180.0 / math.pi * math.acos(np.dot(r1_1,r2) / (np.linalg.norm(r1_1) * np.linalg.norm(r2)))
-                            angle_jkl = 180.0 / math.pi * math.acos(np.dot(r2_2,r3) / (np.linalg.norm(r2_2) * np.linalg.norm(r3)))
-                            
-                            
-                            forc_const = 10.0
-                            angle = (180 + angle) % 360
-                            multiplicity = 1  # Default multiplicity
-                            self.dihedrals.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
+                        # Measure dihedral angle between i, j, k, and l.    
+                        r1 = cgbead_coords[j] - cgbead_coords[i]
+                        r2 = cgbead_coords[k] - cgbead_coords[j]
+                        r3 = cgbead_coords[l] - cgbead_coords[k]
+                        p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                        p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
+                        r2 /= np.linalg.norm(r2)
+                        cosphi = np.dot(p1, p2)
+                        sinphi = np.dot(r2, np.cross(p1, p2))
+                        angle = 180.0 / math.pi * np.arctan2(sinphi, cosphi)                       
+            
+                        forc_const = 10.0
+                        angle = (180 + angle) % 360
+                        multiplicity = 1  # Default multiplicity
+                        self.dihedrals.append([i, j, k, l, 9, angle, forc_const, multiplicity, ""])
 
 
     def build_virtual_sites(self):
@@ -552,29 +515,23 @@ class Topology:
             rs = np.asarray(self.cgbead_coords[site], dtype=float)
 
             rij = rj - ri
-            n_rij = float(np.linalg.norm(rij))
-            if n_rij == 0.0:
-                raise ValueError("Invalid 3fad definition: i and j are coincident")
+            n_rij = np.linalg.norm(rij)
 
             rjk = rk - rj
-            denom = float(np.dot(rij, rij))
-            if denom == 0.0:
-                raise ValueError("Invalid 3fad definition: r_ij has zero length")
-
-            r_perp = rjk - (float(np.dot(rij, rjk)) / denom) * rij
-            n_rperp = float(np.linalg.norm(r_perp))
-            if n_rperp == 0.0:
-                raise ValueError("Invalid 3fad definition: i, j, k are collinear")
+            denom = np.dot(rij, rij)
+ 
+            r_perp = rjk - np.dot(rij, rjk) / denom * rij
+            n_rperp = np.linalg.norm(r_perp)
 
             e1 = rij / n_rij
             e2 = r_perp / n_rperp
 
             v = rs - ri
-            v1 = float(np.dot(v, e1))
-            v2 = float(np.dot(v, e2))
+            v1 = np.dot(v, e1)
+            v2 = np.dot(v, e2)
 
-            d_angstrom = math.sqrt(v1 * v1 + v2 * v2)
-            theta_deg = math.degrees(math.atan2(v2, v1))
+            d_angstrom = np.sqrt(v1 * v1 + v2 * v2)
+            theta_deg = np.degrees(np.atan2(v2, v1))
             d_nm = d_angstrom * 0.1
 
             return [site, i, j, k, 3, theta_deg, d_nm]
@@ -637,7 +594,6 @@ class Topology:
                 bond_entry = [anchor, bead, 1, dist, "ring_anchor"]
                 bonds.append(bond_entry)
         
-        
         # For now check if we have rings with 5+ beads 
         for ring in self.ringbeads:
             if len(ring) < 5:
@@ -668,17 +624,24 @@ class Topology:
 
     def build_exclusions(self):
         # For all the beads within a ring add all of them to the exclusion list with each other
+        bonds = self.bonds + self.constraints
+        conn = [b[:2] for b in bonds]
         for ring in self.ringbeads:
             for i in ring:
                 for j in ring:
                     if i >= j:
                         continue
-                    if [i, j] not in self.exclusions and [j, i] not in self.exclusions:
-                        self.exclusions.append([i, j])
+                    if [i, j] in conn or [j, i] in conn:
+                        continue
+                    if [i, j] in self.exclusions or [j, i] in self.exclusions:
+                        continue
+                    self.exclusions.append([i, j])
         self.exclusions.sort()
 
+####################################################################################################
+### TOPOLOGY ITP FORMATTING METHODS
+####################################################################################################
     
-    # Format methods - return formatted strings
     def format_header(self):
         """Format Topology header section."""
         text = "; GENERATED WITH Auto_Martini for {}\n".format(self.molname)

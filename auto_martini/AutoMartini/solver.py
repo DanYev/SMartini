@@ -140,22 +140,22 @@ class Cg_molecule:
         # Find coarse-grained bead positions 
         # -- keep all possibilities in case something goes wrong later in the code.
         import pickle
-        list_cg_beads = optimization.find_bead_pos(
-            self.molecule,
-            self.conf,
-            self.ha_graph,
-            self.list_ha,
-            self.ha_coords,
-            self.aa_coords,
-            self.ring_atoms,
-            self.ring_atoms_flat,
-            self.force_map,  # AutoM3 new argument
-            min_beads=self.min_beads,
-            max_beads=self.max_beads,
-        )
-        logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
-        with open(f"{self.molname}_candidate_mappings.pkl", "wb") as f:
-            pickle.dump(list_cg_beads, f)
+        # list_cg_beads = optimization.find_bead_pos(
+        #     self.molecule,
+        #     self.conf,
+        #     self.ha_graph,
+        #     self.list_ha,
+        #     self.ha_coords,
+        #     self.aa_coords,
+        #     self.ring_atoms,
+        #     self.ring_atoms_flat,
+        #     self.force_map,  # AutoM3 new argument
+        #     min_beads=self.min_beads,
+        #     max_beads=self.max_beads,
+        # )
+        # logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
+        # with open(f"{self.molname}_candidate_mappings.pkl", "wb") as f:
+        #     pickle.dump(list_cg_beads, f)
         with open(f"{self.molname}_candidate_mappings.pkl", "rb") as f:
             list_cg_beads = pickle.load(f)
 
