@@ -78,6 +78,8 @@ def process_ligand(ligand_name):
         ewaldErrorTolerance=1e-5
     )
     _save_system_to_xml(system, system_xml)
+    logger.info(f'Saving reference PDB with selection: {SELECTION}')
+    mda.Universe(system_pdb).select_atoms(SELECTION).write(str(aa_dir / "md.pdb"))
 
 
 def md_npt(): 
@@ -95,22 +97,36 @@ def md_npt():
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(system_xml)
     # Create simulation object
-    integrator = mm.LangevinMiddleIntegrator(TEMPERATURE, GAMMA, 2*unit.femtosecond)  
+    integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator) 
         # platform=platform, platformProperties=platform_properties)
     simulation.context.setPositions(pdb.positions)
     # Minimization
     logger.info("Minimizing energy...")
     simulation.minimizeEnergy(maxIterations=1000)
+    # Heatup
+    logger.info("Heating up...")
+    n_cycles = 10
+    steps_per_cycle = 1000
+    for i in range(n_cycles):
+        current_temp = (i + 1) * TEMPERATURE / n_cycles
+        simulation.integrator.setTemperature(current_temp)
+        simulation.step(steps_per_cycle)
     # Eqilibration
     logger.info("Equilibrating...")
     barostat = mm.MonteCarloBarostat(PRESSURE, TEMPERATURE)
     system.addForce(barostat)
+    simulation.integrator.setTemperature(TEMPERATURE)
+    simulation.context.reinitialize(preserveState=True)
     simulation.step(10000)
     # MD
     logger.info("Production...")
-    logger.info(f'Saving reference PDB with selection: {SELECTION}')
-    mda.Universe(system_pdb).select_atoms(SELECTION).write(str(aa_dir / "md.pdb"))
+    # state = simulation.context.getState(getPositions=True, getVelocities=True)
+    simulation.integrator.setStepSize(TSTEP)
+    simulation.context.reinitialize(preserveState=True)
+    # simulation.context.setPositions(state.getPositions())
+    # simulation.context.setVelocities(state.getVelocities())
+    # simulation.context.setPeriodicBoxVectors(*state.getPeriodicBoxVectors())
     reporters = _get_reporters(append=False, prefix='md')
     simulation.reporters = reporters
     simulation.step(int(TOTAL_STEPS))

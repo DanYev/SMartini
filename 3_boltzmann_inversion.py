@@ -1,4 +1,5 @@
 import copy
+import pickle
 import logging
 from pathlib import Path
 
@@ -19,9 +20,6 @@ from partitioning_patch import patch_topology_partitioning_from_sdf
 
 logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)
-
-
-MOLNAME = CFG.molname
 
 
 def _pair_key(i: int, j: int):
@@ -376,13 +374,12 @@ def update_dihedrals(
 
 
 if __name__ == "__main__":
-    import pickle
-    molname = MOLNAME
+    molname = CFG.molname
     wdir = CFG.wdir
-    out_dir = CFG.out_dir
+    mol_dir = CFG.mol_dir
     logger.info("Starting analysis for molecule: %s", molname)
 
-    in_itp = out_dir / f"{molname}.itp"
+    in_itp = mol_dir / f"{molname}.itp"
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
@@ -412,7 +409,7 @@ if __name__ == "__main__":
     topo = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
 
-    out_itp = out_dir / f"{molname}_updated.itp"
+    out_itp = mol_dir / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 

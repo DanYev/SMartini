@@ -10,13 +10,13 @@ from typing import Optional
 class LigParConfig:
     # Identity / layout
     molname: str = "ANP"
-    n_beads: int = None # if None, will be determined by AutoMartini
+    n_beads: int = 12 # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
 
     wdir: Path = systems_dir / molname
-    out_dir: Path = wdir / "molecule"
+    mol_dir: Path = wdir / "molecule"
 
     # Common subfolders
     aa_sysname: str = "aa_md"

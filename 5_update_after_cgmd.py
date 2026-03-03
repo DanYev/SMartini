@@ -377,7 +377,7 @@ def refine_topology_from_cg_vs_aa(
 if __name__ == "__main__":
     molname = CFG.molname
     wdir = CFG.wdir
-    outdir = CFG.out_dir
+    outdir = CFG.mol_dir
 
     itp_updated = outdir / f"{molname}_updated.itp"
     in_itp = itp_updated 

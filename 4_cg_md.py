@@ -18,7 +18,7 @@ NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
 
 ligand = CFG.molname
 sysdir = CFG.wdir
-outdir = CFG.out_dir
+outdir = CFG.mol_dir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
 
