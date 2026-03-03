@@ -164,7 +164,7 @@ def boltzmann_inversion_bond(distances, temperature=300.0):
     return r0, k
 
 
-def boltzmann_inversion_angle(angles, temperature=300.0):
+def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0):
     """Estimate harmonic angle parameters from samples.
 
     Mean-based harmonic approximation:
@@ -180,7 +180,7 @@ def boltzmann_inversion_angle(angles, temperature=300.0):
 
     residual_rad = np.deg2rad(angles - theta0)
     variance_rad = float(np.var(residual_rad))
-    k = float(0.8 * kT / variance_rad)
+    k = float(fc_scale * kT / variance_rad)
 
     return theta0, k
 
@@ -290,7 +290,7 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e
     return best
 
 
-def boltzmann_inversion_improper(dihedrals, temperature=300.0):
+def boltzmann_inversion_improper(dihedrals, temperature=300.0, fc_scale=1.0):
     """Estimate harmonic improper dihedral parameters from samples.
 
     Mean-based harmonic approximation for periodic angles:
@@ -307,7 +307,7 @@ def boltzmann_inversion_improper(dihedrals, temperature=300.0):
     residual_deg = wrap_to_180(dihedrals - phi0)
     residual_rad = np.deg2rad(residual_deg)
     variance_rad = float(np.var(residual_rad))
-    k = float(kT / variance_rad)
+    k = float(fc_scale * kT / variance_rad)
 
     return phi0, k
 
@@ -319,6 +319,7 @@ def fit_type9_dihedral(
     bins=360,
     min_prob=1e-6,
     return_score: bool = False,
+    fc_scale: float = 1.0,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
 
@@ -427,7 +428,7 @@ def fit_type9_dihedral(
         a = coeffs[1 + 2 * idx]
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
-        terms.append((int(n), float(0.8 * k), float(phi)))
+        terms.append((int(n), float(fc_scale * k), float(phi)))
 
     if return_score:
         return terms, score
@@ -441,6 +442,7 @@ def fit_type11_cbt_dihedral(
     min_prob=1e-3,
     cos_power_max: int = 4,
     return_score: bool = False,
+    fc_scale: float = 1.0,
 ):
     r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).
 
@@ -524,7 +526,7 @@ def fit_type11_cbt_dihedral(
     a = (coeffs / scale).tolist()
     # Ensure length exactly 5
     a = [float(x) for x in a[:5]]
-    result = (float(0.8 * k_phi), a)
+    result = (float(fc_scale * k_phi), a)
     if return_score:
         return result, score
     return result

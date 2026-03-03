@@ -103,7 +103,7 @@ def boltzmann_invert_bonds(
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "bond")]
-        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+        r0_calc, k_calc = boltzmann_inversion_bond(distances, temperature=CFG.temperature)
         comment = bond[5] if len(bond) >= 6 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
 
@@ -111,7 +111,8 @@ def boltzmann_invert_bonds(
     for bond in topo.constraints:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "constraint")]
-        r0_calc, k_calc = boltzmann_inversion_bond(distances)
+        r0_calc, k_calc = boltzmann_inversion_bond(
+            distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale)
         comment = bond[4] if len(bond) >= 5 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
     
@@ -126,7 +127,8 @@ def boltzmann_invert_angles(topo, internal_coords):
         if (i, j, k, "angle") not in internal_coords:
             continue
         samples = internal_coords[(i, j, k, "angle")]
-        theta0_calc, k_calc = boltzmann_inversion_angle(samples)
+        theta0_calc, k_calc = boltzmann_inversion_angle(samples, 
+            temperature=CFG.temperature, fc_scale=CFG.fc_scale)
         comment = angle[6] if len(angle) >= 7 else ""
         updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
 
@@ -212,6 +214,7 @@ def boltzmann_invert_dihedrals(topo,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
             return_score=True,
+            fc_scale=CFG.fc_scale,
         )
         (kphi, a), score11 = fit_type11_cbt_dihedral(
             data,
@@ -219,6 +222,7 @@ def boltzmann_invert_dihedrals(topo,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
             return_score=True,
+            fc_scale=CFG.fc_scale,
         )
         print(f"Dihedral ({i+1},{j+1},{k+1},{l+1}): score9={score9:.4f}, score11={score11:.4f}")
 

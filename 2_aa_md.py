@@ -173,7 +173,7 @@ def _get_reporters(append=False, prefix="md"):
         sys.stderr, LOG_NOUT, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
     # Custom trajectory reporter with velocities using MmReporter
-    logger.info(f'Setting up trajectory reporter with selection: {ELECTION}')
+    logger.info(f'Setting up trajectory reporter with selection: {SELECTION}')
     traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{TRJEXT}"), 
         reportInterval=TRJ_NOUT, selection=SELECTION)
     return log_reporter, err_reporter, traj_reporter
