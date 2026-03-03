@@ -647,12 +647,14 @@ class Cg_molecule:
             self.topology.beadtypes = bead_types
         
         # Build bonds and constraints
-        self.topology.build_bonds(
-            ha_neighbors=self.ha_neighbors,
-        )
+        self.topology.build_bonds(ha_neighbors=self.ha_neighbors)
+
+        # Build exclusions 
+        # BEFORE virtual sites so that we can duplicate default nrexcl exclusions for virtual sites
+        self.topology.build_exclusions()
 
         # Build virtual sites.
-        # Gotta do this before angles and dihedrals so that they can include virtual sites if needed.
+        # BEFORE angles and dihedrals so that they do not end up in any angles or dihedrals.
         self.topology.build_virtual_sites()
         
         # Build angles
@@ -661,8 +663,7 @@ class Cg_molecule:
         # Build dihedrals (unless simple model)
         self.topology.build_dihedrals()
 
-        # Build exclusions 
-        self.topology.build_exclusions()
+
 
         
     def update_topology(self, cg_beads, cg_beads_rings, bead_types, attempt):

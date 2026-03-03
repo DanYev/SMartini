@@ -527,38 +527,6 @@ class Topology:
                 if atom['id'] in anchors_ids:  # atom ids are 1-indexed
                     atom['mass'] = int(atom['mass'] * factor)  # double the mass of the anchor beads to help stabilize the ring structure during simulations
 
-        def _sanitize_exclusions(vsite_entry, bonds):
-            # add exclusions between the virtual site and all the beads withing self.nrexcl of it 
-            # since we are removing it from the bonds
-            def _remove_duplicates(lst):
-                seen = []
-                tmp = lst.copy()
-                for item in tmp:
-                    if item not in seen:
-                        seen.append(item)
-                    else:
-                        for i in range(lst.count(item)):
-                            lst.remove(item)
-
-            site = vsite_entry[0]
-            conn = [b[:2] for b in bonds]
-            ext_conn = [b[:2] for b in bonds if site in b[:2]]
-            init_ext_conn = ext_conn.copy()
-            for eb in init_ext_conn:
-                for n in range(1, self.nrexcl):
-                    for b in conn:
-                        if b == eb:
-                            continue
-                        x = eb + b
-                        _remove_duplicates(x)
-                        if len(x) != 2:
-                            continue
-                        if x not in ext_conn:
-                            ext_conn.append(sorted(x))
-            for conn in ext_conn:
-                if conn not in self.exclusions and conn[::-1] not in self.exclusions:
-                    self.exclusions.append(conn)
-
         def _sanitize_bonds(bonds, ring, anchors):
             # Remove any within the ring and make bonds involving the anchor beads 
             for bead_i in ring:
@@ -588,7 +556,6 @@ class Topology:
                     continue
                 vs3_entry = _make_vs3_fad_entry(bead, i, j, k)
                 vsites.append(vs3_entry)
-                _sanitize_exclusions(vs3_entry, bonds)
             _sanitize_bonds(bonds, ring, anchors)
 
         if vsites and anchors:
@@ -606,19 +573,48 @@ class Topology:
         return []
 
     def build_exclusions(self):
-        # For all the beads within a ring add all of them to the exclusion list with each other
+        logger.info("Building exclusions")
         bonds = self.bonds + self.constraints
-        conn = [b[:2] for b in bonds]
+        conn = [(b[:2]) for b in bonds]
+
+        # just duplicate defauls nrexcl exclusions in case it changes later
+        # e.g merging with a protein or smth
+        def _remove_duplicates(lst):
+            seen = []
+            tmp = lst.copy()
+            for item in tmp:
+                if item not in seen:
+                    seen.append(item)
+                else:
+                    for i in range(lst.count(item)):
+                        lst.remove(item)
+
+        ext_conn = [b for b in conn]
+        init_ext_conn = ext_conn.copy()
+        for eb in init_ext_conn:
+            for n in range(1, self.nrexcl):
+                for b in conn:
+                    if b == eb:
+                        continue
+                    x = eb + b
+                    _remove_duplicates(x)
+                    if len(x) != 2:
+                        continue
+                    if x not in ext_conn:
+                        ext_conn.append(sorted(x))
+        for b in ext_conn:
+            self.exclusions.append(b)
+
+        # For all the beads within a ring add all of them to the exclusion list with each other
         for ring in self.ringbeads:
             for i in ring:
                 for j in ring:
                     if i >= j:
                         continue
-                    if [i, j] in conn or [j, i] in conn:
-                        continue
-                    if [i, j] in self.exclusions or [j, i] in self.exclusions:
-                        continue
                     self.exclusions.append([i, j])
+
+        self.exclusions = [(b[0], b[1]) for b in self.exclusions]
+        self.exclusions = list(set(self.exclusions))
         self.exclusions.sort()
 
 ####################################################################################################

@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "FTA"
+    molname: str = "ANP"
     n_beads: int = None # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
@@ -44,7 +44,7 @@ class LigParConfig:
     constraint_k_cutoff: float = 20000.0
     angle_k_cutoff: float = 25.0
     dihedral_k_cutoff: float = 0.0
-    angle_cutoff: float = 150.0
+    angle_cutoff: float = 160.0
 
     # Refinement guardrails
     refine_max_k_scale: float = 25.0
