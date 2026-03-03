@@ -708,7 +708,7 @@ class Topology:
                     kphi = float(d[5])
                     a0, a1, a2, a3, a4 = (float(d[6]), float(d[7]), float(d[8]), float(d[9]), float(d[10]))
                     text += (
-                        "  {:2} {:2} {:2} {:2}    11   {: .6g}  {: .6g}  {: .6g}  {: .6g}  {: .6g}  {: .6g}{}\n".format(
+                        "  {:2} {:2} {:2} {:2}    11   {: .4g}  {: .4g}  {: .4g}  {: .4g}  {: .4g}  {: .4g}{}\n".format(
                             d[0] + 1,
                             d[1] + 1,
                             d[2] + 1,
@@ -729,7 +729,7 @@ class Topology:
                     force_const = float(d[6])
                     multiplicity = int(d[7])
                     text += (
-                        "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.1f}     {:1}{}\n".format(
+                        "  {:2} {:2} {:2} {:2}    {:1}    {:<5.1f}  {:5.3f}     {:2}{}\n".format(
                             d[0] + 1,
                             d[1] + 1,
                             d[2] + 1,
