@@ -359,10 +359,7 @@ def update_dihedrals(
         # - other funct: keep as-is (unknown parameter layout)
         for t in other:
             tt = t.copy()
-            try:
-                funct = int(tt[4])
-            except Exception:
-                funct = None
+            funct = int(tt[4])
             if funct == 11 and len(tt) >= 6:
                 tt[5] = float(tt[5]) * scale
             new_dihedrals.append(tt)

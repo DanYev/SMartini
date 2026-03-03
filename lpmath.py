@@ -374,7 +374,7 @@ def fit_type9_dihedral(
             spacings = np.concatenate([diffs, [wrap_diff]])
             spacing = float(np.median(spacings)) if spacings.size else 360.0
 
-        optimal_n = int(np.clip(int(np.ceil(360.0 / spacing)), 1, int(max_n)))
+        optimal_n = int(np.clip(int(np.floor(360.0 / spacing)), 1, int(max_n)))
 
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
@@ -428,7 +428,8 @@ def fit_type9_dihedral(
         a = coeffs[1 + 2 * idx]
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
-        if n != 1 and len(harmonics_to_fit) > 1:
+        if not (n == 1 and len(harmonics_to_fit) > 1):
+            # if not n == len(harmonics_to_fit):
             k *= fc_scale
         terms.append((int(n), float(k), float(phi)))
 

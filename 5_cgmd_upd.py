@@ -153,18 +153,18 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
     """
     n_bonds_updated = 0
     n_constraints_updated = 0
-    
+
     # Bonds
     new_bonds = []
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
+        aa_key = (i, j, "constraint")
         key = (i, j, "bond")
-        aa_vals = aa_internal.get(key)
+        aa_vals = aa_internal.get(aa_key)
         cg_vals = cg_internal.get(key)
         if aa_vals is None or cg_vals is None:
             new_bonds.append(bond)
             continue
-        print("HERE")
 
         mu_aa, sigma_aa = _stats(aa_vals, "bond")
         mu_cg, sigma_cg = _stats(cg_vals, "bond")
@@ -286,17 +286,18 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         _, sigma_aa = _stats(aa_vals, "dihedral")
         _, sigma_cg = _stats(cg_vals, "dihedral")
-        scale = float((sigma_cg / sigma_aa) ** 1)
+        scale = float((sigma_cg / sigma_aa) ** 1.25)
+        print(scale)
 
 
         for term in terms:
             updated = list(term)
             funct = int(updated[4])
 
-            if funct == 9 and len(updated) >= 7:
-                mult = int(updated[7]) if len(updated) >= 8 else None
-                if mult == 1 and len(terms) > 1: 
-                    continue
+            if funct == 9 and len(updated) >= 8:
+                mult = int(updated[7])
+                if mult == len(terms): 
+                    scale = float(sigma_cg / sigma_aa) ** 0.7
                 k_new = float(updated[6]) * scale
                 k_new = max(k_new, float(CFG.dihedral_k_cutoff))
                 updated[6] = float(k_new)
