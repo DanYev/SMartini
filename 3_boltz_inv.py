@@ -6,7 +6,7 @@ from pathlib import Path
 import AutoMartini as am
 import numpy as np
 
-from ligpar_config import CFG
+from config import CFG
 from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
@@ -129,6 +129,8 @@ def boltzmann_invert_angles(topo, internal_coords):
         samples = internal_coords[(i, j, k, "angle")]
         theta0_calc, k_calc = boltzmann_inversion_angle(samples, 
             temperature=CFG.temperature, fc_scale=CFG.fc_scale)
+        if float(k_calc) < CFG.angle_k_cutoff:
+            k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
         updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
 
@@ -353,7 +355,7 @@ def update_dihedrals(
 
         group = tuple(sorted(key))
         n_perm = int(perm_group_size.get(group, 1))
-        scale = 1.0 / float(n_perm) if n_perm > 0 else 1.0
+        scale = 1.0 / float(n_perm) # * CFG.fc_scale
 
         # Apply scaling to "other" terms when supported.
         # - funct=11: scale kphi (index 5)

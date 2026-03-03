@@ -6,7 +6,7 @@ import AutoMartini as am
 from pathlib import Path
 from openff.toolkit import ForceField, Molecule, Topology 
 from rdkit import Chem
-from ligpar_config import CFG
+from config import CFG
 
 logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)  # or DEBUG

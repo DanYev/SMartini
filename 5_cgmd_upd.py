@@ -17,7 +17,7 @@ from lpmath import (
 )
 from plots import plot_internal_coordinates_overlay
 from partitioning_patch import patch_topology_partitioning_from_sdf
-from ligpar_config import CFG
+from config import CFG
 
 logger = logging.getLogger(__name__)
 
@@ -238,13 +238,13 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         theta0_new = float(np.clip(theta0_new, 0.0, 180.0))
 
         updated[4] = theta0_new
-        updated[5] = _k_rescale(
+        k_new = _k_rescale(
             float(updated[5]),
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
             max_scale=CFG.refine_max_k_scale,
         )
-
+        updated[5] = max(float(k_new), CFG.angle_k_cutoff)
         new_angles.append(updated)
 
         n_angles_updated += 1

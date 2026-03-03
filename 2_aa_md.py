@@ -10,7 +10,7 @@ from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 from reforge.mdsystem.mmmd import MmReporter, convert_trajectories
 
-from ligpar_config import CFG
+from config import CFG
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

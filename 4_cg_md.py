@@ -5,7 +5,7 @@ from pathlib import Path
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
 from reforge.utils import clean_dir
 
-from ligpar_config import CFG
+from config import CFG
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

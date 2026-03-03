@@ -145,7 +145,7 @@ def calculate_internal_coordinates(cg_trajectory, topo):
     return internal_coords
 
 
-def boltzmann_inversion_bond(distances, temperature=300.0):
+def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0):
     """Estimate harmonic bond parameters from samples.
 
     This is a *mean-based harmonic approximation* (not PMF-minimum based):
@@ -159,7 +159,7 @@ def boltzmann_inversion_bond(distances, temperature=300.0):
     r0 = float(np.mean(distances))
 
     variance = float(np.var(distances))
-    k = float(kT / variance)
+    k = float(fc_scale * kT / variance)
 
     return r0, k
 
@@ -207,7 +207,7 @@ def gmm_pdf_1d(x, weights, means, variances):
     return np.sum(weights * exps / norm, axis=1)
 
 
-def fit_gmm_1d_best(data, max_components=3, max_iter=200, tol=1e-6, var_floor=1e-4, 
+def fit_gmm_1d_best(data, max_components=3, max_iter=100, tol=1e-6, var_floor=1e-4, 
                     min_weight=0.05, min_spacing_std=2.0):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
@@ -317,7 +317,7 @@ def fit_type9_dihedral(
     temperature=300.0,
     max_n=6,
     bins=360,
-    min_prob=1e-6,
+    min_prob=1e-2,
     return_score: bool = False,
     fc_scale: float = 1.0,
 ):
@@ -374,7 +374,7 @@ def fit_type9_dihedral(
             spacings = np.concatenate([diffs, [wrap_diff]])
             spacing = float(np.median(spacings)) if spacings.size else 360.0
 
-        optimal_n = int(np.clip(int(np.round(360.0 / spacing)), 1, int(max_n)))
+        optimal_n = int(np.clip(int(np.ceil(360.0 / spacing)), 1, int(max_n)))
 
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
@@ -402,7 +402,7 @@ def fit_type9_dihedral(
     if len(harmonics_to_fit) == 1:
         w = np.pow(density, 1.0)
     else:
-        w = np.pow(density, 0.3)
+        w = np.pow(density, 0.15)
 
     A = np.column_stack(cols)
     Aw = A * w[:, None]
@@ -428,7 +428,9 @@ def fit_type9_dihedral(
         a = coeffs[1 + 2 * idx]
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
-        terms.append((int(n), float(fc_scale * k), float(phi)))
+        if n != 1:
+            k *= fc_scale
+        terms.append((int(n), float(k), float(phi)))
 
     if return_score:
         return terms, score
@@ -507,7 +509,7 @@ def fit_type11_cbt_dihedral(
 
     A = np.column_stack(cols)  # shape (nbins, 5)
     # Weights: emphasize well-sampled/high-probability regions
-    w = np.power(density, 0.25)
+    w = np.power(density, 0.2)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
@@ -526,7 +528,7 @@ def fit_type11_cbt_dihedral(
     a = (coeffs / scale).tolist()
     # Ensure length exactly 5
     a = [float(x) for x in a[:5]]
-    result = (float(fc_scale * k_phi), a)
+    result = (float(k_phi), a)
     if return_score:
         return result, score
     return result
