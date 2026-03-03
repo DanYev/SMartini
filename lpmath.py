@@ -402,7 +402,7 @@ def fit_type9_dihedral(
     if len(harmonics_to_fit) == 1:
         w = np.pow(density, 1.0)
     else:
-        w = np.pow(density, 0.15)
+        w = np.pow(density, 0.25)
 
     A = np.column_stack(cols)
     Aw = A * w[:, None]
@@ -428,7 +428,7 @@ def fit_type9_dihedral(
         a = coeffs[1 + 2 * idx]
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
-        if n != 1:
+        if n != 1 and len(harmonics_to_fit) > 1:
             k *= fc_scale
         terms.append((int(n), float(k), float(phi)))
 
@@ -509,7 +509,7 @@ def fit_type11_cbt_dihedral(
 
     A = np.column_stack(cols)  # shape (nbins, 5)
     # Weights: emphasize well-sampled/high-probability regions
-    w = np.power(density, 0.2)
+    w = np.power(density, 0.25)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)

@@ -331,10 +331,7 @@ def update_dihedrals(
         key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
         dihedrals_by_key.setdefault(key, []).append(d)
 
-    # Some topology generators may emit the same torsion multiple times under
-    # different index permutations (same 4 beads). To avoid double counting,
-    # rescale force constants by 1/N where N is the number of permutations
-    # actually present for that 4-bead set.
+    # Some dihedrals are "duplicated"
     keys = set(dihedrals_by_key)
     perm_group_size = {}
     groups = {}

@@ -16,7 +16,6 @@ from lpmath import (
     wrap_to_180,
 )
 from plots import plot_internal_coordinates_overlay
-from partitioning_patch import patch_topology_partitioning_from_sdf
 from config import CFG
 
 logger = logging.getLogger(__name__)
@@ -132,7 +131,7 @@ def _pair_mode_centers(aa_centers, cg_centers):
     return {c0: a1, c1: a0}
 
 
-def _k_rescale(k_old: float, sigma_target: float, sigma_current: float, max_scale: float) -> float:
+def _k_rescale(k_old: float, sigma_target: float, sigma_current: float) -> float:
     if not np.isfinite(k_old) or k_old <= 0:
         return k_old
     if not np.isfinite(sigma_target) or not np.isfinite(sigma_current):
@@ -165,22 +164,23 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
         if aa_vals is None or cg_vals is None:
             new_bonds.append(bond)
             continue
+        print("HERE")
 
         mu_aa, sigma_aa = _stats(aa_vals, "bond")
         mu_cg, sigma_cg = _stats(cg_vals, "bond")
-        delta = mu_aa - mu_cg
-
         updated = list(bond)
+
+        delta = mu_aa - mu_cg
         updated[3] = float(updated[3]) + delta
+
         k_new = _k_rescale(
             float(updated[4]),
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
-            max_scale=CFG.refine_max_k_scale,
         )
         updated[4] = min(float(k_new), CFG.constraint_k_cutoff)
+        
         new_bonds.append(updated)
-
         n_bonds_updated += 1
 
     topo.bonds = new_bonds
@@ -230,23 +230,22 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
 
         mu_aa, sigma_aa = _stats(aa_vals, "angle")
         mu_cg, sigma_cg = _stats(cg_vals, "angle")
-        delta = mu_aa - mu_cg
-
         updated = list(angle)
+
+        delta = mu_aa - mu_cg
         theta0_old = float(updated[4])
         theta0_new = float(theta0_old + delta)
         theta0_new = float(np.clip(theta0_new, 0.0, 180.0))
-
         updated[4] = theta0_new
+
         k_new = _k_rescale(
             float(updated[5]),
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
-            max_scale=CFG.refine_max_k_scale,
         )
         updated[5] = max(float(k_new), CFG.angle_k_cutoff)
-        new_angles.append(updated)
 
+        new_angles.append(updated)
         n_angles_updated += 1
 
     topo.angles = new_angles
@@ -287,38 +286,25 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         _, sigma_aa = _stats(aa_vals, "dihedral")
         _, sigma_cg = _stats(cg_vals, "dihedral")
-        if not np.isfinite(sigma_aa) or not np.isfinite(sigma_cg) or sigma_aa <= 0 or sigma_cg <= 0:
-            new_dihedrals.extend(terms)
-            continue
+        scale = float((sigma_cg / sigma_aa) ** 1)
 
-        scale = float((sigma_cg / sigma_aa) ** 2)
-        if np.isfinite(CFG.refine_max_k_scale) and CFG.refine_max_k_scale and CFG.refine_max_k_scale > 0:
-            max_scale = float(CFG.refine_max_k_scale)
-            scale = float(np.clip(scale, 1.0 / max_scale, max_scale))
-
-        # For funct=9, only rescale the highest-multiplicity term (keep relative weights).
-        max_mult = max((int(term[7]) for term in terms if len(term) >= 8 and int(term[4]) == 9), default=None)
 
         for term in terms:
             updated = list(term)
-            try:
-                funct = int(updated[4])
-            except Exception:
-                funct = None
+            funct = int(updated[4])
 
             if funct == 9 and len(updated) >= 7:
                 mult = int(updated[7]) if len(updated) >= 8 else None
-                if max_mult is None or mult == max_mult:
-                    k_new = float(updated[6]) * scale
-                    if np.isfinite(CFG.dihedral_k_cutoff) and CFG.dihedral_k_cutoff and CFG.dihedral_k_cutoff > 0:
-                        k_new = min(k_new, float(CFG.dihedral_k_cutoff))
-                    updated[6] = float(k_new)
-                    n_dihedrals_updated += 1
+                if mult == 1 and len(terms) > 1: 
+                    continue
+                k_new = float(updated[6]) * scale
+                k_new = max(k_new, float(CFG.dihedral_k_cutoff))
+                updated[6] = float(k_new)
+                n_dihedrals_updated += 1
 
             elif funct == 11 and len(updated) >= 6:
                 kphi_new = float(updated[5]) * scale
-                if np.isfinite(CFG.dihedral_k_cutoff) and CFG.dihedral_k_cutoff and CFG.dihedral_k_cutoff > 0:
-                    kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
+                kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
                 updated[5] = float(kphi_new)
                 n_dihedrals_updated += 1
 
