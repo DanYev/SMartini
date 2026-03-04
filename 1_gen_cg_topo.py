@@ -61,15 +61,25 @@ if __name__ == "__main__":
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
+    # # PDB
+    # ligand_pdb = wdir / f"{molname}.pdb"
+    # mol = Chem.MolFromPDBFile(ligand_pdb, removeHs=True)
+    # Chem.AddHs(mol)
+    # Chem.SanitizeMol(mol)
+    # Chem.AllChem.EmbedMolecule(mol, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
+    # Chem.AllChem.UFFOptimizeMolecule(mol)
+    # smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
+
+
     ligand_sdf = wdir / f"{molname}.sdf"
-    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
+    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf, from_smiles=None)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = mol_dir / f"{molname}.itp"
     cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_mol)
+        min_beads=15, max_beads=20, raw_molecule=raw_mol)
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)

@@ -46,6 +46,7 @@ def process_ligand(ligand_name):
     logger.info("Working directory: %s", wdir)
     logger.info("Processing ligand: %s", ligand_name)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
+    aa_dir.mkdir(parents=True, exist_ok=True)
     input_file = wdir / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
     ligand = Molecule.from_file(str(input_file))

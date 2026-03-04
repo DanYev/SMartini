@@ -9,8 +9,8 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
-    n_beads: int = 12 # if None, will be determined by AutoMartini
+    molname: str = "LIB"
+    n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
