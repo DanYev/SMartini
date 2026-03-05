@@ -1,0 +1,601 @@
+r"""
+Created on March 13, 2019 by Andrew Abi-Mansour
+Updated to Martini 3 force field on January 31, 2025 by Magdalena Szczuka
+
+This is the::
+    _   _   _ _____ ___     __  __    _    ____ _____ ___ _   _ ___   __  __ _____
+   / \ | | | |_   _/ _ \   |  \/  |  / \  |  _ \_   _|_ _| \ | |_ _|  |  \/  |___ /  
+  / _ \| | | | | || | | |  | |\/| | / _ \ | |_) || |  | ||  \| || |   | |\/| | |_ \  
+ / ___ \ |_| | | || |_| |  | |  | |/ ___ \|  _ < | |  | || |\  || |   | |  | |___) | 
+/_/  _\_\___/  |_| \___/   |_|  |_/_/   \_\_| \_\|_| |___|_| \_|___|  |_|  |_|____/    
+                                                
+
+A tool for automatic MARTINI 3 force field mapping and parametrization of small organic molecules
+
+Developers::
+        Magdalena Szczuka (magdalena.szczuka at univ-tlse3.fr)
+        Tristan BEREAU (bereau at mpip-mainz.mpg.de)
+        Kiran Kanekal (kanekal at mpip-mainz.mpg.de)
+        Andrew Abi-Mansour (andrew.gaam at gmail.com)
+
+AUTO_MARTINI M3 is open-source, distributed under the terms of the GNU Public
+License, version 2 or later. It is distributed in the hope that it will
+be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
+received a copy of the GNU General Public License along with PyGran.
+If not, see http://www.gnu.org/licenses . See also top-level README
+and LICENSE files.
+"""
+
+from sys import exit
+from .common import *
+from . import topology # AutoM3 change
+from .utils import timeit, memprofit
+from . import optimization_cy as opcy
+import math
+import multiprocessing as mp
+import os
+
+logger = logging.getLogger(__name__)
+
+#############################################################################
+### HELPER FUNCTIONS ###
+#############################################################################
+
+def read_bead_params():
+    """Returns bead parameter dictionary
+    CG Bead vdw radius (in Angstroem)"""
+    bead_params = dict()
+    bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
+    bead_params["rvdw_aromatic"] = 4.1 / 2.0 # AutoM3 change: was 4.3 / 2.0    #sigma for ring
+    bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
+    bead_params["offset_bd_weight"] = 20.0 # AutoM3 change: was 50.0    #penalty weight for nonring beads
+    bead_params["offset_bd_aromatic_weight"] = 5.0 # AutoM3 change: was 20.0    #penalty weight for ring beads
+    bead_params["lonely_atom_penalize"] = 0.28  # AutoM3 change: was 0.20
+    bead_params["bd_bd_overlap_coeff"] = 1.0 # AutoM3 change: was 9.0
+    bead_params["at_in_bd_coeff"] = 0.9
+    return bead_params
+
+
+def _get_masses(molecule):
+    """Return an array of atomic masses for all atoms in the molecule."""
+    masses = []
+    for i in range(molecule.GetNumAtoms()):
+        mass = molecule.GetAtomWithIdx(i).GetMass()
+        masses.append(mass)
+    return np.array(masses).astype(np.float32)
+
+
+def _get_bond_distances(conformer):
+    """Return a symmetric (N,N) distance matrix with a 0 diagonal.
+
+    Notes
+    -----
+    `Chem.rdMolTransforms.GetBondLength` is used here (even though it returns a
+    pairwise distance) to preserve existing behavior.
+    """
+    n = conformer.GetNumAtoms()
+    dists = np.zeros((n, n), dtype=np.float32)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = Chem.rdMolTransforms.GetBondLength(conformer, i, j)
+            dists[i, j] = dist
+            dists[j, i] = dist
+    return dists
+
+
+def _ring_id_of_atom_from_rings(ring_atoms, dtype=np.int32):
+    """Build a dense `ring_id_of_atom` array.
+
+    ring_id_of_atom[atom_id] = ring index, or -1 when not in any ring.
+    """
+    max_atom = -1
+    for ring in ring_atoms:
+        if ring:
+            max_atom = max(max_atom, int(np.max(ring)))
+    ring_id = np.full(max_atom + 1 if max_atom >= 0 else 0, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        if not ring:
+            continue
+        arr = np.asarray(ring, dtype=dtype)
+        # Ensure ring_id is long enough
+        mx = int(arr.max())
+        if mx >= ring_id.shape[0]:
+            ring_id = np.pad(ring_id, (0, mx - ring_id.shape[0] + 1), constant_values=-1)
+        ring_id[arr] = rid
+    return ring_id
+
+#############################################################################
+### INITIAL PARTITIONING ###
+#############################################################################
+
+@timeit(level=logging.INFO)
+def find_bead_pos(
+    molecule, conformer, graph, list_heavy_atoms, heavyatom_coords, allatom_coords, ring_atoms, ringatoms_flat, force_map,
+    min_beads=None, max_beads=None, dtype=np.int32, 
+):
+    """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
+    arrangement with best energy score. Return all possible arrangements sorted by energy score."""
+    # Check number of heavy atoms
+    if len(list_heavy_atoms) == 0:
+        print("Error. No heavy atom found.")
+        exit(1)
+
+    if len(list_heavy_atoms) == 1:
+        # Put one CG bead on the one heavy atom.
+        best_trial_comb = [np.array([0], dtype=dtype)]
+        return best_trial_comb
+
+    if len(list_heavy_atoms) > 50:
+        print("Error. Exhaustive enumeration can't handle large molecules.")
+        exit(1)
+
+    atoms = graph["atoms"]
+    list_bonds = [a["ij"] for a in graph["bonds"]]
+    list_bonds = np.array(list_bonds, dtype=dtype)
+    ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms, dtype=dtype)
+    print("ring_id_of_atom:", ring_id_of_atom)
+    atoms_and_neighbors = [a["neighbors"] + [a["idx"]] for a in graph["atoms"]]
+
+    for ring in ring_atoms:
+        neighbors = [atoms[a]["neighbors"] for a in ring]
+        extra_neighbors = [[n for n in nbrs if n not in ring] for nbrs in neighbors]
+        extra_neighbors_flat = [n for nbrs in extra_neighbors for n in nbrs]
+        is_aromatic = any(atoms[a]["is_aromatic"] for a in ring)
+        ring_and_neighbors = ring + extra_neighbors_flat
+        n_atoms = len(ring_and_neighbors)
+        if is_aromatic:
+            min_beads = n_atoms // 2
+            max_beads = n_atoms // 2 + n_atoms % 2
+        else:
+            min_beads = n_atoms // 4
+            max_beads = n_atoms // 2 
+    exit()
+
+    ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
+    if not min_beads:
+        min_beads = int(len(list_heavy_atoms) / 4.0)
+    if not max_beads:
+        max_beads = int(len(list_heavy_atoms) / 2.0)
+        # max_beads = len(list_heavy_atoms) // 2 + len(list_heavy_atoms) % 2
+
+    # Collect all possible combinations of bead positions
+    list_trial_comb = []
+    current_lowest_energy = 1e6
+
+    for num_beads in range(min_beads, max_beads + 1):
+        logger.info("Trying %d beads..." % num_beads)
+        # Use recursive function to loop through all possible
+        # combinations of CG bead positions.
+        if num_beads==0: num_beads=1
+
+        logger.info("Finding Acceptable Mapping Combinations...")
+        acceptable_trials = find_acceptable_trials_mp(
+            list_heavy_atoms, num_beads,
+            ring_atoms,
+            list_bonds,
+            atoms_and_neighbors,
+            dtype=dtype,
+        )
+        n_accceptable = len(acceptable_trials)
+        if n_accceptable == 0:
+            logger.info("No acceptable combinations found for %d beads. Stopping search.", num_beads)
+            continue
+        logger.info("Number of Acceptable Combinations: %d", len(acceptable_trials))
+
+        logger.info("Collecting Combinations And Their Energies...")
+        list_trial_comb, ene_best_trial = collect_energies_and_combs(
+            molecule,
+            conformer,
+            acceptable_trials,
+            ringatoms_flat,
+            current_lowest_energy,
+            list_trial_comb,
+        )
+
+        if ene_best_trial >= current_lowest_energy:
+            break
+        current_lowest_energy = ene_best_trial
+
+    sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
+    for comb in sorted_combs[:10000:100]:
+        logger.info("Combination: %s, Energy: %f", comb[0], comb[1])
+    return_list = [x[0] for x in sorted_combs]
+    return return_list
+
+
+@timeit(level=logging.INFO)
+def find_acceptable_trials_mp(
+    list_heavy_atoms,
+    num_beads,
+    ring_atoms,
+    list_bonds,
+    atoms_and_neighbors,
+    dtype=np.int32,
+    chunk_size=int(1e7),
+    nprocs=None,
+):
+    """Multiprocessing version of acceptable-trial filtering (Option 2).
+
+    Each process generates its own chunk and filters it, then returns the full
+    accepted combinations array back to the parent (IPC/pickling heavy).
+    """
+    if chunk_size >= 2147483647:
+        chunk_size = 2147483646
+    bonds = np.asarray(list_bonds, dtype=dtype)
+
+    max_atom = bonds.max()
+    ring_id = np.full(max_atom + 1, -1, dtype=dtype)
+    for rid, ring in enumerate(ring_atoms):
+        ring = np.asarray(ring, dtype=dtype)
+        ring_id[ring] = rid
+    nrings = len(ring_atoms)
+
+    n_heavy_atoms = len(list_heavy_atoms)
+    total = math.comb(int(n_heavy_atoms), int(num_beads))
+    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
+
+    if nprocs is None:
+        nprocs = int(os.environ.get("SLURM_CPUS_PER_TASK") or (os.cpu_count() or 1))
+    nprocs = max(1, int(nprocs))
+
+    # Avoid OpenMP oversubscription if the cython filter uses OpenMP internally.
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+    work = [
+        (chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings)
+        for chunk_num in range(int(n_chunks))
+    ]
+
+    acc_trials_list = []
+    with mp.Pool(processes=nprocs) as pool:
+        for chunk_acceptable in pool.imap_unordered(_filter_chunk, work, chunksize=1):
+            if chunk_acceptable.size:
+                acc_trials_list.append(chunk_acceptable)
+
+    filtered_list = _filter_out_bad_combinations(acc_trials_list, atoms_and_neighbors, 
+        natoms=len(atoms_and_neighbors), dtype=dtype)
+
+    if not filtered_list:
+        return np.empty((0, int(num_beads)), dtype=dtype)
+
+    return np.vstack(filtered_list)
+
+
+def _filter_chunk(args):
+    """Multiprocessing worker: generate one chunk and return acceptable combos.
+
+    Notes
+    -----
+    * Must be top-level for multiprocessing pickling.
+    * Returns a numpy array (can be large). This is the "Option 2" approach.
+    """
+    chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings = args
+    start_index = int(chunk_num) * int(chunk_size)
+    chunk_array = opcy.generate_combinations(
+        int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size)
+    )
+    if chunk_array.size == 0:
+        return np.empty((0, int(num_beads)), dtype=np.int32)
+    return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
+
+
+def _filter_out_bad_combinations(acc_trials_list, atoms_and_neighbors, natoms, dtype=np.int32):
+    """Filter out bad combinations from acceptable_trials."""
+    filtered_list = []
+    for chunk in acc_trials_list:
+        for trial in chunk:
+            sum = 0
+            for atom_idx in trial:
+                sum += len(atoms_and_neighbors[atom_idx])
+            if sum >= natoms:
+                filtered_list.append(trial)
+    return filtered_list
+
+
+@timeit(level=logging.INFO)
+def find_acceptable_trials(atoms, bonds, nbeads, dtype=np.int32, chunk_size=int(1e5)):
+    """Filter acceptable trial combinations, processing in memory-efficient chunks."""
+    if chunk_size >= 2147483647:
+        chunk_size = 2147483646
+    logger.info("Max chunk size: %d", chunk_size)
+    bonds = np.asarray(list_bonds, dtype=dtype)
+  
+    # Process chunks 
+    acceptable_trials_list = []
+    n_atoms = len(atoms)    
+    total = math.comb(int(n_atoms), int(nbeads))
+    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
+
+    logger.info("Starting processing chunks")
+    for chunk_num in range(n_chunks):
+        start_index = int(chunk_num) * int(chunk_size)
+        chunk_array = opcy.generate_combinations(int(n_atoms), int(nbeads), int(start_index), int(chunk_size))
+        logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
+        if chunk_array.size == 0:
+            break
+        chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
+        if chunk_acceptable.size > 0:
+            acceptable_trials_list.append(chunk_acceptable)
+    
+    return np.vstack(acceptable_trials_list)
+
+
+@timeit(level=logging.INFO)
+def collect_energies_and_combs(
+    molecule,
+    conformer,
+    acceptable_trials,
+    ringatoms_flat,
+    ene_best_trial,
+    list_trial_comb,
+    dtype=np.int32
+):
+    """Collect energies and combinations for all acceptable trials"""
+    logger.debug("Entering collect_energies_and_combs()") 
+    # Trial positions: any heavy atom
+    bead_params = read_bead_params()
+    bond_dists = _get_bond_distances(conformer)
+    masses = _get_masses(molecule)
+
+    # Precompute ring mask once
+    n_atoms = bond_dists.shape[0]
+    is_ring = np.zeros(n_atoms, dtype=np.uint8)
+    for a in ringatoms_flat:
+        ia = int(a)
+        if 0 <= ia < n_atoms:
+            is_ring[ia] = 1
+
+    # Scalarize bead params once (avoid dict lookups in the inner loop)
+    p_offset = float(bead_params["offset_bd_weight"])
+    p_offset_ar = float(bead_params["offset_bd_aromatic_weight"])
+    p_lonely = float(bead_params["lonely_atom_penalize"])
+    p_overlap = float(bead_params["bd_bd_overlap_coeff"])
+    p_at_in = float(bead_params["at_in_bd_coeff"])
+    p_rvdw = float(bead_params["rvdw"])
+    p_rvdw_ar = float(bead_params["rvdw_aromatic"])
+    p_rvdw_cross = float(bead_params["rvdw_cross"])
+    
+    ene_best_trial, energies_array = opcy.collect_energies(
+        acceptable_trials,
+        is_ring,
+        bond_dists,
+        masses,
+        p_offset,
+        p_offset_ar,
+        p_lonely,
+        p_overlap,
+        p_at_in,
+        p_rvdw,
+        p_rvdw_ar,
+        p_rvdw_cross,
+        ene_best_trial,
+    )
+    list_trial_comb.extend([[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))])
+    
+    return list_trial_comb, ene_best_trial
+
+
+#############################################################################
+### TO FINISH PARTITIONING ###
+#############################################################################
+
+def get_partitioning(self, trial_comb):
+        """Get partitioning of atoms into beads for given trial combination"""
+        atoms = self.ha_graph["atoms"]
+        mapping = self._distribute_neighbors(trial_comb, atoms)
+        mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
+        partitioning = self.invert_mapping_dictionary(mapping_dict)
+        return partitioning
+
+
+def _distribute_neighbors(trial_comb, atoms):
+    """Find acceptable mappings of atoms to beads for given trial combination"""
+
+    def _single_atom_in_mapping(mapping):
+        for ns in mapping:
+            if len(ns) == 1:
+                return True
+        return False
+
+    def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+        for ns, ring in zip(mapping, bead_is_in_ring):
+            if ring and len(ns) > 2:
+                return False
+        return True
+
+    def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+        for ns, ring in zip(mapping, bead_is_in_ring):
+            if not ring:
+                continue
+            for atom in ns:
+                if not atom_is_in_ring[atom]:
+                    return False
+        return True
+
+    def _beads_are_big(mapping, max_bead_size=4):
+        for ns in mapping:
+            if len(ns) > max_bead_size:
+                return True
+        return False
+
+    bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
+    bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
+    atom_is_in_ring = [a["is_in_ring"] for a in atoms]
+    n_atoms = len(atoms)
+    atom_ids = set(range(n_atoms))
+    nei_ids = atom_ids - set(trial_comb)
+    mapping = [[int(i)] for i in trial_comb]
+    mappings = [mapping]
+
+    # Distribute neighbors of trial combination atoms to beads,
+    # keeping track of all possible mappings.
+    for nei_idx in nei_ids:
+        updated_mappings = []
+        for mapping in mappings:
+            for idx, bead in enumerate(mapping):
+                if nei_idx not in bead_neighbors[idx]:
+                    continue
+                tmp_mapping = [x.copy() for x in mapping]
+                tmp_mapping[idx].append(nei_idx)
+                updated_mappings.append(tmp_mapping)
+        mappings = updated_mappings
+
+    # Filter out mappings with single atoms in beads
+    tmp_list = []
+    for mapping in mappings:
+        if _single_atom_in_mapping(mapping):
+            continue
+        tmp_list.append(mapping)
+    mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
+
+    # Prefer keeping ring beads small
+    tmp_list = []
+    for mapping in mappings:
+        if not _ring_beads_are_tiny(mapping, bead_is_in_ring):
+            continue
+        tmp_list.append(mapping)
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
+
+    # Prefer keeping ring beads together (no mixing ring/non-ring)
+    tmp_list = []
+    for mapping in mappings:
+        if not _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+            continue
+        tmp_list.append(mapping)
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
+
+    # Prefer smaller beads overall (e.g. 5+ atoms is too big for Martini)
+    tmp_list = []
+    for mapping in mappings:
+        if _beads_are_big(mapping):
+            continue
+        tmp_list.append(mapping)
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
+
+    # TODO: SYMMETRIZE MAPPINGS
+    if len(mappings) == 2:
+        return mappings[0]
+
+    return mappings[0]
+
+#############################################################################
+### HELPER FUNCTIONS FOR MAPPING DICTIONARIES ###
+#############################################################################
+
+def make_mapping_dictionary(atom_partitioning):
+    """Create mapping dictionary from atom_partitioning"""
+    mapping_dict = {}
+    for atom_idx, bead_idx in atom_partitioning.items():
+        if bead_idx not in mapping_dict:
+            mapping_dict[bead_idx] = []
+        mapping_dict[bead_idx].append(atom_idx)
+    return mapping_dict
+
+
+def invert_mapping_dictionary(mapping_dict):
+    """Inverse of make_mapping_dictionary(): bead_idx -> [atom_idx] to atom_idx -> bead_idx."""
+    atom_partitioning = {}
+    for bead_idx, atom_indices in mapping_dict.items():
+        for atom_idx in atom_indices:
+            if atom_idx in atom_partitioning:
+                raise ValueError(f"Atom {atom_idx} appears in multiple beads")
+            atom_partitioning[atom_idx] = bead_idx
+    return dict(sorted(atom_partitioning.items()))
+
+
+### AutoM3 change :  Including Ertl Functional Groups Finder algorithm (merge, identify_functional_groups) ###
+def identify_functional_groups(mol): # AutoM3 change
+    # atoms connected by non-aromatic double or triple bond to any heteroatom
+    PATT_DOUBLE_TRIPLE = Chem.MolFromSmarts('A=,#[!#6]')
+    # atoms in non-aromatic carbon-carbon double or triple bonds
+    PATT_CC_DOUBLE_TRIPLE = Chem.MolFromSmarts('C=,#C')
+    # acetal carbons, i.e. sp3 carbons connected to two or more oxygens, nitrogens or sulfurs; these O, N or S atoms must have only single bonds
+    PATT_ACETAL = Chem.MolFromSmarts('[CX4](-[O,N,S])-[O,N,S]')
+    # all atoms in oxirane, aziridine and thiirane rings
+    PATT_OXIRANE_ETC = Chem.MolFromSmarts('[O,N,S]1CC1')
+    # the bridge between two aromatic cycles
+    PATT_BRIDGE_AROMATIC = Chem.MolFromSmarts("[x;!x2]")
+
+    PATT_TUPLE = (PATT_DOUBLE_TRIPLE, PATT_CC_DOUBLE_TRIPLE, PATT_ACETAL, PATT_OXIRANE_ETC, PATT_BRIDGE_AROMATIC)
+
+    marked = set()
+    # mark all heteroatoms in a molecule, including halogens
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() not in (6, 1):  # would we ever have hydrogen?
+            marked.add(atom.GetIdx())
+
+    # mark the four specific types of carbon atom
+    for patt in PATT_TUPLE:
+        for path in mol.GetSubstructMatches(patt):
+            for atomindex in path:
+                marked.add(atomindex)
+
+    # merge all connected marked atoms to a single FG
+    groups = []
+    while marked:
+        grp = set([marked.pop()])
+        merge(mol, marked, grp)
+        groups.append(grp)
+
+    # extract also connected unmarked carbon atoms
+    ifg = namedtuple('IFG', ['atomIds', 'atoms', 'type', 'type_atomIds'])
+    ifgs = []
+    for g in groups:
+        uca = set()
+        for atomidx in g:
+            for n in mol.GetAtomWithIdx(atomidx).GetNeighbors():
+                if n.GetAtomicNum() == 6:
+                    uca.add(n.GetIdx())
+        type_atoms = g.union(uca)
+        ifgs.append(
+            ifg(atomIds=tuple(sorted(g)),
+                atoms=Chem.MolFragmentToSmiles(mol, g, canonical=True),
+                type=Chem.MolFragmentToSmiles(mol, type_atoms, canonical=True),
+                type_atomIds=tuple(sorted(type_atoms)))
+        )
+    """for ix, fg in enumerate(ifgs):
+        print(f'Functional Group {ix + 1}:')
+        print(f'  Atom Indices: {fg.atomIds}')
+        print(f'  Atoms (SMILES): {fg.atoms}')
+        print(f'  Group Type (SMILES): {fg.type}')
+        print(f'  Group Type Atom Indices: {fg.type_atomIds}')"""
+    
+    """
+    USE:
+    m = Chem.MolFromSmiles(smiles)
+    fgs = identify_functional_groups(m)
+    print('%2d: %d fgs' % (ix + 1, len(fgs)), fgs)
+    """
+    return ifgs
+
+
+def merge(mol, marked, aset): # AutoM3 change
+    #  Original authors: Richard Hall and Guillaume Godin
+    #  This file is part of the RDKit.
+    #  The contents are covered by the terms of the BSD license
+    #  which is included in the file license.txt, found at the root
+    #  of the RDKit source tree.
+    bset = set()
+    for idx in aset:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            jdx = nbr.GetIdx()
+            if jdx in marked:
+                marked.remove(jdx)
+                bset.add(jdx)
+    if not bset:
+        return
+    merge(mol, marked, bset)
+    aset.update(bset)
