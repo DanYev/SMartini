@@ -54,6 +54,15 @@ def read_bead_params():
     return bead_params
 
 
+def _get_masses(molecule):
+    """Return an array of atomic masses for all atoms in the molecule."""
+    masses = []
+    for i in range(molecule.GetNumAtoms()):
+        mass = molecule.GetAtomWithIdx(i).GetMass()
+        masses.append(mass)
+    return np.array(masses).astype(np.float32)
+
+
 def _get_bond_distances(conformer):
     """Return a symmetric (N,N) distance matrix with a 0 diagonal.
 
@@ -70,15 +79,6 @@ def _get_bond_distances(conformer):
             dists[i, j] = dist
             dists[j, i] = dist
     return dists
-
-
-def _get_masses(molecule):
-    """Return an array of atomic masses for all atoms in the molecule."""
-    masses = []
-    for i in range(molecule.GetNumAtoms()):
-        mass = molecule.GetAtomWithIdx(i).GetMass()
-        masses.append(mass)
-    return np.array(masses).astype(np.float32)
 
 
 def _filter_chunk(args):
@@ -99,80 +99,26 @@ def _filter_chunk(args):
     return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
 
 
-def make_mapping_dictionary(atom_partitioning):
-    """Create mapping dictionary from atom_partitioning"""
-    mapping_dict = {}
-    for atom_idx, bead_idx in atom_partitioning.items():
-        if bead_idx not in mapping_dict:
-            mapping_dict[bead_idx] = []
-        mapping_dict[bead_idx].append(atom_idx)
-    return mapping_dict
-
-
-def invert_mapping_dictionary(mapping_dict):
-    """Inverse of make_mapping_dictionary(): bead_idx -> [atom_idx] to atom_idx -> bead_idx."""
-    atom_partitioning = {}
-    for bead_idx, atom_indices in mapping_dict.items():
-        for atom_idx in atom_indices:
-            if atom_idx in atom_partitioning:
-                raise ValueError(f"Atom {atom_idx} appears in multiple beads")
-            atom_partitioning[atom_idx] = bead_idx
-    return dict(sorted(atom_partitioning.items()))
 
     
 @timeit(level=logging.INFO)
-def find_acceptable_trials(list_heavy_atoms, num_beads, ring_atoms, list_bonds, 
-    dtype=np.int32, chunk_size=int(1e7)):
-    """Filter acceptable trial combinations, processing in memory-efficient chunks.
-    
-    Parameters
-    ----------
-    seq_iter : iterator or array-like
-        Trial combinations to filter. Typically an itertools.combinations iterator
-        for memory efficiency.
-    ring_atoms : list
-        Ring information for filtering.
-    list_bonds : array-like
-        Bond information for filtering.
-    dtype : np.dtype, optional
-        Data type for arrays (default: np.int32).
-    chunk_size : int, optional
-        Number of trials to process per chunk (default: 1e7). # Less than 2147483647
-        Adjust based on available memory.
-    
-    Returns
-    -------
-    np.ndarray
-        2D array of acceptable trial combinations.
-    
-    Notes
-    -----
-    Processes the iterator in chunks to avoid materializing the entire
-    sequence in memory. This is critical for large combinatorial spaces.
-    """
+def find_acceptable_trials(atoms, bonds, nbeads, dtype=np.int32, chunk_size=int(1e5)):
+    """Filter acceptable trial combinations, processing in memory-efficient chunks."""
     if chunk_size >= 2147483647:
         chunk_size = 2147483646
     logger.info("Max chunk size: %d", chunk_size)
     bonds = np.asarray(list_bonds, dtype=dtype)
-    
-    # Compute max atom ID from bonds for ring_id initialization
-    max_atom = bonds.max()     
-    ring_id = np.full(max_atom + 1, -1, dtype=dtype)
-    for rid, ring in enumerate(ring_atoms):
-        ring = np.asarray(ring, dtype=dtype)
-        ring_id[ring] = rid
-    nrings = len(ring_atoms)
-    
+  
     # Process chunks 
     acceptable_trials_list = []
-    n_heavy_atoms = len(list_heavy_atoms)    
-    total = math.comb(int(n_heavy_atoms), int(num_beads))
+    n_atoms = len(atoms)    
+    total = math.comb(int(n_atoms), int(nbeads))
     n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
 
     logger.info("Starting processing chunks")
     for chunk_num in range(n_chunks):
         start_index = int(chunk_num) * int(chunk_size)
-        chunk_array = opcy.generate_combinations(int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size))
+        chunk_array = opcy.generate_combinations(int(n_atoms), int(nbeads), int(start_index), int(chunk_size))
         logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
         if chunk_array.size == 0:
             break
@@ -353,10 +299,27 @@ def find_bead_pos(
         print("Error. Exhaustive enumeration can't handle large molecules.")
         exit(1)
 
+    atoms = graph["atoms"]
     list_bonds = [a["ij"] for a in graph["bonds"]]
     list_bonds = np.array(list_bonds, dtype=dtype)
     ring_id_of_atom = _ring_id_of_atom_from_rings(ring_atoms, dtype=dtype)
+    print("ring_id_of_atom:", ring_id_of_atom)
     atoms_and_neighbors = [a["neighbors"] + [a["idx"]] for a in graph["atoms"]]
+
+    for ring in ring_atoms:
+        neighbors = [atoms[a]["neighbors"] for a in ring]
+        extra_neighbors = [[n for n in nbrs if n not in ring] for nbrs in neighbors]
+        extra_neighbors_flat = [n for nbrs in extra_neighbors for n in nbrs]
+        is_aromatic = any(atoms[a]["is_aromatic"] for a in ring)
+        ring_and_neighbors = ring + extra_neighbors_flat
+        n_atoms = len(ring_and_neighbors)
+        if is_aromatic:
+            min_beads = n_atoms // 2
+            max_beads = n_atoms // 2 + n_atoms % 2
+        else:
+            min_beads = n_atoms // 4
+            max_beads = n_atoms // 2 
+    exit()
 
     ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
     if not min_beads:
@@ -410,62 +373,135 @@ def find_bead_pos(
     return return_list
 
 
-def functional_groups_ok(atom_partitioning, molecule, ringatoms): # AutoM3
-    """
-    Checking if functional groups are conserved in distinctive bead, within atom number per bead limit.
-    """
+def get_partitioning(self, trial_comb):
+        """Get partitioning of atoms into beads for given trial combination"""
+        atoms = self.ha_graph["atoms"]
+        mapping = self._distribute_neighbors(trial_comb, atoms)
+        mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
+        partitioning = self.invert_mapping_dictionary(mapping_dict)
+        return partitioning
 
-    fgs = identify_functional_groups(molecule)
-    fgs_id=[j[0] for j in [i[0] for i in fgs]]
+    def _distribute_neighbors(trial_comb, atoms):
+        """Find acceptable mappings of atoms to beads for given trial combination"""
 
-    bead_atoms={}
-    for at, bead in atom_partitioning.items():
-        if bead not in bead_atoms:
-            bead_atoms[bead] = []
-        bead_atoms[bead].append(at) 
-    
-    group_found = []
-    for ix, fg in enumerate(fgs):
-        gr_f = False
-
-        """if fg.atoms=='cc': #bridge atoms between fused cycles
-            for bead, atoms in bead_atoms.items():
-                bridge_lost=False
-                if not set(fg.atomIds).issubset(atoms):
-                    print(f"the found bridge {fg.atomIds} is not in  {atoms}")
-                    bridge_lost=True
-            if bridge_lost: return False # reject mapping which doesn't enclose bridge in one bead"""
-        
-        for bead, atoms in bead_atoms.items():
-            if set(fg.type_atomIds).issubset(atoms) or len(fg.type_atomIds)>=3: #do not change!!!! better symmetry if len >=3
-                gr_f = True
-                break
-        group_found.append(gr_f)
-
-    # Check if at least 50% of elements in group_found are True
-    if group_found.count(True) >= len(group_found) / 2 :
-        return True
-    else:
-        return False
-
-def max2arperbead(atom_partitioning, ringatoms): # AutoM3
-    """ 
-    Checking the number of aromatic atoms in a bead and returning False if it's more than 2.
-    """
-    bead_atoms = {}
-    for at, bead in atom_partitioning.items():
-        if bead not in bead_atoms:
-            bead_atoms[bead] = []
-        bead_atoms[bead].append(at)
-    
-    # Convert ringatoms to a set
-    ringatoms_set = set(atom for sublist in ringatoms for atom in sublist)
-    for bead, atoms in bead_atoms.items():
-        ring_atom_count = sum(1 for atom in atoms if atom in ringatoms_set)
-        if ring_atom_count > 2:
+        def _single_atom_in_mapping(mapping):
+            for ns in mapping:
+                if len(ns) == 1:
+                    return True
             return False
-        else:   
+
+        def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+            for ns, ring in zip(mapping, bead_is_in_ring):
+                if ring and len(ns) > 2:
+                    return False
             return True
+
+        def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+            for ns, ring in zip(mapping, bead_is_in_ring):
+                if not ring:
+                    continue
+                for atom in ns:
+                    if not atom_is_in_ring[atom]:
+                        return False
+            return True
+
+        def _beads_are_big(mapping, max_bead_size=4):
+            for ns in mapping:
+                if len(ns) > max_bead_size:
+                    return True
+            return False
+
+        bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
+        bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
+        atom_is_in_ring = [a["is_in_ring"] for a in atoms]
+        n_atoms = len(atoms)
+        atom_ids = set(range(n_atoms))
+        nei_ids = atom_ids - set(trial_comb)
+        mapping = [[int(i)] for i in trial_comb]
+        mappings = [mapping]
+
+        # Distribute neighbors of trial combination atoms to beads,
+        # keeping track of all possible mappings.
+        for nei_idx in nei_ids:
+            updated_mappings = []
+            for mapping in mappings:
+                for idx, bead in enumerate(mapping):
+                    if nei_idx not in bead_neighbors[idx]:
+                        continue
+                    tmp_mapping = [x.copy() for x in mapping]
+                    tmp_mapping[idx].append(nei_idx)
+                    updated_mappings.append(tmp_mapping)
+            mappings = updated_mappings
+
+        # Filter out mappings with single atoms in beads
+        tmp_list = []
+        for mapping in mappings:
+            if _single_atom_in_mapping(mapping):
+                continue
+            tmp_list.append(mapping)
+        mappings = tmp_list
+        if len(mappings) == 1:
+            return mappings[0]
+
+        # Prefer keeping ring beads small
+        tmp_list = []
+        for mapping in mappings:
+            if not _ring_beads_are_tiny(mapping, bead_is_in_ring):
+                continue
+            tmp_list.append(mapping)
+        if tmp_list:
+            mappings = tmp_list
+        if len(mappings) == 1:
+            return mappings[0]
+
+        # Prefer keeping ring beads together (no mixing ring/non-ring)
+        tmp_list = []
+        for mapping in mappings:
+            if not _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+                continue
+            tmp_list.append(mapping)
+        if tmp_list:
+            mappings = tmp_list
+        if len(mappings) == 1:
+            return mappings[0]
+
+        # Prefer smaller beads overall (e.g. 5+ atoms is too big for Martini)
+        tmp_list = []
+        for mapping in mappings:
+            if _beads_are_big(mapping):
+                continue
+            tmp_list.append(mapping)
+        if tmp_list:
+            mappings = tmp_list
+        if len(mappings) == 1:
+            return mappings[0]
+
+        # TODO: SYMMETRIZE MAPPINGS
+        if len(mappings) == 2:
+            return mappings[0]
+
+        return mappings[0]
+
+# HELPER FUNCTIONS FOR MAPPING DICTIONARIES
+def make_mapping_dictionary(atom_partitioning):
+    """Create mapping dictionary from atom_partitioning"""
+    mapping_dict = {}
+    for atom_idx, bead_idx in atom_partitioning.items():
+        if bead_idx not in mapping_dict:
+            mapping_dict[bead_idx] = []
+        mapping_dict[bead_idx].append(atom_idx)
+    return mapping_dict
+
+
+def invert_mapping_dictionary(mapping_dict):
+    """Inverse of make_mapping_dictionary(): bead_idx -> [atom_idx] to atom_idx -> bead_idx."""
+    atom_partitioning = {}
+    for bead_idx, atom_indices in mapping_dict.items():
+        for atom_idx in atom_indices:
+            if atom_idx in atom_partitioning:
+                raise ValueError(f"Atom {atom_idx} appears in multiple beads")
+            atom_partitioning[atom_idx] = bead_idx
+    return dict(sorted(atom_partitioning.items()))
 
 
 ### AutoM3 change :  Including Ertl Functional Groups Finder algorithm (merge, identify_functional_groups) ###
