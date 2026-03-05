@@ -287,8 +287,6 @@ cdef inline bint _has_terminal_partner_collision(const I32[::1] trial_comb, cons
 cdef bint check_beads(
     const I32[::1] trial_comb,
     const I32[:, ::1] listbonds,
-    const I32[::1] ring_id_of_atom,
-    const int nrings,
 ) nogil:
     """Validate a CG bead trial combination against chemical constraints (GIL-free).
 
@@ -304,9 +302,6 @@ cdef bint check_beads(
         1D array of atom indices for proposed bead centers.
     listbonds
         2D array (nbonds, 2) of heavy-atom bonds; symmetric pairs.
-    ring_id_of_atom
-        1D array indexed by atom ID. Value is ring ID or -1 if not in ring.
-
     Returns
     -------
     bool
@@ -321,10 +316,6 @@ cdef bint check_beads(
     cdef Py_ssize_t bi, bj
     cdef int ai, aj
     cdef int n_trial = trial_comb.shape[0]
-    cdef int rid_i, rid_j
-    cdef int k, m
-    cdef int rid
-    cdef int num_bonds_in_rings = 0
 
     if n_trial <= 1:
         return True
@@ -336,16 +327,6 @@ cdef bint check_beads(
             aj = <int>trial_comb[bj]
             if _is_bond(ai, aj, listbonds):
                 return False
-                # rid_i = <int>ring_id_of_atom[ai]
-                # rid_j = <int>ring_id_of_atom[aj]
-                # if rid_i != -1 and rid_i == rid_j:
-                #     num_bonds_in_rings += 1
-                # else:
-                #     return False
-
-    # # Reject if any ring has more than 1 bond
-    # if num_bonds_in_rings > 1:
-    #     return False
 
     # Check for two terminal beads linked to the same atom
     if _has_terminal_partner_collision(trial_comb, listbonds):
@@ -354,27 +335,9 @@ cdef bint check_beads(
     return True
 
 
-def find_acceptable_trials_tmp(
-    I32[:, ::1] seq_one_beads,
-    I32[:, ::1] listbonds,
-    I32[::1] ring_id_of_atom,
-    const int nrings,
-):
-    cdef Py_ssize_t i
-    acceptable_trials = []
-    for i in range(seq_one_beads.shape[0]):
-        if check_beads(seq_one_beads[i], listbonds, ring_id_of_atom, nrings):
-            acceptable_trials.append(seq_one_beads[i])
-    if not acceptable_trials:
-        return np.empty((0, 0), dtype=np.int32)
-    return np.asarray(acceptable_trials, dtype=np.int32)
-
-
 def find_acceptable_combinations(
     I32[:, ::1] trial_combinations,
     I32[:, ::1] listbonds,
-    I32[::1] ring_id_of_atom,
-    const int nrings,
 ):
     """OpenMP-parallel filter for valid CG bead trial combinations.
 
@@ -422,7 +385,7 @@ def find_acceptable_combinations(
     cdef cnp.ndarray[cnp.uint8_t, ndim=1] mask = np.zeros(n_trials, dtype=np.uint8)
 
     for i in prange(n_trials, schedule='static', nogil=True):
-        if check_beads(trial_combinations[i], listbonds, ring_id_of_atom, nrings):
+        if check_beads(trial_combinations[i], listbonds):
             mask[i] = 1
 
     # Count accepted (serial)

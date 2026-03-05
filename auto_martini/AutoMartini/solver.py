@@ -144,22 +144,14 @@ class Cg_molecule:
         import pickle
         mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
         if not mapping_pickle.exists():
-            list_cg_beads = partitioning.find_bead_pos(
-                self.molecule,
-                self.conf,
-                self.ha_graph,
-                self.list_ha,
-                self.ha_coords,
-                self.aa_coords,
-                self.ring_atoms,
-                self.ring_atoms_flat,
-                self.force_map,  # AutoM3 new argument
+            list_cg_beads = partitioning.find_bead_anchors(
+                self.molecule, 
                 min_beads=self.min_beads,
                 max_beads=self.max_beads,
             )
             logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
-            with open(mapping_pickle, "wb") as f:
-                pickle.dump(list_cg_beads, f)
+            # with open(mapping_pickle, "wb") as f:
+            #     pickle.dump(list_cg_beads, f)
         else:
             with open(mapping_pickle, "rb") as f:
                 list_cg_beads = pickle.load(f)
@@ -168,17 +160,11 @@ class Cg_molecule:
         logger.info("Going through the candidate mappings")
         for attempt in range(self.max_attempts):
 
-            if attempt % 1000 == 0:  # Log every 1000 attempts
+            if attempt % 10000 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
                 logger.info("Trying to partition the atoms between beads")
 
             cg_beads = list_cg_beads[attempt]
-
-            try:
-                self.partitioning = self.get_partitioning(cg_beads)
-            except Exception:
-                continue
-
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 

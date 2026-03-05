@@ -385,7 +385,6 @@ def find_bead_pos(
         ring_connectivity.append(len(ring_neighbors_flat))
 
 
-    ### AutoM3 change : Max and Min number of beads --> in Martini3 it can be 2 to 4 heavy atoms per bead ###
     n_heavy_atoms = len(list_heavy_atoms)
     if not min_beads:
         min_beads = int(n_heavy_atoms / 4.0)
@@ -430,6 +429,7 @@ def find_bead_pos(
         acceptable_trials = np.array(acceptable_trials, dtype=dtype)
 
         logger.info("Collecting Combinations And Their Energies...")
+        conformer = molecule.GetConformer()
         list_trial_comb, ene_best_trial = collect_energies_and_combs(
             molecule,
             conformer,
