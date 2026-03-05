@@ -33,33 +33,4 @@ from . import solver, topology
 from ._version import __version__
 
 
-def _select_optimization_module():
-                """Select optimization backend.
-
-                Controlled via env var:
-                        AUTO_MARTINI_OPTIMIZATION=legacy  -> optimization_legacy
-                        (anything else / unset)           -> optimization
-
-                This is intentionally evaluated at import time so downstream modules can do:
-                        from auto_martiniM3 import optimization
-                """
-
-                mode = os.getenv("AUTO_MARTINI_OPTIMIZATION", "")
-                if mode is None:
-                                mode = ""
-                mode = str(mode).strip().lower()
-
-                if mode in {"legacy", "old", }:
-                                from . import optimization_legacy as optimization_module
-
-                                return optimization_module
-
-                from . import optimization as optimization_module
-
-                return optimization_module
-
-
-# Public alias
-optimization = _select_optimization_module()
-
-__all__ = ["solver", "topology", "optimization", "__version__"]
+__all__ = ["solver", "topology", "partitioning", "__version__"]

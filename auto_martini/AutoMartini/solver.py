@@ -28,7 +28,7 @@ and LICENSE files.
 """ 
 
 from . import output
-from . import optimization as optimization
+from . import partitioning
 from .topology import Topology, read_delta_f_types, smi2alogps, run_bartender
 from .common import *
 
@@ -144,7 +144,7 @@ class Cg_molecule:
         import pickle
         mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
         if not mapping_pickle.exists():
-            list_cg_beads = optimization.find_bead_pos(
+            list_cg_beads = partitioning.find_bead_pos(
                 self.molecule,
                 self.conf,
                 self.ha_graph,
