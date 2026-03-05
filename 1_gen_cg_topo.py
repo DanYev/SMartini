@@ -58,6 +58,7 @@ if __name__ == "__main__":
     # smiles = "Clc1ccc(cc1)CN(c2nnnn2)Cc3ccc(Cl)cc3"  
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
     # smiles = "Nc1ncnc2n(cnc12)[C@@H]3O[C@H](CO[P](O)(=O)O[P](O)(=O)N[P](O)(O)=O)[C@@H](O)[C@H]3O" # ANP
+    # smiles = "CN(C)c1ccc(C2N(C)c3ccccc3N2C)cc1" # DMBI
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     # Use auto_martiniM3's built-in .itp writer via topfname
     itp_path = mol_dir / f"{molname}.itp"
     cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=15, max_beads=20, raw_molecule=raw_mol)
+        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_mol)
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)

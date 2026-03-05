@@ -59,7 +59,6 @@ nosetests.xml
 .DS_Store
 
 # ---- Cython / compiled extensions ----
-*.so
 *.pyd
 *.dll
 *.dylib
