@@ -88,35 +88,26 @@ def _get_ring_id_of_atom(atom, rings, dtype=np.int32):
     """ring_id_of_atom[atom_id] = ring index, or 0 when not in any ring."""
     for rid, ring in enumerate(rings):
         if atom in ring:
-            return rid + 1      
-    return 0
+            return rid      
+    return -1
+
+
+def flat_set(lst):
+    """Flatten a list of lists into a set of unique elements."""
+    if not lst:
+        return set()
+    aset = set(item for sublist in lst for item in sublist) 
+    alist = sorted(aset)
+    return alist
 
 #############################################################################
 ### INITIAL PARTITIONING ###
 #############################################################################
 
-def _get_ha_info(molecule):
+def _get_ha_graph(molecule):
     """Extract molecule info needed for partitioning."""
     atoms = molecule.GetAtoms()
     ha_list = [a for a in atoms if a.GetAtomicNum() > 1]
-
-    # Get ring atoms (systems of joined rings)
-    all_rings = molecule.GetRingInfo().AtomRings()
-    ring_systems = []
-    for ring in all_rings:
-        ring_atoms = set(ring)
-        new_systems = []
-        for system in ring_systems:
-            shared = len(ring_atoms.intersection(system))
-            if shared:
-                ring_atoms = ring_atoms.union(system)
-            else:
-                new_systems.append(system)
-        new_systems.append(ring_atoms)
-        ring_systems = new_systems
-    rings = [list(ring) for ring in ring_systems]
-
-    # Get bonds between heavy atoms
     bonds = []
     for ai in ha_list:
         for aj in ha_list:
@@ -124,43 +115,80 @@ def _get_ha_info(molecule):
             j = aj.GetIdx()
             if i < j and molecule.GetBondBetweenAtoms(int(i), int(j)) is not None:
                 bonds.append([i, j])
+    return ha_list, bonds
 
-    return ha_list, rings, bonds
+
+
+def split_into_fragments(molecule):
+    """Split molecule into fragments based on rings and their neighbors."""
+
+    def _fuse_rings(rings):
+        # Get ring atoms (systems of joined rings)
+        all_rings = molecule.GetRingInfo().AtomRings()
+        ring_systems = []
+        for ring in all_rings:
+            ring_atoms = set(ring)
+            new_systems = []
+            for system in ring_systems:
+                shared = len(ring_atoms.intersection(system))
+                if shared:
+                    ring_atoms = ring_atoms.union(system)
+                else:
+                    new_systems.append(system)
+            new_systems.append(ring_atoms)
+            ring_systems = new_systems
+        rings = [list(ring) for ring in ring_systems]
+        return rings
+
+    atoms, bonds = _get_ha_graph(molecule)
+    atids = [a.GetIdx() for a in atoms]
+    atom_neis_list = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in atoms]
+    rings = _fuse_rings(molecule.GetRingInfo().AtomRings())
+    atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atids]
+    n_rings = len(rings)
+    fragments = [[atid for atid, segid in zip(atids, atom_ring_ids) if segid == x] for x in range(n_rings)]
+    linear_atoms = [atid for atid, segid in zip(atids, atom_ring_ids) if segid == -1]
+    for atom in linear_atoms:
+        atom_nei = atom_neis_list[atom]
+        if len(atom_nei) == 1: # if a terminal atom attached to a ring, add it to the ring fragment
+            nei_ring_id = atom_ring_ids[atom_nei[0]]
+            if nei_ring_id != -1:
+                fragments[nei_ring_id].append(atom) 
+        if atom not in flat_set(fragments): # if an atom with 2+ neighbors not in any of the fragments, make a new fragmnent
+            fragments.append([atom] + atom_nei) # add linear atom as its own fragment if it 2+ neighbors
+    return fragments, rings
+
 
 @timeit(level=logging.INFO)
 def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
     arrangement with best energy score. Return all possible arrangements sorted by energy score.
     """
-
-    def _get_min_max_beads_for_ring(ring):
-        is_aromatic = any(ha_list[a].GetIsAromatic() for a in ring)
-        has_and_neis = [[a] + ha_neis[a] for a in ring] # ring and its nearest neighbors
-        has_and_neis_flat = [a for sublist in has_and_neis for a in sublist]
-        ring_and_nns = sorted(list(set(has_and_neis_flat))) 
-        n_atoms = len(ring_and_nns)
+   
+    def _get_min_max_beads(fragment, atoms):
+        is_aromatic = any(atoms[a].GetIsAromatic() for a in fragment)
+        n_atoms = len(fragment)
         if is_aromatic:
             min_beads = n_atoms // 2
             max_beads = n_atoms // 2 + n_atoms % 2
         else:
-            min_beads = n_atoms // 4 + n_atoms % 4
+            min_beads = (n_atoms + n_atoms % 4) // 4
             max_beads = n_atoms // 2 
-        return min_beads, max_beads, ring_and_nns
+        return min_beads, max_beads
 
-    
     @timeit(level=logging.DEBUG)
-    def _find_anchors(atoms, bonds, nbeads, dtype=np.int32):
-        """Filter acceptable trial combinations, processing in memory-efficient chunks."""
+    def _find_bead_anchors(fragment, bonds, nbeads, dtype=np.int32):
+        """Find acceptable combinations of anchor atoms for a given number of beads."""
         bonds = np.asarray(bonds, dtype=dtype)
         # all_combs = opcy.generate_combinations(int(n_atoms), int(nbeads), int(start_index), int(chunk_size))
-        all_combs = np.array(list(itertools.combinations(atoms, nbeads)), dtype=dtype)
+        all_combs = np.array(list(itertools.combinations(fragment, nbeads)), dtype=dtype)
         logger.debug(f"Generated {all_combs.shape[0]} combinations.")
         acc_combs = opcy.find_acceptable_combinations(all_combs, bonds)
         logger.info(f"Found {acc_combs.shape[0]} acceptable combinations")
         return acc_combs
 
 
-    @timeit(level=logging.INFO)
+    @timeit(level=logging.DEBUG)
     def _filter_out_bad_combinations(combs, atoms_and_neighbors, natoms, dtype=np.int32):
         """Filter out bad combinations from acceptable_trials.
         If the sum of atoms and neighbors for a trial is greater than or equal to the total number of atoms,
@@ -168,71 +196,50 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         """
         filtered_list = []
         for trial in combs:
-            summ = 0
-            for idx in trial:
-                summ += len(atoms_and_neighbors[idx])
-            if summ >= natoms:
-                filtered_list.append(trial)
+            trial_atoms_and_neighbors = flat_set([atoms_and_neighbors[idx] for idx in trial])
+            if len(trial_atoms_and_neighbors) < natoms:
+                continue
+            filtered_list.append(trial)
         return filtered_list
 
+    atoms, bonds = _get_ha_graph(molecule)
 
-    ha_list, rings, bonds = _get_ha_info(molecule)
-    ha_ids = [a.GetIdx() for a in ha_list]
-    ha_neis = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in ha_list]
-    # ha_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in ha_ids]
-
-    n_heavy_atoms = len(ha_list)
+    n_heavy_atoms = len(atoms)
     if not min_beads:
-        min_beads = (n_heavy_atoms + n_heavy_atoms % 4) // 4 # at least 4 atoms per bead, with some flexibility for remainder
+        min_beads = (n_heavy_atoms + n_heavy_atoms % 4) // 4 
     if not max_beads:
         max_beads = n_heavy_atoms // 2 
 
-    all_rings_anchors = []
-    for ring in rings:
-        ring_anchors = []
-        min_ring_beads, max_ring_beads, ring_and_nns = _get_min_max_beads_for_ring(ring)
-        for nbeads in range(min_ring_beads, max_ring_beads + 1):
-            logger.info(f"Finding acceptable combinations for ring with {len(ring_and_nns)} atoms and {nbeads} beads...")
-            ring_anchors_nbeads = _find_anchors(ring_and_nns, bonds, nbeads, dtype=dtype)
-            ring_anchors.extend(ring_anchors_nbeads)
-        all_rings_anchors.append(ring_anchors)
-    logger.info(f"Number of combinations for ring anchors: {len(all_rings_anchors)}, Sizes: {[len(r) for r in all_rings_anchors]}")
+    fragments, rings = split_into_fragments(molecule)
+    atids = [a.GetIdx() for a in atoms]
+    ha_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
+    ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
+    print(fragments)
 
-    linear_fragments = [a for a in ha_ids if _get_ring_id_of_atom(a, rings) == 0]
-    fragment = [a for a in linear_fragments if len(ha_neis[a]) > 1]
-    has_and_neis = [[a] + ha_neis[a] for a in fragment] # fragment and its nearest neighbors
-    has_and_neis_flat = [a for sublist in has_and_neis for a in sublist]
-    fragment_and_nns = sorted(list(set(has_and_neis_flat))) 
-    n_atoms = len(fragment_and_nns)
-    min_fragment_beads = (n_atoms + n_atoms % 4) // 4
-    max_fragment_beads = n_atoms // 2 
-    fragment_anchors = []
-    for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
-        logger.info(f"Finding acceptable combinations for fragment with {n_atoms} atoms and {nbeads} beads...")
-        anchors_nbeads = np.array(list(itertools.combinations(fragment, nbeads)), dtype=dtype)
-        # anchors_nbeads = _find_anchors(fragment_and_nns, bonds, nbeads, dtype=dtype)
-        print(len(anchors_nbeads))
-        fragment_anchors.extend(anchors_nbeads)
-    logger.info(f"Number of combinations for linear anchors: {len(fragment_anchors)}")
-    exit()
+    all_anchors = []
+    for fragment in fragments:
+        fragment_anchors = []
+        min_fragment_beads, max_fragment_beads = _get_min_max_beads(fragment, atoms)
+        for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
+            logger.info(f"Finding acceptable combinations for fragment with {len(fragment)} atoms and {nbeads} beads...")
+            combs = _find_bead_anchors(fragment, bonds, nbeads, dtype=dtype)
+            filtered_combs = _filter_out_bad_combinations(combs, ha_atoms_and_neis, natoms=len(fragment), dtype=dtype)
+            fragment_anchors.extend(filtered_combs)
+        all_anchors.append(fragment_anchors)
+    logger.info(f"Number of combinations for fragment anchors: {len(all_anchors)}, Sizes: {[len(r) for r in all_anchors]}")
 
-    anchors_combs = fragment_anchors
-    ring_combs = all_rings_anchors
-    for i in range(len(ring_combs)): 
+    merged_combs = all_anchors[0]
+    for i in range(1, len(all_anchors)): 
         new_combs = []
-        for comb1 in anchors_combs:
-            for comb2 in ring_combs[i]:
+        for comb1 in merged_combs:
+            for comb2 in all_anchors[i]:
                 merged = set(comb1).union(set(comb2))
                 if len(merged) > max_beads:
                     continue
                 new_combs.append(list(merged))
-        anchors_combs = new_combs
-    logger.info(f"Total combinations of ring anchors: {len(anchors_combs)}")
+        merged_combs = new_combs
+    logger.info(f"Total combinations of ring anchors: {len(merged_combs)}")
 
-    ha_atoms_and_neis = [[a] + ha_neis[a] for a in ha_ids]
-    filtered_combs = _filter_out_bad_combinations(anchors_combs, ha_atoms_and_neis, natoms=len(ha_list), dtype=dtype)
-    logger.info(f"Total combinations of ring anchors after filtering: {len(filtered_combs)}")
-    exit()
     
     logger.info("Collecting Combinations And Their Energies...")
     conformer = molecule.GetConformer()
@@ -240,7 +247,7 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     list_trial_comb = []
     current_lowest_energy = float("inf")
     for n in range(min_beads, max_beads + 1):
-        acceptable_trials = [comb for comb in filtered_combs if len(comb) == n]
+        acceptable_trials = [comb for comb in merged_combs if len(comb) == n]
         if not acceptable_trials:
             continue
         acceptable_trials = np.array(acceptable_trials, dtype=dtype)
@@ -258,11 +265,9 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         current_lowest_energy = ene_best_trial
 
     sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
-    for comb in sorted_combs[:100000:1000]:
+    for comb in sorted_combs[::10]:
         logger.info("Combination length: %s, Energy: %f", len(comb[0]), comb[1])
     return_list = [x[0] for x in sorted_combs]
-    print(len(return_list))
-    exit()
     return return_list
 
 
