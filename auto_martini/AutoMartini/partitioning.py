@@ -332,7 +332,9 @@ def generate_mappings(molecule, min_beads=None, max_beads=None):
     """Generate all possible mappings of atoms to beads for given molecule."""
     anchor_combs = find_bead_anchors(molecule, min_beads=min_beads, max_beads=max_beads)
     mappings = get_partitioning(anchor_combs, molecule)
-    return mappings
+    mapping_dicts = [{str(idx): bead for idx, bead in enumerate(mapping)} for mapping in mappings]
+    partitionings = [invert_mapping_dictionary(mapping) for mapping in mapping_dicts]
+    return mappings, partitionings
 
 
 def get_partitioning(anchor_combs, molecule):
@@ -351,15 +353,17 @@ def get_partitioning(anchor_combs, molecule):
         if attempt % 100 == 0:  # Log every 1000 attempts
             logger.info("Attempt %d/%d", attempt, max_attempts)
             logger.info("Trying to partition the atoms between beads")
-        mappings = _distribute_neighbors(comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring)
+        mappings = _distribute_atoms(comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring)
         if not mappings:
             continue
         all_mappings.extend(mappings)
+        if len(all_mappings) > 10:
+            break
     logger.info(f"Total mappings found: {len(all_mappings)}")
     return all_mappings
 
 
-def _distribute_neighbors(trial_comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring):
+def _distribute_atoms(trial_comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 
     def _single_atom_in_mapping(mapping):

@@ -144,34 +144,29 @@ class Cg_molecule:
         import pickle
         mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
         if not mapping_pickle.exists():
-            list_cg_beads = partitioning.generate_mappings(
+            mappings, parts = partitioning.generate_mappings(
                 self.molecule, 
                 min_beads=self.min_beads,
                 max_beads=self.max_beads,
             )
-            logger.info("Generated %d candidate bead mappings", len(list_cg_beads))
+            logger.info("Generated %d candidate bead mappings", len(mappings))
             # with open(mapping_pickle, "wb") as f:
-            #     pickle.dump(list_cg_beads, f)
+            #     pickle.dump(mappings, f)
         else:
             with open(mapping_pickle, "rb") as f:
-                list_cg_beads = pickle.load(f)
-        exit()
+                mappings = pickle.load(f)
 
-        self.max_attempts = len(list_cg_beads) 
+        self.max_attempts = len(mappings) 
         logger.info("Going through the candidate mappings")
-        for attempt in range(self.max_attempts):
+
+        attempt = -1
+        for cg_beads, part in zip(mappings, parts):
+            attempt += 1
 
             if attempt % 100 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
-                logger.info("Trying to partition the atoms between beads")
 
-            cg_beads = list_cg_beads[attempt]
-            self.partitioning = partitioning.get_partitioning(cg_beads, self.molecule)
-         
-            try:
-                self.partitioning = partitioning.get_partitioning(cg_beads, self.molecule)
-            except:
-                continue
+            self.partitioning = part
 
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(cg_beads))
 
@@ -207,7 +202,7 @@ class Cg_molecule:
             logger.info("Building Atoms")
             # Use temporary Topology instance for trial build
             temp_topo = Topology(molname=self.molname, mol_smi=self.smiles)
-            temp_topo.build_atoms(
+            atoms, bead_types = build_cgbeads(
                 cgbeads=cg_beads,
                 cgbead_coords=self.cg_bead_coords,
                 forcepred=self.forcepred,
@@ -218,9 +213,11 @@ class Cg_molecule:
                 partitioning=self.partitioning,
                 ringatoms=self.ring_atoms,
                 logp_file=self.logp_file,
+                molname=self.molname,
             )
+            exit()
+            temp_topo.atoms = atoms
             self.cg_bead_names = temp_topo.atomnames
-            bead_types = temp_topo.beadtypes
 
             # Check additivity between fragments and entire molecule
             if not self.check_additivity(bead_types):
@@ -487,20 +484,6 @@ class Cg_molecule:
     def build_topology(self, cg_beads, cg_beads_rings, bead_types):
         """Build topology data using Topology instance methods."""
         
-        # # Build atoms data
-        # self.topology.build_atoms(
-        #     cgbeads=cg_beads,
-        #     cgbead_coords=self.cg_bead_coords,
-        #     forcepred=self.forcepred,
-        #     molecule=self.molecule,
-        #     hbonda=self.hbond_a,
-        #     hbondd=self.hbond_d,
-        #     mapping=self.mapping,
-        #     partitioning=self.partitioning,
-        #     ringatoms=self.ring_atoms,
-        #     logp_file=self.logp_file,
-        # )
-
         # Override beadtypes if provided
         if bead_types is not None:
             self.topology.beadtypes = bead_types
@@ -633,3 +616,158 @@ class Cg_molecule:
         else:
             return cg_out
 
+
+def build_cgbeads(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
+                ringatoms, logp_file, molname="UNK"):
+    """Build atoms data structure."""
+    logger.info("Bilding CG beads")
+    atoms = []
+    beadtypes = []
+    
+    # Identify which beads are in rings and store them in self.ringbeads
+    ringbeads = []
+    for ring in ringatoms:
+        bead_ring = []
+        for atom_idx in ring:
+            for bead_idx, atom_indices in mapping.items():
+                if atom_idx in atom_indices:
+                    bead_ring.append(bead_idx)
+        ringbeads.append(sorted(list(set(bead_ring))))
+    
+    # Create global atom name map (PDB-style: N1, C1, C2, etc.)
+    atom_name_map = {}
+    atom_type_counter = {}
+    for at_idx in range(molecule.GetNumAtoms()):
+        at_symbol = molecule.GetAtomWithIdx(at_idx).GetSymbol()
+        if at_symbol not in atom_type_counter:
+            atom_type_counter[at_symbol] = 0
+        atom_type_counter[at_symbol] += 1
+        atom_name_map[at_idx] = f"{at_symbol}{atom_type_counter[at_symbol]}"
+    
+    atoms_in_smi_dict = {}
+    for bead in cgbeads:
+        try:
+            smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(
+                molecule, partitioning, bead, atom_name_map
+            )
+        except Exception:
+            raise
+        atoms_in_smi_dict[bead + 1] = atoms_in_smi.replace(" ; atoms: ", "")
+    
+        atom_name = ""
+        for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
+            try:
+                float(character)
+            except ValueError:
+                if count == 1:
+                    atom_name += "{:s}".format(character)
+                else:
+                    atom_name += "{:s}{:s}".format(character, str(count))
+        
+        mol_frag, errval = gen_molecule_smi(smi_frag)
+        charge_frag = get_charge(mol_frag)
+
+        try:
+            if charge_frag == 0:
+                alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file)
+            else:
+                alogps = 0.0
+                logp_origin = "; Charged fragment"
+        except (NameError, TypeError, ValueError):
+            return
+
+        hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
+        hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
+
+        ringbeads_flat = [bead for ring in ringbeads for bead in ring]
+        in_ring = bead in ringbeads_flat
+
+        atomnames = []
+        bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
+        atom_name = ""
+        name_index = bead + 1
+        atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
+        atomnames.append(atom_name)
+        
+        mass = get_standard_mass(bead_type)
+
+        atom_dict = {
+            'id': bead + 1,
+            'type': bead_type,
+            'resnr': 1,
+            'residue': molname[:4] if len(molname) > 4 else molname,
+            'atom': atom_name,
+            'cgnr': bead + 1,
+            'charge': charge,
+            'mass': mass,
+            'smiles': smi_frag,
+            'atoms_in_smi': atoms_in_smi,
+            'logp_origin': logp_origin
+        }
+        atoms.append(atom_dict)
+        beadtypes.append(bead_type)
+    return atoms, beadtypes
+
+
+def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
+    """Substructure to smiles conversion; also output Wildman-Crippen log_p;
+    and charge of group."""
+    logger.debug("Entering substruct2smi() for bead %d", cg_bead)
+    frag = rdchem.EditableMol(molecule)
+    print(partitioning)
+    print(cg_bead)
+    # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
+    num_atoms = molecule.GetConformer().GetNumAtoms()
+    # First delete all hydrogens
+    for i in range(num_atoms):
+        if molecule.GetAtomWithIdx(i).GetSymbol() == "H":
+            # find atom from coordinates
+            submol = frag.GetMol()
+            for j in range(submol.GetConformer().GetNumAtoms()):
+                if (
+                    molecule.GetConformer().GetAtomPosition(i)[0]
+                    == submol.GetConformer().GetAtomPosition(j)[0]
+                ):
+                    frag.RemoveAtom(j)
+    print(len(frag.GetMol().GetAtoms()))
+    # Then heavy atoms that aren't part of the CG bead #(except those
+    # involved in the same ring).
+    for atom, bead in partitioning.items():
+        if atom not in cg_bead: # AutoM3 change
+            # find atom from coordinates
+            submol = frag.GetMol()
+            for j in range(submol.GetConformer().GetNumAtoms()):
+                if (
+                    molecule.GetConformer().GetAtomPosition(i)[0]
+                    == submol.GetConformer().GetAtomPosition(j)[0]
+                ):
+                    frag.RemoveAtom(j)
+    # Wildman-Crippen log_p
+    print(len(frag.GetMol().GetAtoms()))
+    wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(frag.GetMol())[0]
+    # Charge -- look at atoms that are only part of the bead (no ring rule)
+    chg = 0
+    for i in cg_bead:
+        chg += molecule.GetAtomWithIdx(i).GetFormalCharge()
+
+    smi = Chem.MolToSmiles(Chem.rdmolops.AddHs(frag.GetMol(), addCoords=True))
+    print(smi)
+    ### AutoM3 ###
+    atoms_in_smi = " ; atoms: "
+    converted_smi = False
+    real_smi = None
+    for at, bd in partitioning.items():
+        if bd in cg_bead:
+            if atom_name_map:
+                atom_label = atom_name_map[at]
+            else:
+                at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
+                atom_label = at_symbol + str(at+1)
+            atoms_in_smi += atom_label + ", "
+    if "c" in smi or "n" in smi or "s" in smi:
+        converted_smi = True
+        real_smi = smi
+        smi = cyclic_smi_conversion(smi)
+    # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
+    # smi = smi.lower() if smi.islower() else smi.upper()
+    return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi

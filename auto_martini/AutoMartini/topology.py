@@ -94,11 +94,11 @@ class Topology:
         """Build atoms data structure."""
         logger.debug("Entering Topology.build_atoms()")
         
-        self.mapping = mapping
-        self.partitioning = partitioning
-        self.cgbeads = cgbeads
-        self.cgbead_coords = cgbead_coords
-        self.ringatoms = ringatoms
+        # self.mapping = mapping
+        # self.partitioning = partitioning
+        # self.cgbeads = cgbeads
+        # self.cgbead_coords = cgbead_coords
+        # self.ringatoms = ringatoms
         
         # Identify which beads are in rings and store them in self.ringbeads
         for ring in ringatoms:
