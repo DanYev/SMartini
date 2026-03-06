@@ -144,7 +144,7 @@ class Cg_molecule:
         import pickle
         mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
         if not mapping_pickle.exists():
-            list_cg_beads = partitioning.find_bead_anchors(
+            list_cg_beads = partitioning.generate_mappings(
                 self.molecule, 
                 min_beads=self.min_beads,
                 max_beads=self.max_beads,
@@ -155,6 +155,7 @@ class Cg_molecule:
         else:
             with open(mapping_pickle, "rb") as f:
                 list_cg_beads = pickle.load(f)
+        exit()
 
         self.max_attempts = len(list_cg_beads) 
         logger.info("Going through the candidate mappings")
@@ -165,6 +166,7 @@ class Cg_molecule:
                 logger.info("Trying to partition the atoms between beads")
 
             cg_beads = list_cg_beads[attempt]
+            self.partitioning = partitioning.get_partitioning(cg_beads, self.molecule)
          
             try:
                 self.partitioning = partitioning.get_partitioning(cg_beads, self.molecule)

@@ -189,7 +189,6 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         logger.info(f"Found {acc_combs.shape[0]} acceptable combinations")
         return acc_combs
 
-
     @timeit(level=logging.DEBUG)
     def _filter_out_bad_combinations(combs, atoms_and_neighbors, natoms, dtype=np.int32):
         """Filter out bad combinations from acceptable_trials.
@@ -216,7 +215,6 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     atids = [a.GetIdx() for a in atoms]
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
-    print(fragments)
 
     all_anchors = []
     for fragment in fragments:
@@ -240,10 +238,9 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                     continue
                 new_combs.append(list(merged))
         merged_combs = new_combs
-    logger.info(f"Total combinations of ring anchors: {len(merged_combs)}")
-
-    
-    logger.info("Collecting Combinations And Their Energies...")
+    logger.info(f"Total combinations of fragments: {len(merged_combs)}")
+ 
+    logger.info("Sorting Combinations By Their Energies...")
     conformer = molecule.GetConformer()
     ringatoms_flat = [a for ring in rings for a in ring]
     list_trial_comb = []
@@ -267,13 +264,12 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         current_lowest_energy = ene_best_trial
 
     sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
-    # for comb in sorted_combs[::10]:
-    #     logger.info("Combination length: %s, Energy: %f", len(comb[0]), comb[1])
     return_list = [x[0] for x in sorted_combs]
+    logger.info(f"Final number of combinations: {len(return_list)}")
     return return_list
 
 
-@timeit(level=logging.INFO)
+@timeit(level=logging.DEBUG)
 def collect_energies_and_combs(
     molecule,
     conformer,
@@ -332,15 +328,38 @@ def collect_energies_and_combs(
 ### TO FINISH PARTITIONING ###
 #############################################################################
 
-def get_partitioning(trial_comb, molecule):
-        """Get partitioning of atoms into beads for given trial combination"""
-        mapping = _distribute_neighbors(trial_comb, molecule)
-        mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
-        partitioning = invert_mapping_dictionary(mapping_dict)
-        return partitioning
+def generate_mappings(molecule, min_beads=None, max_beads=None):
+    """Generate all possible mappings of atoms to beads for given molecule."""
+    anchor_combs = find_bead_anchors(molecule, min_beads=min_beads, max_beads=max_beads)
+    mappings = get_partitioning(anchor_combs, molecule)
+    return mappings
 
 
-def _distribute_neighbors(trial_comb, molecule):
+def get_partitioning(anchor_combs, molecule):
+    """Get partitioning of atoms into beads for given trial combination"""
+    logger.info("Finding partitioning for anchor combinations...")
+    atoms, bonds = _get_ha_graph(molecule)
+    atom_ids = [a.GetIdx() for a in atoms]
+    atom_neighbors = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in atoms]
+    rings = _fuse_rings(molecule)
+    atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atom_ids]
+    atom_is_in_ring = [atom_ring_ids[i] != -1 for i in atom_ids]
+
+    max_attempts = len(anchor_combs)
+    all_mappings = []
+    for attempt, comb in enumerate(anchor_combs):
+        if attempt % 100 == 0:  # Log every 1000 attempts
+            logger.info("Attempt %d/%d", attempt, max_attempts)
+            logger.info("Trying to partition the atoms between beads")
+        mappings = _distribute_neighbors(comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring)
+        if not mappings:
+            continue
+        all_mappings.extend(mappings)
+    logger.info(f"Total mappings found: {len(all_mappings)}")
+    return all_mappings
+
+
+def _distribute_neighbors(trial_comb, atom_ids, atom_neighbors, atom_ring_ids, atom_is_in_ring):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 
     def _single_atom_in_mapping(mapping):
@@ -349,13 +368,13 @@ def _distribute_neighbors(trial_comb, molecule):
                 return True
         return False
 
-    def _ring_beads_are_tiny(mapping, bead_is_in_ring):
+    def _ring_beads_are_tiny(mapping):
         for ns, ring in zip(mapping, bead_is_in_ring):
             if ring and len(ns) > 2:
                 return False
         return True
 
-    def _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+    def _ring_beads_are_together(mapping):
         for ns, ring in zip(mapping, bead_is_in_ring):
             if not ring:
                 continue
@@ -370,16 +389,9 @@ def _distribute_neighbors(trial_comb, molecule):
                 return True
         return False
 
-    atoms, bonds = _get_ha_graph(molecule)
-    atom_ids = [a.GetIdx() for a in atoms]
-    atom_neighbors = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in atoms]
     bead_neighbors = [atom_neighbors[i] for i in trial_comb]
-    rings = _fuse_rings(molecule)
-    atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atom_ids]
-
     bead_is_in_ring = [atom_ring_ids[i] != -1 for i in trial_comb]
-    atom_is_in_ring = [atom_ring_ids[i] != -1 for i in atom_ids]
-    n_atoms = len(atoms)
+    n_atoms = len(atom_ids)
     nei_ids = set(atom_ids) - set(trial_comb)
     mapping = [[int(i)] for i in trial_comb]
     mappings = [mapping]
@@ -405,23 +417,23 @@ def _distribute_neighbors(trial_comb, molecule):
         tmp_list.append(mapping)
     mappings = tmp_list
     if len(mappings) == 1:
-        return mappings[0]
+        return mappings
 
     # Prefer keeping ring beads small
     tmp_list = []
     for mapping in mappings:
-        if not _ring_beads_are_tiny(mapping, bead_is_in_ring):
+        if not _ring_beads_are_tiny(mapping):
             continue
         tmp_list.append(mapping)
     if tmp_list:
         mappings = tmp_list
     if len(mappings) == 1:
-        return mappings[0]
+        return mappings
 
     # Prefer keeping ring beads together (no mixing ring/non-ring)
     tmp_list = []
     for mapping in mappings:
-        if not _ring_beads_are_together(mapping, bead_is_in_ring, atom_is_in_ring):
+        if not _ring_beads_are_together(mapping):
             continue
         tmp_list.append(mapping)
     if tmp_list:
@@ -438,13 +450,16 @@ def _distribute_neighbors(trial_comb, molecule):
     if tmp_list:
         mappings = tmp_list
     if len(mappings) == 1:
-        return mappings[0]
+        return mappings
 
     # TODO: SYMMETRIZE MAPPINGS
     if len(mappings) == 2:
-        return mappings[0]
+        return mappings
+    
+    if not mappings:
+        return None
 
-    return mappings[0]
+    return mappings
 
 #############################################################################
 ### HELPER FUNCTIONS FOR MAPPING DICTIONARIES ###
