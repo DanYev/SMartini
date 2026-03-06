@@ -714,8 +714,6 @@ def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
     and charge of group."""
     logger.debug("Entering substruct2smi() for bead %d", cg_bead)
     frag = rdchem.EditableMol(molecule)
-    print(partitioning)
-    print(cg_bead)
     # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
     num_atoms = molecule.GetConformer().GetNumAtoms()
     # First delete all hydrogens
@@ -729,21 +727,19 @@ def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
                     == submol.GetConformer().GetAtomPosition(j)[0]
                 ):
                     frag.RemoveAtom(j)
-    print(len(frag.GetMol().GetAtoms()))
     # Then heavy atoms that aren't part of the CG bead #(except those
     # involved in the same ring).
-    for atom, bead in partitioning.items():
-        if atom not in cg_bead: # AutoM3 change
+    for atom_idx, bead_idx in partitioning.items():
+        if atom_idx not in cg_bead: # AutoM3 change
             # find atom from coordinates
             submol = frag.GetMol()
             for j in range(submol.GetConformer().GetNumAtoms()):
                 if (
-                    molecule.GetConformer().GetAtomPosition(i)[0]
+                    molecule.GetConformer().GetAtomPosition(atom_idx)[0]
                     == submol.GetConformer().GetAtomPosition(j)[0]
                 ):
                     frag.RemoveAtom(j)
     # Wildman-Crippen log_p
-    print(len(frag.GetMol().GetAtoms()))
     wc_log_p = rdMolDescriptors.CalcCrippenDescriptors(frag.GetMol())[0]
     # Charge -- look at atoms that are only part of the bead (no ring rule)
     chg = 0
@@ -751,13 +747,12 @@ def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
         chg += molecule.GetAtomWithIdx(i).GetFormalCharge()
 
     smi = Chem.MolToSmiles(Chem.rdmolops.AddHs(frag.GetMol(), addCoords=True))
-    print(smi)
     ### AutoM3 ###
     atoms_in_smi = " ; atoms: "
     converted_smi = False
     real_smi = None
     for at, bd in partitioning.items():
-        if bd in cg_bead:
+        if at in cg_bead:
             if atom_name_map:
                 atom_label = atom_name_map[at]
             else:
