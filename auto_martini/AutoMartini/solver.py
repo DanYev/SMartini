@@ -663,11 +663,11 @@ def build_cgbeads(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, m
             alogps = 0.0
             logp_origin = "; Charged fragment"
 
-        hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
-        hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
+        hbond_a_flag = sum(1 for at in hbonda if at in bead)
+        hbond_d_flag = sum(1 for at in hbondd if at in bead)
 
         ringbeads_flat = [bead for ring in ringbeads for bead in ring]
-        in_ring = bead in ringbeads_flat
+        in_ring = idx in ringbeads_flat
 
         atomnames = []
         bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
