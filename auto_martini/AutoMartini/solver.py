@@ -693,9 +693,6 @@ def build_cgbeads(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, m
         }
         atoms.append(atom_dict)
         beadtypes.append(bead_type)
-    print(atoms)
-    print(beadtypes)
-    exit()
     return atoms, beadtypes
 
 
