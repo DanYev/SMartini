@@ -101,7 +101,7 @@ def flat_set(lst):
     return alist
 
 #############################################################################
-### INITIAL PARTITIONING ###
+### GRAPH FUNCTIONS ###
 #############################################################################
 
 def _get_ha_graph(molecule):
@@ -118,32 +118,31 @@ def _get_ha_graph(molecule):
     return ha_list, bonds
 
 
+def _fuse_rings(molecule):
+    # Get ring atoms (systems of joined rings)
+    all_rings = molecule.GetRingInfo().AtomRings()
+    ring_systems = []
+    for ring in all_rings:
+        ring_atoms = set(ring)
+        new_systems = []
+        for system in ring_systems:
+            shared = len(ring_atoms.intersection(system))
+            if shared:
+                ring_atoms = ring_atoms.union(system)
+            else:
+                new_systems.append(system)
+        new_systems.append(ring_atoms)
+        ring_systems = new_systems
+    rings = [list(ring) for ring in ring_systems]
+    return rings
+
 
 def split_into_fragments(molecule):
     """Split molecule into fragments based on rings and their neighbors."""
-
-    def _fuse_rings(rings):
-        # Get ring atoms (systems of joined rings)
-        all_rings = molecule.GetRingInfo().AtomRings()
-        ring_systems = []
-        for ring in all_rings:
-            ring_atoms = set(ring)
-            new_systems = []
-            for system in ring_systems:
-                shared = len(ring_atoms.intersection(system))
-                if shared:
-                    ring_atoms = ring_atoms.union(system)
-                else:
-                    new_systems.append(system)
-            new_systems.append(ring_atoms)
-            ring_systems = new_systems
-        rings = [list(ring) for ring in ring_systems]
-        return rings
-
     atoms, bonds = _get_ha_graph(molecule)
     atids = [a.GetIdx() for a in atoms]
     atom_neis_list = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in atoms]
-    rings = _fuse_rings(molecule.GetRingInfo().AtomRings())
+    rings = _fuse_rings(molecule)
     atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atids]
     n_rings = len(rings)
     fragments = [[atid for atid, segid in zip(atids, atom_ring_ids) if segid == x] for x in range(n_rings)]
@@ -158,6 +157,9 @@ def split_into_fragments(molecule):
             fragments.append([atom] + atom_nei) # add linear atom as its own fragment if it 2+ neighbors
     return fragments, rings
 
+#############################################################################
+### INITIAL PARTITIONING ###
+#############################################################################
 
 @timeit(level=logging.INFO)
 def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
@@ -265,130 +267,10 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         current_lowest_energy = ene_best_trial
 
     sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
-    for comb in sorted_combs[::10]:
-        logger.info("Combination length: %s, Energy: %f", len(comb[0]), comb[1])
+    # for comb in sorted_combs[::10]:
+    #     logger.info("Combination length: %s, Energy: %f", len(comb[0]), comb[1])
     return_list = [x[0] for x in sorted_combs]
     return return_list
-
-
-@timeit(level=logging.INFO)
-def find_acceptable_trials_mp(
-    list_heavy_atoms,
-    num_beads,
-    ring_atoms,
-    list_bonds,
-    atoms_and_neighbors,
-    dtype=np.int32,
-    chunk_size=int(1e7),
-    nprocs=None,
-):
-    """Multiprocessing version of acceptable-trial filtering (Option 2).
-
-    Each process generates its own chunk and filters it, then returns the full
-    accepted combinations array back to the parent (IPC/pickling heavy).
-    """
-    if chunk_size >= 2147483647:
-        chunk_size = 2147483646
-    bonds = np.asarray(list_bonds, dtype=dtype)
-
-    max_atom = bonds.max()
-    ring_id = np.full(max_atom + 1, -1, dtype=dtype)
-    for rid, ring in enumerate(ring_atoms):
-        ring = np.asarray(ring, dtype=dtype)
-        ring_id[ring] = rid
-    nrings = len(ring_atoms)
-
-    n_heavy_atoms = len(list_heavy_atoms)
-    total = math.comb(int(n_heavy_atoms), int(num_beads))
-    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
-
-    if nprocs is None:
-        nprocs = int(os.environ.get("SLURM_CPUS_PER_TASK") or (os.cpu_count() or 1))
-    nprocs = max(1, int(nprocs))
-
-    # Avoid OpenMP oversubscription if the cython filter uses OpenMP internally.
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
-
-    work = [
-        (chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings)
-        for chunk_num in range(int(n_chunks))
-    ]
-
-    acc_trials_list = []
-    with mp.Pool(processes=nprocs) as pool:
-        for chunk_acceptable in pool.imap_unordered(_filter_chunk, work, chunksize=1):
-            if chunk_acceptable.size:
-                acc_trials_list.append(chunk_acceptable)
-
-    filtered_list = _filter_out_bad_combinations(acc_trials_list, atoms_and_neighbors, 
-        natoms=len(atoms_and_neighbors), dtype=dtype)
-
-    if not filtered_list:
-        return np.empty((0, int(num_beads)), dtype=dtype)
-
-    return np.vstack(filtered_list)
-
-
-def _filter_chunk(args):
-    """Multiprocessing worker: generate one chunk and return acceptable combos.
-
-    Notes
-    -----
-    * Must be top-level for multiprocessing pickling.
-    * Returns a numpy array (can be large). This is the "Option 2" approach.
-    """
-    chunk_num, n_heavy_atoms, num_beads, chunk_size, bonds, ring_id, nrings = args
-    start_index = int(chunk_num) * int(chunk_size)
-    chunk_array = opcy.generate_combinations(
-        int(n_heavy_atoms), int(num_beads), int(start_index), int(chunk_size)
-    )
-    if chunk_array.size == 0:
-        return np.empty((0, int(num_beads)), dtype=np.int32)
-    return opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
-
-
-def _filter_out_bad_combinations_tmp(acc_trials_list, atoms_and_neighbors, natoms, dtype=np.int32):
-    """Filter out bad combinations from acceptable_trials.
-    If the sum of atoms and neighbors for a trial is greater than or equal to the total number of atoms,
-    then we discard that trial, as it would not be a valid partitioning (some atoms would be in multiple beads).
-    """
-    filtered_list = []
-    for chunk in acc_trials_list:
-        for trial in chunk:
-            summ = 0
-            for idx in trial:
-                summ += len(atoms_and_neighbors[idx])
-            if summ >= natoms:
-                filtered_list.append(trial)
-    return filtered_list
-
-
-@timeit(level=logging.INFO)
-def find_acceptable_trials(atoms, bonds, nbeads, dtype=np.int32, chunk_size=int(1e5)):
-    """Filter acceptable trial combinations, processing in memory-efficient chunks."""
-    if chunk_size >= 2147483647:
-        chunk_size = 2147483646
-    logger.info("Max chunk size: %d", chunk_size)
-    bonds = np.asarray(list_bonds, dtype=dtype)
-  
-    # Process chunks 
-    acceptable_trials_list = []
-    n_atoms = len(atoms)    
-    total = math.comb(int(n_atoms), int(nbeads))
-    n_chunks = (total + int(chunk_size) - 1) // int(chunk_size)
-
-    logger.info("Starting processing chunks")
-    for chunk_num in range(n_chunks):
-        start_index = int(chunk_num) * int(chunk_size)
-        chunk_array = opcy.generate_combinations(int(n_atoms), int(nbeads), int(start_index), int(chunk_size))
-        logger.info(f"Processing chunk {chunk_num} ({chunk_array.shape[0]} trials)")
-        if chunk_array.size == 0:
-            break
-        chunk_acceptable = opcy.find_acceptable_combinations(chunk_array, bonds, ring_id, nrings)
-        if chunk_acceptable.size > 0:
-            acceptable_trials_list.append(chunk_acceptable)
-    
-    return np.vstack(acceptable_trials_list)
 
 
 @timeit(level=logging.INFO)
@@ -450,16 +332,15 @@ def collect_energies_and_combs(
 ### TO FINISH PARTITIONING ###
 #############################################################################
 
-def get_partitioning(self, trial_comb):
+def get_partitioning(trial_comb, molecule):
         """Get partitioning of atoms into beads for given trial combination"""
-        atoms = self.ha_graph["atoms"]
-        mapping = self._distribute_neighbors(trial_comb, atoms)
+        mapping = _distribute_neighbors(trial_comb, molecule)
         mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
-        partitioning = self.invert_mapping_dictionary(mapping_dict)
+        partitioning = invert_mapping_dictionary(mapping_dict)
         return partitioning
 
 
-def _distribute_neighbors(trial_comb, atoms):
+def _distribute_neighbors(trial_comb, molecule):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 
     def _single_atom_in_mapping(mapping):
@@ -489,15 +370,20 @@ def _distribute_neighbors(trial_comb, atoms):
                 return True
         return False
 
-    bead_neighbors = [atoms[i]["neighbors"] for i in trial_comb]
-    bead_is_in_ring = [atoms[i]["is_in_ring"] for i in trial_comb]
-    atom_is_in_ring = [a["is_in_ring"] for a in atoms]
+    atoms, bonds = _get_ha_graph(molecule)
+    atom_ids = [a.GetIdx() for a in atoms]
+    atom_neighbors = [[na.GetIdx() for na in a.GetNeighbors() if na.GetAtomicNum() > 1] for a in atoms]
+    bead_neighbors = [atom_neighbors[i] for i in trial_comb]
+    rings = _fuse_rings(molecule)
+    atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atom_ids]
+
+    bead_is_in_ring = [atom_ring_ids[i] != -1 for i in trial_comb]
+    atom_is_in_ring = [atom_ring_ids[i] != -1 for i in atom_ids]
     n_atoms = len(atoms)
-    atom_ids = set(range(n_atoms))
-    nei_ids = atom_ids - set(trial_comb)
+    nei_ids = set(atom_ids) - set(trial_comb)
     mapping = [[int(i)] for i in trial_comb]
     mappings = [mapping]
-
+    
     # Distribute neighbors of trial combination atoms to beads,
     # keeping track of all possible mappings.
     for nei_idx in nei_ids:
