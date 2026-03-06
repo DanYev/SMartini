@@ -202,7 +202,7 @@ class Cg_molecule:
             logger.info("Building Atoms")
             # Use temporary Topology instance for trial build
             temp_topo = Topology(molname=self.molname, mol_smi=self.smiles)
-            bead_types = build_cgbeads(
+            bead_types = get_beadtypes(
                 cgbeads=cg_beads,
                 cgbead_coords=self.cg_bead_coords,
                 forcepred=self.forcepred,
@@ -617,7 +617,7 @@ class Cg_molecule:
             return cg_out
 
 
-def determine_beadtypes(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
+def get_beadtypes(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
                 ringatoms, logp_file, molname="UNK"):
     """Build atoms data structure."""
     logger.info("Bilding CG beads")
@@ -693,7 +693,9 @@ def determine_beadtypes(cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbo
         }
         atoms.append(atom_dict)
         beadtypes.append(bead_type)
-    return atoms, beadtypes, ringbeads
+    smiles_list = [atom['smiles'] for atom in atoms]
+    atoms_in_smi_list = [atom['atoms_in_smi'] for atom in atoms]
+    return beadtypes, smiles_list, atoms_in_smi_list
 
 
 def substruct2smi(molecule, partitioning, cg_bead, atom_name_map=None):
