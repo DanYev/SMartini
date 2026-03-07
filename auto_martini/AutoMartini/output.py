@@ -60,28 +60,6 @@ def output_gro(sites, site_names, molname):
     return gro_out
 
 
-def output_map(sites, site_names, molname):
-    """Output MAP file of CG structure"""
-    logger.info("Writing MAP file")
-    num_beads = len(sites)
-    gro_out = ""
-    gro_out += "{:s} generated from auto_martiniM3\n".format(molname)
-    gro_out += "{:5d}\n".format(num_beads)
-    if len(molname)>4:molname=molname[:4]
-    for i in range(num_beads):
-        gro_out += "{:5d}{:<6s} {:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
-            1, #was i +1, but this is GRO file for one molecule, so all beads should be a part of the same molecule
-            molname,
-            site_names[i],
-            i + 1,
-            sites[i][0] / 10.0,
-            sites[i][1] / 10.0,
-            sites[i][2] / 10.0,
-        )
-    gro_out += "{:10.5f}{:10.5f}{:10.5f}\n".format(10.0, 10.0, 10.0)
-    return gro_out
-
-
 def output_pdb(sites, site_names, molname, bonds=None, constraints=None):
     """Output PDB file of CG structure with CONECT records
     
@@ -180,150 +158,34 @@ def output_pdb(sites, site_names, molname, bonds=None, constraints=None):
     return pdb_out
 
 
-def _parse_itp_atoms_mapping(itp_text: str):
-    """Parse AutoMartini-generated `[atoms]` block and extract bead->atom mapping.
-
-    Expected input format (as produced by `topology.format_topology_header()` + `topology.format_topology_atoms()`)
-    includes per-atom comment fragments like:
-
-        ; atoms: P0, O5, O14, ...
-
-    Returns
-    -------
-    (molname, bead_atomnames, chiral_blocks)
-      - molname: str or None
-      - bead_atomnames: dict[str, list[str]] mapping bead name (e.g. "D01") -> list of atom labels (e.g. ["P0","O5"]).
-      - chiral_blocks: list[list[str]] raw lines from any `[ chiral ]` sections (optional; may be empty)
-    """
-
-    molname = None
-    bead_atomnames: dict[str, list[str]] = {}
-
-    lines = itp_text.splitlines()
-    # Molname from [moleculetype]
-    for i, ln in enumerate(lines):
-        if ln.strip().lower() == "[moleculetype]":
-            # find first non-empty, non-comment line after it
-            for j in range(i + 1, min(i + 20, len(lines))):
-                s = lines[j].strip()
-                if not s or s.startswith(";"):
-                    continue
-                molname = s.split()[0]
-                break
-            break
-
-    in_atoms = False
-    for ln in lines:
-        s = ln.strip()
-        if not s:
-            continue
-        if s.startswith("[") and s.endswith("]"):
-            in_atoms = s.lower() == "[atoms]"
-            continue
-        if not in_atoms:
-            continue
-        if s.startswith(";"):
-            continue
-
-        # Split into pre-comment columns and optional comment
-        pre, _, comment = ln.partition(";")
-        cols = pre.split()
-        if len(cols) < 5:
-            continue
-        bead_name = cols[4]
-
-        # Find 'atoms:' segment in comment
-        if "atoms:" not in comment:
-            continue
-        after = comment.split("atoms:", 1)[1]
-        # Trim at next ';' if present (some lines contain "; ALOGPS..." etc)
-        after = after.split(";", 1)[0]
-
-        atom_labels = []
-        for tok in after.replace(",", " ").split():
-            tok = tok.strip()
-            # Keep things like P0, O14, Cl12, etc.
-            if not tok:
-                continue
-            # Defensive: avoid trailing punctuation
-            tok = tok.strip(",")
-            atom_labels.append(tok)
-        if not atom_labels:
-            continue
-        bead_atomnames[bead_name] = atom_labels
-
-    # Collect any `[ chiral ]` blocks as raw text, if present.
-    chiral_blocks: list[list[str]] = []
-    in_chiral = False
-    current: list[str] = []
-    for ln in lines:
-        s = ln.strip()
-        if s.lower() == "[ chiral ]":
-            if current:
-                chiral_blocks.append(current)
-                current = []
-            in_chiral = True
-            continue
-        if s.startswith("[") and s.endswith("]"):
-            if in_chiral and current:
-                chiral_blocks.append(current)
-                current = []
-            in_chiral = False
-            continue
-        if in_chiral:
-            if s and not s.startswith(";"):
-                current.append(ln.rstrip())
-    if in_chiral and current:
-        chiral_blocks.append(current)
-
-    return molname, bead_atomnames, chiral_blocks
-
-
-def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, to_ff: str = "martini3001"):
-    """Create a `.map` file (similar to `gln.amber.map`) from an AutoMartini `.itp`.
-
-    This is intentionally minimal: we only require that the `.itp` contains an `[atoms]`
-    section whose lines include an `atoms:` list in the comment (as produced by AutoMartini M3).
+def output_map(topology, map_file: str, to_ff: str = "martini3001"):
+    """Create a `.map` file from a Topology instance.
 
     Parameters
     ----------
-    itp_text:
-        Full `.itp` file content.
-    resname:
-        Optional residue name placed in `[ molecule ]`. If omitted, uses molname parsed from
-        `[moleculetype]` (fallback: "MOL").
-    from_ff / to_ff:
-        Strings for the `[from]` and `[to]` blocks.
+    topology:
+        A Topology object instance.
+    map_file:
+        Path to the output .map file.
+    to_ff:
+        String for the `[to]` block.
     """
-    itp_text = Path(itp_file).read_text()
+    if not topology.atoms:
+        raise ValueError("Topology has no atoms to map.")
 
-    molname, bead_atomnames, chiral_blocks = _parse_itp_atoms_mapping(itp_text)
-    if not bead_atomnames:
-        raise ValueError("Could not find any bead `atoms:` annotations in the `[atoms]` section.")
+    resname = topology.molname or "MOL"
+    if len(resname) > 4:
+        resname = resname[:4]
 
-    if resname is None:
-        resname = molname or "MOL"
-
-    # The `.map` format expects a `[ martini ]` list of bead names.
-    # Keep ITP ordering: atoms section is bead id order => bead name order should be stable.
-    # We reconstruct ordering by scanning the ITP again.
-    bead_order: list[str] = []
-    for ln in itp_text.splitlines():
-        pre, _, _comment = ln.partition(";")
-        cols = pre.split()
-        if len(cols) >= 5 and cols[0].isdigit():
-            bead = cols[4]
-            if bead in bead_atomnames and bead not in bead_order:
-                bead_order.append(bead)
-    if not bead_order:
-        bead_order = list(bead_atomnames.keys())
+    bead_order = [atom['atom'] for atom in topology.atoms]
+    bead_atomnames = {atom['atom']: atom['atomnames'] for atom in topology.atoms}
 
     out = ""
     out += "[ molecule ]\n"
     out += f"{resname}\n\n"
-    out += "[from]\n"
+    out += "[ from ]\n"
     out += "amber charmm\n\n"
-    out += "[to]\n"
+    out += "[ to ]\n"
     out += f"{to_ff}\n\n"
     out += "[ martini ]\n"
     out += "  " + " ".join(bead_order) + "\n\n"
@@ -332,16 +194,19 @@ def make_map_from_itp(itp_file: str, map_file:str, resname: str | None = None, t
     out += "[ atoms ]\n"
     num = 1
     for bead in bead_order:
-        for atom in bead_atomnames.get(bead, []):
+        atom_names_str = bead_atomnames.get(bead, "")
+        # atomnames can be a string like 'C1, C2, C3'
+        if isinstance(atom_names_str, str):
+            atom_list = [name.strip() for name in atom_names_str.split(',') if name.strip()]
+        else:
+            atom_list = []
+
+        for atom in atom_list:
             out += f"{num:>6d}  {atom:>6s}  {bead:>6s}\n"
             num += 1
-
-    if chiral_blocks:
-        # Preserve chiral info if present (can be used by martinize-type tools).
-        for block in chiral_blocks:
-            out += "\n[ chiral ]\n"
-            for ln in block:
-                out += f"{ln}\n"
+    
+    # Chiral information is not directly available in the same way.
+    # This part is omitted as it was parsed from ITP comments.
 
     out += "\n"
     with open(Path(map_file), "w") as f:

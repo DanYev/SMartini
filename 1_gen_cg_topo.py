@@ -95,5 +95,5 @@ if __name__ == "__main__":
 
     # Make .map file
     map_path = mol_dir / f"{molname}.map"
-    am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname)
+    cg.output_map(str(map_path))
     logging.info(f"Wrote: {map_path}")

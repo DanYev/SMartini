@@ -50,10 +50,13 @@ class Topology:
     
     # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logp_origin
     atoms: list = field(default_factory=list)
+    names: list = field(default_factory=list)
+    types: list = field(default_factory=list)
+    charges: list = field(default_factory=list)
+    bead_atomnames: list = field(default_factory=list)
+    bead_smiles: list = field(default_factory=list)
+    logp_origins: list = field(default_factory=list)
     partitioning: dict = field(default_factory=dict)
-    atomnames: list = field(default_factory=list)
-    beadtypes: list = field(default_factory=list)
-    atoms_in_smi_dict: dict = field(default_factory=dict)
     
     # Bonds data: list of [i, j, funct, dist, k]
     bonds: list = field(default_factory=list)
@@ -83,113 +86,66 @@ class Topology:
     ringatoms: list = field(default_factory=list)
     cgbeads: list = field(default_factory=list)
     ringbeads: list = field(default_factory=list)
-    cgbead_coords: np.ndarray = field(default_factory=lambda: np.array([]))
+    coords: np.ndarray = field(default_factory=lambda: np.array([]))
     
     # Exclusions data: list of [i, j] pairs
     exclusions: list = field(default_factory=list)
     
     # Build methods - update topology data
-    def build_atoms(self, cgbeads, cgbead_coords, forcepred, molecule, hbonda, hbondd, mapping, partitioning, 
-                    ringatoms, logp_file):
+    def build_atoms(self, mapping, bead_types, bead_coords, molname, molecule):
         """Build atoms data structure."""
         logger.debug("Entering Topology.build_atoms()")
         
-        # self.mapping = mapping
-        # self.partitioning = partitioning
-        # self.cgbeads = cgbeads
-        # self.cgbead_coords = cgbead_coords
-        # self.ringatoms = ringatoms
-        
-        # Identify which beads are in rings and store them in self.ringbeads
-        for ring in ringatoms:
-            bead_ring = []
-            for atom_idx in ring:
-                for bead_idx, atom_indices in mapping.items():
-                    if atom_idx in atom_indices:
-                        bead_ring.append(bead_idx)
-            self.ringbeads.append(sorted(list(set(bead_ring))))
-        
-        # Create global atom name map (PDB-style: N1, C1, C2, etc.)
-        atom_name_map = {}
-        atom_type_counter = {}
-        for at_idx in range(molecule.GetNumAtoms()):
-            at_symbol = molecule.GetAtomWithIdx(at_idx).GetSymbol()
-            if at_symbol not in atom_type_counter:
-                atom_type_counter[at_symbol] = 0
-            atom_type_counter[at_symbol] += 1
-            atom_name_map[at_idx] = f"{at_symbol}{atom_type_counter[at_symbol]}"
-        
-        for bead in range(len(cgbeads)):
-            try:
-                smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(
-                    molecule, partitioning, bead, atom_name_map
-                )
-            except Exception:
-                raise
-            self.atoms_in_smi_dict[bead + 1] = atoms_in_smi.replace(" ; atoms: ", "")
+        self.mapping = mapping
+        self.types = bead_types
+        self.coords = bead_coords
+        self.molname = molname
+        self.nbeads = len(mapping)
 
-            atom_name = ""
-            for character, count in sorted(six.iteritems(letter_occurrences(smi_frag))):
-                try:
-                    float(character)
-                except ValueError:
-                    if count == 1:
-                        atom_name += "{:s}".format(character)
-                    else:
-                        atom_name += "{:s}{:s}".format(character, str(count))
-            
-            mol_frag, errval = gen_molecule_smi(smi_frag)
-            charge_frag = get_charge(mol_frag)
+        ringbeads_flat = [bead for ring in self.ringbeads for bead in ring]
+        n_beads = self.nbeads
+        for idx in range(n_beads):
+            bead_type = bead_types[idx].strip()
+            if bead_type.startswith("T"):
+                letter = bead_type[1] 
+                mass = 36
+            elif bead_type.startswith("S"):
+                letter = bead_type[1]
+                mass = 54
+            else:
+                letter = bead_type[0]
+                mass = 72
+            bead_name = "{:1s}{:02d}".format(letter, idx + 1)
+            self.names.append(bead_name)
 
-            try:
-                if charge_frag == 0:
-                    alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, bead + 1, converted_smi, real_smi, logp_file)
-                else:
-                    alogps = 0.0
-                    logp_origin = "; Charged fragment"
-            except (NameError, TypeError, ValueError):
-                return
+            charge = self.charges[idx] if self.charges else 0
+            smi_frag = self.bead_smiles[idx] if self.bead_smiles else ""
+            atomnames = self.bead_atomnames[idx] if self.bead_atomnames else ""
+            logp_origin = self.logp_origins[idx] if self.logp_origins else ""
 
-            hbond_a_flag = sum(1 for at in hbonda if partitioning[at] == bead)
-            hbond_d_flag = sum(1 for at in hbondd if partitioning[at] == bead)
-
-            ringbeads_flat = [bead for ring in self.ringbeads for bead in ring]
-            in_ring = bead in ringbeads_flat
-
-            bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
-            atom_name = ""
-            name_index = bead + 1
-            atom_name = "{:1s}{:02d}".format(bead_type[1], name_index)
-            self.atomnames.append(atom_name)
-            
-            mass = get_standard_mass(bead_type)
-
-            atom_dict = {
-                'id': bead + 1,
+            bead_dict = {
+                'id': idx + 1,
                 'type': bead_type,
                 'resnr': 1,
                 'residue': self.molname[:4] if len(self.molname) > 4 else self.molname,
-                'atom': atom_name,
-                'cgnr': bead + 1,
+                'atom': bead_name,
+                'cgnr': idx + 1,
                 'charge': charge,
                 'mass': mass,
                 'smiles': smi_frag,
-                'atoms_in_smi': atoms_in_smi,
+                'atomnames': atomnames,
                 'logp_origin': logp_origin
             }
-            self.atoms.append(atom_dict)
-            self.beadtypes.append(bead_type)
+            self.atoms.append(bead_dict)
     
     def build_bonds(self, ha_neighbors):
         """Build bonds and constraints data."""
         logger.info("Building bonds and constraints...")
 
         mapping = self.mapping
-        cgbead_coords = self.cgbead_coords
-        nbeads = len(self.cgbeads)
-        if nbeads <= 1:
-            return
-        
+        coords = self.coords
+        nbeads = self.nbeads
+
         # First make list of bonds based on connectivity of the original molecule
         for i in range(nbeads):
             for j in range(i + 1, nbeads):
@@ -197,7 +153,7 @@ class Topology:
                 for at_i in mapping[i]:
                     for at_j in mapping[j]:
                         if at_j in ha_neighbors[at_i]:
-                            dist = np.linalg.norm(cgbead_coords[i] - cgbead_coords[j]) * 0.1
+                            dist = np.linalg.norm(coords[i] - coords[j]) * 0.1
                             self.constraints.append([i, j, 1, dist, ""])
                             found_connection = True
                             break
@@ -227,7 +183,7 @@ class Topology:
                         if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
                             n_bonds += 1
                             continue
-                        dist = np.linalg.norm(cgbead_coords[pair[0]] - cgbead_coords[pair[1]]) * 0.1
+                        dist = np.linalg.norm(coords[pair[0]] - coords[pair[1]]) * 0.1
                         if dist < min_dist:
                             min_dist = dist
                             min_pair = pair
@@ -240,11 +196,8 @@ class Topology:
 
         bondlist = self.bonds + self.constraints
         partitioning = self.partitioning
-        cgbead_coords = self.cgbead_coords
-
-        nbeads = len(self.cgbead_coords)
-        if nbeads <= 2:
-            return
+        coords = self.coords
+        nbeads = self.nbeads
 
         for i in range(nbeads):
             for j in range(nbeads): 
@@ -311,12 +264,12 @@ class Topology:
                         / math.pi
                         * math.acos(
                             np.dot(
-                                cgbead_coords[i] - cgbead_coords[j],
-                                cgbead_coords[k] - cgbead_coords[j],
+                                coords[i] - coords[j],
+                                coords[k] - coords[j],
                             )
                             / (
-                                np.linalg.norm(cgbead_coords[i] - cgbead_coords[j])
-                                * np.linalg.norm(cgbead_coords[k] - cgbead_coords[j])
+                                np.linalg.norm(coords[i] - coords[j])
+                                * np.linalg.norm(coords[k] - coords[j])
                             )
                         )
                     )
@@ -338,13 +291,9 @@ class Topology:
                     return True
             return False
 
-        cgbead_coords = self.cgbead_coords
+        coords = self.coords
         bondlist = self.bonds + self.constraints
-        self.dihedrals = []
-
-        nbeads = len(cgbead_coords)
-        if nbeads <= 3:
-            return 
+        nbeads = self.nbeads
 
         # Dihedrals
         for i in range(nbeads):
@@ -408,9 +357,9 @@ class Topology:
                             continue
 
                         # Measure dihedral angle between i, j, k, and l.    
-                        r1 = cgbead_coords[j] - cgbead_coords[i]
-                        r2 = cgbead_coords[k] - cgbead_coords[j]
-                        r3 = cgbead_coords[l] - cgbead_coords[k]
+                        r1 = coords[j] - coords[i]
+                        r2 = coords[k] - coords[j]
+                        r3 = coords[l] - coords[k]
                         p1 = np.cross(r1, r2) / (np.linalg.norm(r1) * np.linalg.norm(r2))
                         p2 = np.cross(r2, r3) / (np.linalg.norm(r2) * np.linalg.norm(r3))
                         r2 /= np.linalg.norm(r2)
@@ -474,7 +423,7 @@ class Topology:
                     for bead in ring:
                         if bead in anchors:
                             continue
-                        dist = min(np.linalg.norm(self.cgbead_coords[bead] - self.cgbead_coords[anchor]) for anchor in anchors)
+                        dist = min(np.linalg.norm(self.coords[bead] - self.coords[anchor]) for anchor in anchors)
                         if dist > max_dist:
                             max_dist = dist
                             furthest_bead = bead
@@ -484,15 +433,15 @@ class Topology:
         def _make_vs3_fad_entry(site: int, i: int, j: int, k: int) -> dict:
             """Create a `virtual_sites3` funct=3 (3fad) entry.
 
-            Parameters are derived from the current `cgbead_coords` so that the
+            Parameters are derived from the current `coords` so that the
             virtual site reproduces the present position of `site` from (i, j, k).
 
             Returns a dict compatible with `format_virtual_sites()`.
             """
-            ri = np.asarray(self.cgbead_coords[i], dtype=float)
-            rj = np.asarray(self.cgbead_coords[j], dtype=float)
-            rk = np.asarray(self.cgbead_coords[k], dtype=float)
-            rs = np.asarray(self.cgbead_coords[site], dtype=float)
+            ri = np.asarray(self.coords[i], dtype=float)
+            rj = np.asarray(self.coords[j], dtype=float)
+            rk = np.asarray(self.coords[k], dtype=float)
+            rs = np.asarray(self.coords[site], dtype=float)
 
             rij = rj - ri
             n_rij = np.linalg.norm(rij)
@@ -540,7 +489,7 @@ class Topology:
             for i in range(len(anchors)):
                 anchor = anchors[i]
                 bead = anchors[(i + 1) % len(anchors)]
-                dist = np.linalg.norm(self.cgbead_coords[anchor] - self.cgbead_coords[bead]) * 0.1
+                dist = np.linalg.norm(self.coords[anchor] - self.coords[bead]) * 0.1
                 bond_entry = [anchor, bead, 1, dist, "ring_anchor"]
                 bonds.append(bond_entry)
                 logger.info(f"Added bond between {anchor} and {bead} in ring {ring}")
@@ -635,23 +584,24 @@ class Topology:
             + "[moleculetype]\n"
             + "; molname       nrexcl\n"
             + "  {:5s}         {:d}\n\n".format(self.molname, self.nrexcl)
-            + "[atoms]\n"
-            + "; id      type   resnr residue atom    cgnr    charge  mass ;  smiles    ; atom_num"
+
         )
         return text + info
     
     def format_atoms(self):
         """Format atoms list into ITP text."""
         text = ""
+        text += "[atoms]\n"
+        text += "; id type resn residue atom  cgnr chrg  mass ;  atomnames         ; smiles  ; logp_origin\n"
         for atom in self.atoms:
             text += (
-                "   {:<5d}   {:5s}   {:d}   {:5s}   {:7s}   {:<5d}   {:2d}   {:3d}   ;   {:8s}{:8s}{:9s}\n".format(
+                "   {:<3d} {:5s} {:d}  {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:20s}; {:9s}; {:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
-                    atom['cgnr'], atom['charge'], atom['mass'], atom['smiles'],
-                    atom['atoms_in_smi'], atom['logp_origin']
+                    atom['cgnr'], atom['charge'], atom['mass'], atom['atomnames'], atom['smiles'], atom['logp_origin']
                 )
             )
         return text
+
     
     def format_bonds(self):
         """Format bonds and constraints into ITP text."""
