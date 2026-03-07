@@ -165,8 +165,15 @@ def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0, max_com
     k = float(fc_scale * kT / variance)
 
     gmm = fit_gmm_1d_best(distances, max_components=max_components)
+    
+    density = None
+    if gmm is not None:
+        min_prob = 1e-3
+        x_centers = np.linspace(np.percentile(distances, 1), np.percentile(distances, 99), 100)
+        gmm_density = gmm_pdf_1d(x_centers, *gmm)
+        density = np.clip(gmm_density, min_prob, None)
 
-    return r0, k, gmm
+    return r0, k, density
 
 
 def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0, max_components=1):
@@ -191,8 +198,15 @@ def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0, max_compo
     k = float(fc_scale * kT / variance_rad)
 
     gmm = fit_gmm_1d_best(angles, max_components=max_components)
+    
+    density = None
+    if gmm is not None:
+        min_prob = 1e-3
+        x_centers = np.linspace(np.percentile(angles, 1), np.percentile(angles, 99), 100)
+        gmm_density = gmm_pdf_1d(x_centers, *gmm)
+        density = np.clip(gmm_density, min_prob, None)
 
-    return theta0, k, gmm
+    return theta0, k, density
 
 
 def circular_mean(angles):
@@ -387,7 +401,6 @@ def fit_type9_dihedral(
 
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    # density = gmm_density
     density = np.clip(gmm_density, min_prob, None)
     pmf = -kT * np.log(density)
 

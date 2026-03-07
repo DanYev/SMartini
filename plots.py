@@ -202,10 +202,17 @@ def plot_internal_coordinates(
         _plot_dihedrals(dihedrals_data, topo, output_file, temperature, cache=cache)
 
 
-def _plot_gmm(ax, x_grid, gmm):
-    weights, means, variances = gmm
-    total = gmm_pdf_1d(x_grid, weights, means, variances)
-    ax.plot(x_grid, total, color="C1", linewidth=1.6, )
+def _plot_gmm(ax, x_grid, gmm, density=None):
+    if len(gmm) == 4:
+        weights, means, variances, density = gmm
+    else:    
+        weights, means, variances = gmm
+    
+    if density is not None:
+        ax.plot(x_grid, density, color="red", linewidth=1.6)
+    else:
+        total = gmm_pdf_1d(x_grid, weights, means, variances)
+        ax.plot(x_grid, total, color="C1", linewidth=1.6, )
     for idx, (w, mu, var) in enumerate(zip(weights, means, variances)):
         comp = w * np.exp(-0.5 * (x_grid - mu) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
         ax.plot(x_grid, comp, color="C1", alpha=0.5, linestyle="--", linewidth=1.0)
@@ -284,20 +291,13 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
         if len(distances) > 0:
             ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
             
-            # Check for cached GMM fit
+            # Check for cached fit density
             cache_key = (pair[0], pair[1], str(bond_type))
             cached = cache_section.get(cache_key)
-            if cached is not None:
-                try:
-                    gmm = (
-                        np.asarray(cached[0], dtype=float),
-                        np.asarray(cached[1], dtype=float),
-                        np.asarray(cached[2], dtype=float),
-                    )
-                    x_grid = np.linspace(np.min(distances), np.max(distances), 300)
-                    _plot_gmm(ax, x_grid, gmm)
-                except Exception:
-                    pass
+            if isinstance(cached, dict) and cached.get("density") is not None:
+                density_arr = np.asarray(cached["density"], dtype=float)
+                x_grid = np.linspace(np.percentile(distances, 1), np.percentile(distances, 99), len(density_arr))
+                ax.plot(x_grid, density_arr, color="red", linewidth=1.6)
 
         # Overlay topology-implied density p(r) ~ exp(-U(r)/kT)
         if bond_type == "bond" and pair in bond_params:
@@ -328,7 +328,7 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
                 U = _bond_U_harmonic(x_grid, r0, k_eff)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
                 if p is not None:
-                    ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+                    ax.plot(x_grid, p, color="black", linewidth=1.6)
 
         ax.set_xlabel("Distance (nm)", fontsize=9)
         ax.set_title(f"{bond_type.capitalize()}: {i+1}-{j+1}", fontsize=10)
@@ -408,23 +408,16 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
 
         ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
 
-        # Check for cached GMM fit
+        # Check for cached fit density
         ik0, ik1 = (int(i), int(k))
         if ik0 > ik1:
             ik0, ik1 = ik1, ik0
         cache_key = (ik0, int(j), ik1, str(angle_type))
         cached = cache_section.get(cache_key)
-        if cached is not None:
-            try:
-                gmm = (
-                    np.asarray(cached[0], dtype=float),
-                    np.asarray(cached[1], dtype=float),
-                    np.asarray(cached[2], dtype=float),
-                )
-                x_grid = np.linspace(vmin, vmax, 300)
-                _plot_gmm(ax, x_grid, gmm)
-            except Exception:
-                pass
+        if isinstance(cached, dict) and cached.get("density") is not None:
+            density_arr = np.asarray(cached["density"], dtype=float)
+            x_grid = np.linspace(np.percentile(angles, 1), np.percentile(angles, 99), len(density_arr))
+            ax.plot(x_grid, density_arr, color="red", linewidth=1.6)
 
         # Overlay topology-implied density p(theta) ~ exp(-U(theta)/kT)
         for angle in topo.angles:
@@ -528,18 +521,11 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
             density=True,
         )
 
-        # Plot cached GMM if available
-        if isinstance(cached, dict) and cached.get("gmm") is not None:
-            try:
-                w, mu, var = cached["gmm"]
-                gmm = (
-                    np.asarray(w, dtype=float),
-                    np.asarray(mu, dtype=float),
-                    np.asarray(var, dtype=float),
-                )
-                _plot_gmm(ax, x_grid, gmm)
-            except Exception:
-                pass
+        # Plot cached density if available
+        if isinstance(cached, dict) and cached.get("density") is not None:
+            density_arr = np.asarray(cached["density"], dtype=float)
+            x_density_grid = np.linspace(-180.0, 180.0, len(density_arr), endpoint=False)
+            ax.plot(x_density_grid, density_arr, color="red", linewidth=1.6)
 
         # Overlay topology-implied density p(phi) ~ exp(-U(phi)/kT)
         terms11 = dihedral_terms_11.get((i, j, k, l), [])

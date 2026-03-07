@@ -104,22 +104,26 @@ def boltzmann_invert_bonds(
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "bond")]
-        r0_calc, k_calc, gmm = boltzmann_inversion_bond(distances, temperature=CFG.temperature, max_components=CFG.type9_max_n)
+        r0_calc, k_calc, density = boltzmann_inversion_bond(distances, temperature=CFG.temperature, max_components=CFG.type9_max_n)
         comment = bond[5] if len(bond) >= 6 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
-        if gmm:
-            fit_cache["bonds"][(i, j, "bond")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+        if density is not None:
+            fit_cache["bonds"][(i, j, "bond")] = {
+                "density": list(map(float, density))
+            }
 
     # Constraints
     for bond in topo.constraints:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "constraint")]
-        r0_calc, k_calc, gmm = boltzmann_inversion_bond(
+        r0_calc, k_calc, density = boltzmann_inversion_bond(
             distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
         comment = bond[4] if len(bond) >= 5 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
-        if gmm:
-            fit_cache["bonds"][(i, j, "constraint")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+        if density is not None:
+            fit_cache["bonds"][(i, j, "constraint")] = {
+                "density": list(map(float, density))
+            }
     
     return updated_topo, fit_cache
 
@@ -133,17 +137,19 @@ def boltzmann_invert_angles(topo, internal_coords):
         if (i, j, k, "angle") not in internal_coords:
             continue
         samples = internal_coords[(i, j, k, "angle")]
-        theta0_calc, k_calc, gmm = boltzmann_inversion_angle(samples, 
+        theta0_calc, k_calc, density = boltzmann_inversion_angle(samples, 
             temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
         if float(k_calc) < CFG.angle_k_cutoff:
             k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
         updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
         
-        if gmm:
+        if density is not None:
             ik0, ik1 = (int(i), int(k))
             if ik0 > ik1: ik0, ik1 = ik1, ik0
-            fit_cache["angles"][(ik0, int(j), ik1, "angle")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+            fit_cache["angles"][(ik0, int(j), ik1, "angle")] = {
+                "density": list(map(float, density))
+            }
 
     return updated_topo, fit_cache
 
@@ -207,7 +213,7 @@ def boltzmann_invert_dihedrals(topo,
 
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
-            (kphi, a), gmm, score11 = fit_type11_cbt_dihedral(
+            (kphi, a), density, score11 = fit_type11_cbt_dihedral(
                 data,
                 temperature=CFG.temperature,
                 bins=CFG.type9_bins,
@@ -230,12 +236,13 @@ def boltzmann_invert_dihedrals(topo,
                     comment,
                 ]
             )
+            
             fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
-                "gmm": (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+                "density": list(map(float, density))
             }
             continue
 
-        fit_terms9, gmm9, score9 = fit_type9_dihedral(
+        fit_terms9, density9, score9 = fit_type9_dihedral(
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
@@ -244,7 +251,7 @@ def boltzmann_invert_dihedrals(topo,
             return_score=True,
             fc_scale=CFG.fc_scale,
         )
-        (kphi, a), gmm11, score11 = fit_type11_cbt_dihedral(
+        (kphi, a), density11, score11 = fit_type11_cbt_dihedral(
             data,
             temperature=CFG.temperature,
             bins=CFG.type9_bins,
@@ -272,15 +279,16 @@ def boltzmann_invert_dihedrals(topo,
                     comment,
                 ]
             )
-            gmm = gmm11
+            density_out = density11
         else:
             for mult, k_term, phi0 in fit_terms9:
                 new_dihedrals.append(
                     [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
                 )
-            gmm = gmm9
+            density_out = density9
+            
         fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
-            "gmm": (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+            "density": list(map(float, density_out))
         }
 
     updated_topo.dihedrals = new_dihedrals
