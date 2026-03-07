@@ -200,6 +200,16 @@ class Cg_molecule:
                                 if at not in ring:
                                     ring.append(at)
 
+            ringbeads = []
+            for ring in self.ring_atoms:
+                new_ring = []
+                for atom_idx in ring:
+                    for bead_idx, atom_indices in self.mapping.items():
+                        if atom_idx in atom_indices and bead_idx not in new_ring:
+                            new_ring.append(bead_idx)
+                            new_ring.sort()
+                ringbeads.append(new_ring)
+
             bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
                 cgbeads=beads,
                 molecule=self.molecule,
@@ -212,6 +222,7 @@ class Cg_molecule:
             topo.bead_atomnames = bead_atomnames
             topo.bead_smiles = bead_smiles
             topo.charges = charges
+            topo.ringbeads = ringbeads
             topo.build_atoms(
                 mapping=beads,
                 bead_types=bead_types,

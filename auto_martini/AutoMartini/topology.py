@@ -48,7 +48,7 @@ class Topology:
     molname: str = ""
     mol_smi: str = ""
     
-    # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atoms_in_smi, logp_origin
+    # Atoms data: list of dicts with keys: id, type, resnr, residue, atom, cgnr, charge, mass, smiles, atomnames, logp_origin
     atoms: list = field(default_factory=list)
     names: list = field(default_factory=list)
     types: list = field(default_factory=list)
@@ -87,9 +87,11 @@ class Topology:
     cgbeads: list = field(default_factory=list)
     ringbeads: list = field(default_factory=list)
     coords: np.ndarray = field(default_factory=lambda: np.array([]))
+
     
     # Exclusions data: list of [i, j] pairs
     exclusions: list = field(default_factory=list)
+
     
     # Build methods - update topology data
     def build_atoms(self, mapping, bead_types, bead_coords, molname, molecule):
@@ -123,7 +125,7 @@ class Topology:
             atomnames = self.bead_atomnames[idx] if self.bead_atomnames else ""
             logp_origin = self.logp_origins[idx] if self.logp_origins else ""
 
-            bead_dict = {
+            atom_dict = {
                 'id': idx + 1,
                 'type': bead_type,
                 'resnr': 1,
@@ -136,7 +138,7 @@ class Topology:
                 'atomnames': atomnames,
                 'logp_origin': logp_origin
             }
-            self.atoms.append(bead_dict)
+            self.atoms.append(atom_dict)
     
     def build_bonds(self, ha_neighbors):
         """Build bonds and constraints data."""
@@ -592,10 +594,10 @@ class Topology:
         """Format atoms list into ITP text."""
         text = ""
         text += "[atoms]\n"
-        text += "; id type resn residue atom  cgnr chrg  mass ;  atomnames         ; smiles  ; logp_origin\n"
+        text += "; id type resn residue atom  cgnr chrg  mass ; atomnames         ; smiles        ; logp_origin\n"
         for atom in self.atoms:
             text += (
-                "   {:<3d} {:5s} {:d}  {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:20s}; {:9s}; {:9s}\n".format(
+                "   {:<3d} {:5s} {:d}  {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:18s}; {:15s}; {:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                     atom['cgnr'], atom['charge'], atom['mass'], atom['atomnames'], atom['smiles'], atom['logp_origin']
                 )
@@ -1030,7 +1032,8 @@ def read_itp(itp_file):
         
         elif current_section == 'atoms':
             # Parse atom line with comment
-            # Format: id type resnr residue atom cgnr charge mass ; smiles ; atoms: N1, C1, ...
+            # Format written by format_atoms():
+            #   id type resnr residue atom cgnr charge mass ; atomnames ; smiles ; logp_origin
             pre_comment, _, comment = line.partition(';')
             parts = pre_comment.split()
             
@@ -1044,22 +1047,19 @@ def read_itp(itp_file):
                 charge = int(parts[6])
                 mass = int(parts[7])
                 
-                # Extract smiles and atom info from comment
+                # Extract extended info from comment (if present)
+                atomnames_part = ""
                 smiles_part = ""
-                atoms_in_smi = ""
                 logp_origin = ""
-                
+
                 if comment:
-                    # Split multiple comment sections
-                    comment_parts = comment.split(';')
+                    comment_parts = [c.strip() for c in comment.split(';')]
                     if len(comment_parts) >= 1:
-                        smiles_part = comment_parts[0].strip()
+                        atomnames_part = comment_parts[0]
                     if len(comment_parts) >= 2:
-                        atoms_str = comment_parts[1].strip()
-                        if atoms_str.startswith('atoms:'):
-                            atoms_in_smi = '; ' + atoms_str
+                        smiles_part = comment_parts[1]
                     if len(comment_parts) >= 3:
-                        logp_origin = '; ' + comment_parts[2].strip()
+                        logp_origin = comment_parts[2]
                 
                 atom_dict = {
                     'id': atom_id,
@@ -1071,19 +1071,17 @@ def read_itp(itp_file):
                     'charge': charge,
                     'mass': mass,
                     'smiles': smiles_part,
-                    'atoms_in_smi': atoms_in_smi,
-                    'logp_origin': logp_origin
+                    'atomnames': atomnames_part,
+                    'logp_origin': logp_origin,
                 }
                 
                 topo.atoms.append(atom_dict)
-                topo.atomnames.append(atom_name)
-                topo.beadtypes.append(atom_type)
-                
-                # Extract atom labels for partitioning
-                if atoms_in_smi:
-                    atoms_label_str = atoms_in_smi.replace('; atoms:', '').strip()
-                    atom_labels = [a.strip().rstrip(',') for a in atoms_label_str.split(',') if a.strip()]
-                    topo.atoms_in_smi_dict[atom_id] = ', '.join(atom_labels)
+                topo.names.append(atom_name)
+                topo.types.append(atom_type)
+                topo.charges.append(charge)
+                topo.bead_atomnames.append(atomnames_part)
+                topo.bead_smiles.append(smiles_part)
+                topo.logp_origins.append(logp_origin)
         
         elif current_section == 'bonds':
             # Parse data and comment separately

@@ -16,7 +16,6 @@ from lpmath import (
     read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
-from partitioning_patch import patch_topology_partitioning_from_sdf
 
 logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)
@@ -176,13 +175,24 @@ def boltzmann_invert_dihedrals(topo,
         # only fit CBT (funct=11).
         a1 = _eq_angle(i, j, k)
         a2 = _eq_angle(j, k, l)
-        ill_defined = (
+        ill_defined_1 = (
             a1 is None
             or a2 is None
             or float(a1) >= angle_cutoff
             or float(a2) >= angle_cutoff
         )
 
+        k_cutoff = CFG.angle_k_cutoff
+        angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
+        angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
+        ill_defined_2 = False
+        if angle1:
+            ill_defined_2 += angle1[0][5] < k_cutoff
+        if angle2:
+            ill_defined_2 += angle2[0][5] < k_cutoff
+
+
+        ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
             (kphi, a), score11 = fit_type11_cbt_dihedral(
                 data,
@@ -298,7 +308,7 @@ def update_angles(
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
-    updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(k_cutoff)]
+    # updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(k_cutoff)]
 
     # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
     for angle in updated_topo.angles:
@@ -407,7 +417,7 @@ if __name__ == "__main__":
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff, angle_cutoff=CFG.angle_cutoff)
     # DIHEDRALS
     topo = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    # topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     out_itp = mol_dir / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
