@@ -207,8 +207,8 @@ def gmm_pdf_1d(x, weights, means, variances):
     return np.sum(weights * exps / norm, axis=1)
 
 
-def fit_gmm_1d_best(data, max_components=3, max_iter=100, tol=1e-6, var_floor=1e-4, 
-                    min_weight=0.05, min_spacing_std=2.0):
+def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-12, 
+                    min_weight=0.05, min_spacing_std=2.0, min_prob=1e-3):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
     Parameters
@@ -227,7 +227,6 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=100, tol=1e-6, var_floor=1e
     if data.size < 2:
         return None
 
-    max_components = int(max(1, min(max_components, data.size)))
     best = None
     best_aic_penalized = None
 
@@ -240,7 +239,7 @@ def fit_gmm_1d_best(data, max_components=3, max_iter=100, tol=1e-6, var_floor=1e
         prev_ll = None
         for _ in range(max_iter):
             pdf = gmm_pdf_1d(data, weights, means, variances)
-            pdf = np.clip(pdf, 1e-12, None)
+            pdf = np.clip(pdf, min_prob, None)
             resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
                     / np.sqrt(2.0 * np.pi * variances))
             resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
@@ -353,7 +352,7 @@ def fit_type9_dihedral(
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
-    best_gmm = fit_gmm_1d_best(values, max_components=int(max_n))
+    best_gmm = fit_gmm_1d_best(values, max_components=3)
     best_means = best_gmm[1] if best_gmm is not None else None
 
     if best_gmm is None:
@@ -488,7 +487,7 @@ def fit_type11_cbt_dihedral(
     phi_centers = np.linspace(-180.0, 180.0, int(max(24, bins)), endpoint=False)
     phi_rad = np.deg2rad(phi_centers)
 
-    best_gmm = fit_gmm_1d_best(phi, max_components=6)
+    best_gmm = fit_gmm_1d_best(phi, max_components=3)
     if best_gmm is None:
         raise ValueError("Type-11 CBT fit failed: Gaussian mixture could not be fit.")
 

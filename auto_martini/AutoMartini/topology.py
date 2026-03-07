@@ -219,13 +219,13 @@ class Topology:
                     if stop_iteration:
                         continue
 
-                    # Check if all of them are in one ring
-                    for ring in self.ringbeads:
-                        if i in ring and j in ring and k in ring:
-                            stop_iteration = True
-                            break
-                    if stop_iteration:
-                        continue
+                    # # Check if all of them are in one ring
+                    # for ring in self.ringbeads:
+                    #     if i in ring and j in ring and k in ring:
+                    #         stop_iteration = True
+                    #         break
+                    # if stop_iteration:
+                    #     continue
 
                     # Check if all are bonded
                     ij_bonded = False

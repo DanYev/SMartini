@@ -428,5 +428,5 @@ if __name__ == "__main__":
         topo,
         output_file=wdir / "png" / "aa.png",
         temperature=CFG.temperature,
-        max_gaussians=CFG.type9_max_n,
+        cache_file=wdir / "fit_cache.pkl",
     )
