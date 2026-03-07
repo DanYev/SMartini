@@ -98,42 +98,54 @@ def boltzmann_invert_bonds(
     updated_topo.bonds = []  
     updated_topo.constraints = []  
 
+    fit_cache = {"bonds": {}}
+
     # Bonds
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "bond")]
-        r0_calc, k_calc = boltzmann_inversion_bond(distances, temperature=CFG.temperature)
+        r0_calc, k_calc, gmm = boltzmann_inversion_bond(distances, temperature=CFG.temperature, max_components=CFG.type9_max_n)
         comment = bond[5] if len(bond) >= 6 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
+        if gmm:
+            fit_cache["bonds"][(i, j, "bond")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
 
     # Constraints
     for bond in topo.constraints:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "constraint")]
-        r0_calc, k_calc = boltzmann_inversion_bond(
-            distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale)
+        r0_calc, k_calc, gmm = boltzmann_inversion_bond(
+            distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
         comment = bond[4] if len(bond) >= 5 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
+        if gmm:
+            fit_cache["bonds"][(i, j, "constraint")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
     
-    return updated_topo
+    return updated_topo, fit_cache
 
 
 def boltzmann_invert_angles(topo, internal_coords):
     updated_topo = copy.deepcopy(topo)
+    fit_cache = {"angles": {}}
 
     for idx, angle in enumerate(updated_topo.angles):
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
         if (i, j, k, "angle") not in internal_coords:
             continue
         samples = internal_coords[(i, j, k, "angle")]
-        theta0_calc, k_calc = boltzmann_inversion_angle(samples, 
-            temperature=CFG.temperature, fc_scale=CFG.fc_scale)
+        theta0_calc, k_calc, gmm = boltzmann_inversion_angle(samples, 
+            temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
         if float(k_calc) < CFG.angle_k_cutoff:
             k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
         updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
+        
+        if gmm:
+            ik0, ik1 = (int(i), int(k))
+            if ik0 > ik1: ik0, ik1 = ik1, ik0
+            fit_cache["angles"][(ik0, int(j), ik1, "angle")] = (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
 
-    return updated_topo
+    return updated_topo, fit_cache
 
 
 def boltzmann_invert_dihedrals(topo, 
@@ -141,6 +153,7 @@ def boltzmann_invert_dihedrals(topo,
     angle_cutoff: float = 150.0, 
     ):
     updated_topo = copy.deepcopy(topo)
+    fit_cache = {"dihedrals": {}}
 
     angle_lookup = _build_angle_lookup(updated_topo)
     length_lookup = _build_length_lookup(updated_topo)
@@ -194,7 +207,7 @@ def boltzmann_invert_dihedrals(topo,
 
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
-            (kphi, a), score11 = fit_type11_cbt_dihedral(
+            (kphi, a), gmm, score11 = fit_type11_cbt_dihedral(
                 data,
                 temperature=CFG.temperature,
                 bins=CFG.type9_bins,
@@ -217,9 +230,12 @@ def boltzmann_invert_dihedrals(topo,
                     comment,
                 ]
             )
+            fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
+                "gmm": (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+            }
             continue
 
-        fit_terms9, score9 = fit_type9_dihedral(
+        fit_terms9, gmm9, score9 = fit_type9_dihedral(
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
@@ -228,7 +244,7 @@ def boltzmann_invert_dihedrals(topo,
             return_score=True,
             fc_scale=CFG.fc_scale,
         )
-        (kphi, a), score11 = fit_type11_cbt_dihedral(
+        (kphi, a), gmm11, score11 = fit_type11_cbt_dihedral(
             data,
             temperature=CFG.temperature,
             bins=CFG.type9_bins,
@@ -237,6 +253,7 @@ def boltzmann_invert_dihedrals(topo,
             fc_scale=CFG.fc_scale,
         )
         print(f"Dihedral ({i+1},{j+1},{k+1},{l+1}): score9={score9:.4f}, score11={score11:.4f}")
+
 
         if score11 < score9:
             new_dihedrals.append(
@@ -255,15 +272,21 @@ def boltzmann_invert_dihedrals(topo,
                     comment,
                 ]
             )
+            gmm = gmm11
         else:
             for mult, k_term, phi0 in fit_terms9:
                 new_dihedrals.append(
                     [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
                 )
+            gmm = gmm9
+        fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
+            "gmm": (list(map(float, gmm[0])), list(map(float, gmm[1])), list(map(float, gmm[2])))
+        }
 
     updated_topo.dihedrals = new_dihedrals
 
-    return updated_topo
+
+    return updated_topo, fit_cache
 
 
 def update_bonds(
@@ -409,15 +432,29 @@ if __name__ == "__main__":
         internal_coords = calculate_internal_coordinates(aa_traj, topo)
         with open(pickle_file, "wb") as f:
             pickle.dump(internal_coords, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    master_fit_cache = {"bonds": {}, "angles": {}, "dihedrals": {}}
+
     # BOONDS        
-    topo = boltzmann_invert_bonds(topo, internal_coords)
+    topo, bond_cache = boltzmann_invert_bonds(topo, internal_coords)
+    master_fit_cache["bonds"].update(bond_cache["bonds"])
     topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
+    
     # ANGLES
-    topo = boltzmann_invert_angles(topo, internal_coords)
+    topo, angle_cache = boltzmann_invert_angles(topo, internal_coords)
+    master_fit_cache["angles"].update(angle_cache["angles"])
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    
     # DIHEDRALS
-    topo = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
+    topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
+    master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
     # topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+
+    # Save the fit cache
+    fit_cache_file = wdir / "fit_cache.pkl"
+    logger.info("Saving fit cache to %s", fit_cache_file)
+    with open(fit_cache_file, "wb") as f:
+        pickle.dump(master_fit_cache, f)
 
     out_itp = mol_dir / f"{molname}_updated.itp"
     topo.to_itp(out_file=out_itp)
@@ -428,5 +465,5 @@ if __name__ == "__main__":
         topo,
         output_file=wdir / "png" / "aa.png",
         temperature=CFG.temperature,
-        cache_file=wdir / "fit_cache.pkl",
+        cache_file=fit_cache_file,
     )

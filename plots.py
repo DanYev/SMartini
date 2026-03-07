@@ -12,6 +12,7 @@ from lpmath import (
     boltzmann_inversion_improper,
     wrap_to_180,
     gmm_pdf_1d,
+    circular_mean,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,18 +145,12 @@ def _dihedral_U_type11(phi_deg, terms):
     for t in terms:
         if t.get("kphi") is None or t.get("a") is None:
             continue
-        kphi = float(t["kphi"])
+        k_phi = float(t["kphi"])
         a = t["a"]
         if len(a) < 5:
             continue
-        poly = (
-            float(a[0])
-            + float(a[1]) * c
-            + float(a[2]) * (c**2)
-            + float(a[3]) * (c**3)
-            + float(a[4]) * (c**4)
-        )
-        U += kphi * poly
+        u_term = a[0] + a[1]*c + a[2]*c**2 + a[3]*c**3 + a[4]*c**4
+        U += k_phi * u_term
     return U
 
 
@@ -170,26 +165,24 @@ def plot_internal_coordinates(
     """Plot histograms of internal coordinates (bonds, angles, dihedrals).
 
     Each subplot overlays the topology-implied Boltzmann density
-    $p(x) \propto e^{-U(x)/kT}$ for the corresponding bonded potential.
     """
     # Bonds/constraints may have changed type (bond -> constraint) after fitting.
     # Always plot using the *current* topology list, but re-use whatever distance
     # series was sampled for that atom pair.
-    # Plotting is cache-only: if cache is missing, do not plot.
+    # Plotting is cache-only: if cache is missing, do not fit.
     if cache is None:
         cache = {}
 
     if cache_file is not None and not cache:
         cache_path = Path(cache_file)
-        if not cache_path.exists():
-            logger.info("Cache not found at %s; skipping plots", cache_path)
-            return
-        try:
-            with open(cache_path, "rb") as f:
-                cache.update(pickle.load(f) or {})
-        except Exception as e:
-            logger.warning("Could not load cache from %s: %s", cache_path, e)
-            return
+        if cache_path.exists():
+            try:
+                with open(cache_path, "rb") as f:
+                    cache.update(pickle.load(f) or {})
+            except Exception as e:
+                logger.warning("Could not load cache from %s: %s", cache_path, e)
+        else:
+            logger.info("Cache not found at %s; proceeding without fits", cache_path)
 
     # Ensure structure
     cache.setdefault("meta", {})
@@ -257,31 +250,18 @@ def _dihedral_terms_type11(topo):
 
 
 def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
-    if not isinstance(cache, dict) or not cache.get("bonds"):
-        logger.info("No bond cache provided; skipping bond plots")
-        return
-
-    cache_section = cache.get("bonds")
-    plot_items = []
-    for key, distances in (bonds_data or {}).items():
-        i, j, bond_type = key
-        pair = _pair_key(i, j)
-        cache_key = (pair[0], pair[1], str(bond_type))
-        cached = cache_section.get(cache_key)
-        if cached is None:
-            continue
-        plot_items.append((key, distances, cached))
-
-    if not plot_items:
-        logger.info("No matching bond fits in cache; skipping bond plots")
-        return
-
-    logger.info("Plotting %s bonds/constraints (cached fits)", len(plot_items))
+    if not isinstance(cache, dict):
+        cache = {}
+    cache_section = cache.get("bonds", {})
 
     bond_params = {_pair_key(int(b[0]), int(b[1])): b for b in topo.bonds}
     constraint_params = {_pair_key(int(c[0]), int(c[1])): c for c in topo.constraints}
 
-    n_plots = len(plot_items)
+    n_plots = len(bonds_data)
+    if n_plots == 0:
+        return
+    logger.info("Plotting %s bonds/constraints", n_plots)
+
     n_cols = min(4, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
@@ -291,7 +271,7 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
     else:
         axes = axes.flatten()
 
-    for idx, (key, distances, cached) in enumerate(plot_items):
+    for idx, (key, distances) in enumerate(bonds_data.items()):
         ax = axes[idx]
         i, j, bond_type = key
         pair = _pair_key(i, j)
@@ -303,18 +283,21 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
 
         if len(distances) > 0:
             ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
-            gmm = None
-            try:
-                gmm = (
-                    np.asarray(cached[0], dtype=float),
-                    np.asarray(cached[1], dtype=float),
-                    np.asarray(cached[2], dtype=float),
-                )
-            except Exception:
-                gmm = None
-            if gmm is not None:
-                x_grid = np.linspace(np.min(distances), np.max(distances), 300)
-                _plot_gmm(ax, x_grid, gmm)
+            
+            # Check for cached GMM fit
+            cache_key = (pair[0], pair[1], str(bond_type))
+            cached = cache_section.get(cache_key)
+            if cached is not None:
+                try:
+                    gmm = (
+                        np.asarray(cached[0], dtype=float),
+                        np.asarray(cached[1], dtype=float),
+                        np.asarray(cached[2], dtype=float),
+                    )
+                    x_grid = np.linspace(np.min(distances), np.max(distances), 300)
+                    _plot_gmm(ax, x_grid, gmm)
+                except Exception:
+                    pass
 
         # Overlay topology-implied density p(r) ~ exp(-U(r)/kT)
         if bond_type == "bond" and pair in bond_params:
@@ -354,14 +337,14 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        if len(distances) > 1:
-            _, k_calc = boltzmann_inversion_bond(distances)
-        else:
-            k_calc = float("nan")
-
         param_k = None
-        if bond_type == "bond" and pair in bond_params and len(bond_params[pair]) >= 5:
-            param_k = float(bond_params[pair][4])
+        param_r0 = None
+        if pair in bond_params:
+            if bond_type == "bond" and len(bond_params[pair]) >= 5:
+                param_r0 = float(bond_params[pair][3])
+                param_k = float(bond_params[pair][4])
+            elif bond_type == "constraint" and len(bond_params[pair]) >= 4:
+                param_r0 = float(bond_params[pair][3])
 
         if len(distances) > 0:
             mean_dist = float(np.mean(distances))
@@ -370,12 +353,11 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
         else:
             stats_text = "(no samples)\n"
 
-        if np.isfinite(k_calc):
-            k_rounded = round(k_calc / 1000) * 1000
-            stats_text += f"k={int(k_rounded/1000)}e3"
         if param_k is not None:
             param_k_rounded = round(param_k / 1000) * 1000
-            stats_text += f"\nparam k={int(param_k_rounded/1000)}e3"
+            stats_text += f"param k={int(param_k_rounded/1000)}e3\n"
+        if param_r0 is not None:
+            stats_text += f"param r0={param_r0:.3f}"
 
         ax.text(
             0.98,
@@ -396,30 +378,15 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
 
 
 def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None):
-    if not isinstance(cache, dict) or not cache.get("angles"):
-        logger.info("No angle cache provided; skipping angle plots")
+    if not isinstance(cache, dict):
+        cache = {}
+    cache_section = cache.get("angles", {})
+
+    n_plots = len(angles_data)
+    if n_plots == 0:
         return
+    logger.info("Plotting %s angles", n_plots)
 
-    cache_section = cache.get("angles")
-    plot_items = []
-    for key, angles in (angles_data or {}).items():
-        i, j, k, angle_type = key
-        ik0, ik1 = (int(i), int(k))
-        if ik0 > ik1:
-            ik0, ik1 = ik1, ik0
-        cache_key = (ik0, int(j), ik1, str(angle_type))
-        cached = cache_section.get(cache_key)
-        if cached is None:
-            continue
-        plot_items.append((key, angles, cached))
-
-    if not plot_items:
-        logger.info("No matching angle fits in cache; skipping angle plots")
-        return
-
-    logger.info("Plotting %s angles (cached fits)", len(plot_items))
-
-    n_plots = len(plot_items)
     n_cols = min(4, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
@@ -429,7 +396,7 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
     else:
         axes = axes.flatten()
 
-    for idx, (key, angles, cached) in enumerate(plot_items):
+    for idx, (key, angles) in enumerate(angles_data.items()):
         ax = axes[idx]
         i, j, k, angle_type = key
 
@@ -440,18 +407,24 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
             vmax += 1e-3
 
         ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
-        gmm = None
-        try:
-            gmm = (
-                np.asarray(cached[0], dtype=float),
-                np.asarray(cached[1], dtype=float),
-                np.asarray(cached[2], dtype=float),
-            )
-        except Exception:
-            gmm = None
-        if gmm is not None:
-            x_grid = np.linspace(vmin, vmax, 300)
-            _plot_gmm(ax, x_grid, gmm)
+
+        # Check for cached GMM fit
+        ik0, ik1 = (int(i), int(k))
+        if ik0 > ik1:
+            ik0, ik1 = ik1, ik0
+        cache_key = (ik0, int(j), ik1, str(angle_type))
+        cached = cache_section.get(cache_key)
+        if cached is not None:
+            try:
+                gmm = (
+                    np.asarray(cached[0], dtype=float),
+                    np.asarray(cached[1], dtype=float),
+                    np.asarray(cached[2], dtype=float),
+                )
+                x_grid = np.linspace(vmin, vmax, 300)
+                _plot_gmm(ax, x_grid, gmm)
+            except Exception:
+                pass
 
         # Overlay topology-implied density p(theta) ~ exp(-U(theta)/kT)
         for angle in topo.angles:
@@ -463,7 +436,7 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
                 jac = np.clip(np.sin(np.deg2rad(x_grid)), 0.0, None)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=jac)
                 if p is not None:
-                    ax.plot(x_grid, p, color="black", linewidth=1.6, label=r"$p\propto e^{-U/kT}$")
+                    ax.plot(x_grid, p, color="black", linewidth=1.6)
                 break
 
         ax.set_xlabel("Angle (degrees)", fontsize=9)
@@ -474,22 +447,22 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        _, k_calc = boltzmann_inversion_angle(angles)
-
         param_k = None
+        param_theta0 = None
         for angle in topo.angles:
             if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
+                param_theta0 = float(angle[4])
                 param_k = float(angle[5])
                 break
 
         mean_angle = np.mean(angles)
         std_angle = np.std(angles)
-        k_rounded = round(k_calc / 10) * 10
         stats_text = f"mu={mean_angle:.1f} deg\nsigma={std_angle:.1f} deg\n"
-        stats_text += f"k={int(k_rounded)}"
         if param_k is not None:
             param_k_rounded = round(param_k / 10) * 10
             stats_text += f"\nparam k={int(param_k_rounded)}"
+        if param_theta0 is not None:
+            stats_text += f"\nparam theta0={param_theta0:.1f}"
 
         ax.text(
             0.98,
@@ -510,30 +483,18 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
 
 
 def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache=None):
-    if not isinstance(cache, dict) or not cache.get("dihedrals"):
-        logger.info("No dihedral cache provided; skipping dihedral plots")
+    if not isinstance(cache, dict):
+        cache = {}
+    cache_section = cache.get("dihedrals", {})
+
+    n_plots = len(dihedrals_data)
+    if n_plots == 0:
         return
-
-    cache_section = cache.get("dihedrals")
-    plot_items = []
-    for key, dihedrals in (dihedrals_data or {}).items():
-        i, j, k, l, dihedral_type = key
-        cache_key = (int(i), int(j), int(k), int(l), str(dihedral_type))
-        cached = cache_section.get(cache_key)
-        if not isinstance(cached, dict) or cached.get("gmm") is None or cached.get("shift") is None:
-            continue
-        plot_items.append((key, dihedrals, cached))
-
-    if not plot_items:
-        logger.info("No matching dihedral fits in cache; skipping dihedral plots")
-        return
-
-    logger.info("Plotting %s dihedrals (cached fits)", len(plot_items))
+    logger.info("Plotting %s dihedrals", n_plots)
 
     dihedral_terms = _dihedral_terms(topo)
     dihedral_terms_11 = _dihedral_terms_type11(topo)
 
-    n_plots = len(plot_items)
     n_cols = min(4, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
@@ -543,16 +504,19 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
     else:
         axes = axes.flatten()
 
-    for idx, (key, dihedrals, cached) in enumerate(plot_items):
+    for idx, (key, dihedrals) in enumerate(dihedrals_data.items()):
         ax = axes[idx]
         i, j, k, l, dihedral_type = key
 
         # Plot in absolute wrapped coordinates so we match the potential definition.
         dihedrals = np.asarray(dihedrals, dtype=float)
-        shift = float(cached["shift"])
+        
+        # Determine shift: prefer cache, fallback to data mean
+        cache_key = (int(i), int(j), int(k), int(l), "dihedral")
+        cached = cache_section.get(cache_key)
+        shift = circular_mean(dihedrals) 
         dihedrals_wrapped = wrap_to_180(dihedrals - shift)
         vmin, vmax = -180.0, 180.0
-
         x_grid = np.linspace(vmin, vmax, 600)
 
         ax.hist(
@@ -563,18 +527,19 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
             edgecolor="black",
             density=True,
         )
-        gmm = None
-        try:
-            w, mu, var = cached["gmm"]
-            gmm = (
-                np.asarray(w, dtype=float),
-                np.asarray(mu, dtype=float),
-                np.asarray(var, dtype=float),
-            )
-        except Exception:
-            gmm = None
-        if gmm is not None:
-            _plot_gmm(ax, x_grid, gmm)
+
+        # Plot cached GMM if available
+        if isinstance(cached, dict) and cached.get("gmm") is not None:
+            try:
+                w, mu, var = cached["gmm"]
+                gmm = (
+                    np.asarray(w, dtype=float),
+                    np.asarray(mu, dtype=float),
+                    np.asarray(var, dtype=float),
+                )
+                _plot_gmm(ax, x_grid, gmm)
+            except Exception:
+                pass
 
         # Overlay topology-implied density p(phi) ~ exp(-U(phi)/kT)
         terms11 = dihedral_terms_11.get((i, j, k, l), [])
@@ -589,7 +554,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
                 p,
                 color="black",
                 linewidth=1.6,
-                label=r"funct=11: $p\propto e^{-U/kT}$",
+                label=r"funct=11",
             )
         elif terms9:
             U = _dihedral_U_type9(x_shifted, terms9)
@@ -599,7 +564,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
                 p,
                 color="black",
                 linewidth=1.6,
-                label=r"funct=9: $p\propto e^{-U/kT}$",
+                label=r"funct=9",
             )
 
         ax.set_xlabel(f"Dihedral (deg) - shift={shift:.1f}", fontsize=9)

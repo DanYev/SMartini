@@ -145,12 +145,15 @@ def calculate_internal_coordinates(cg_trajectory, topo):
     return internal_coords
 
 
-def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0):
+def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0, max_components=1):
     """Estimate harmonic bond parameters from samples.
 
     This is a *mean-based harmonic approximation* (not PMF-minimum based):
     - Equilibrium value r0 is the sample mean.
     - Force constant k is computed from fluctuations: k = kT / var(r).
+    
+    Returns:
+        r0 (float), k (float), gmm (tuple or None)
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
@@ -161,16 +164,21 @@ def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0):
     variance = float(np.var(distances))
     k = float(fc_scale * kT / variance)
 
-    return r0, k
+    gmm = fit_gmm_1d_best(distances, max_components=max_components)
+
+    return r0, k, gmm
 
 
-def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0):
+def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0, max_components=1):
     """Estimate harmonic angle parameters from samples.
 
     Mean-based harmonic approximation:
     - Equilibrium value theta0 is the sample mean (degrees).
     - Force constant k is computed from fluctuations in radians:
       k = kT / var(theta_rad).
+
+    Returns:
+        theta0 (float), k (float), gmm (tuple or None)
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
@@ -182,7 +190,9 @@ def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0):
     variance_rad = float(np.var(residual_rad))
     k = float(fc_scale * kT / variance_rad)
 
-    return theta0, k
+    gmm = fit_gmm_1d_best(angles, max_components=max_components)
+
+    return theta0, k, gmm
 
 
 def circular_mean(angles):
@@ -433,15 +443,15 @@ def fit_type9_dihedral(
         terms.append((int(n), float(k), float(phi)))
 
     if return_score:
-        return terms, score
-    return terms
+        return terms, density, score
+    return terms, density, None
 
 
 def fit_type11_cbt_dihedral(
     dihedrals,
     temperature=300.0,
     bins=360,
-    min_prob=1e-3,
+    min_prob=1e-2,
     cos_power_max: int = 4,
     return_score: bool = False,
     fc_scale: float = 1.0,
@@ -530,5 +540,5 @@ def fit_type11_cbt_dihedral(
     a = [float(x) for x in a[:5]]
     result = (float(k_phi), a)
     if return_score:
-        return result, score
-    return result
+        return result, density, score
+    return result, density, None
