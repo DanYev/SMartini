@@ -156,21 +156,20 @@ class Cg_molecule:
             with open(mapping_pickle, "rb") as f:
                 mappings = pickle.load(f)
 
-        self.max_attempts = len(mappings) 
+
         logger.info("Going through the candidate mappings")
-
         attempt = -1
-        for beads in mappings:
+        self.max_attempts = len(mappings) 
+        for mapping in mappings:
             attempt += 1
-
             if attempt % 100 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
 
-            mapping_dict = {idx: bead for idx, bead in enumerate(beads)}
+            mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
             self.mapping = mapping_dict
             self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
 
-            logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(beads))
+            logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
 
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
@@ -178,8 +177,8 @@ class Cg_molecule:
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
 
             # CG beads should take atom rings number if ring atom in bead 
-            beads_rings = beads.copy()
-            for i, b in enumerate(beads):
+            beads_rings = mapping.copy()
+            for i, b in enumerate(mapping):
                 if b not in self.ring_atoms_flat:
                     atoms_in_b = []
                     for at,bd in self.partitioning.items():
@@ -211,7 +210,7 @@ class Cg_molecule:
                 ringbeads.append(new_ring)
 
             bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
-                cgbeads=beads,
+                mapping=mapping,
                 molecule=self.molecule,
                 hbonda=self.hbond_a,
                 hbondd=self.hbond_d,
@@ -224,7 +223,7 @@ class Cg_molecule:
             topo.charges = charges
             topo.ringbeads = ringbeads
             topo.build_atoms(
-                mapping=beads,
+                mapping=mapping,
                 bead_types=bead_types,
                 bead_coords=self.bead_coords,
                 molecule=self.molecule, 
@@ -238,9 +237,9 @@ class Cg_molecule:
             
             logger.info("Success mapping found on attempt %d", attempt)
             self.topology = topo
-            self.build_topology(beads, beads_rings, bead_types)
+            self.build_topology(mapping, beads_rings, bead_types)
             self.topology.partitioning = self._get_aa_partitioning() # make aa_partitioning available in topology for later use in refinement
-            self.update_topology(beads, beads_rings, bead_types, attempt)
+            self.update_topology(mapping, beads_rings, bead_types, attempt)
             self.write_topology()
             break
 
@@ -635,7 +634,7 @@ class Cg_molecule:
         ):
         output.output_map(self.topology, map_file, to_ff=to_ff)
 
-def get_bead_types(cgbeads, molecule, hbonda, hbondd, logp_file=None, forcepred=True):
+def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=True):
     """Determine bead types based on smiles of the the atomistic bead fragment."""
 
     logger.info("Determining bead types")
@@ -644,7 +643,7 @@ def get_bead_types(cgbeads, molecule, hbonda, hbondd, logp_file=None, forcepred=
     bead_atomnames = []
     charges = []
 
-    for idx, bead in enumerate(cgbeads):
+    for idx, bead in enumerate(mapping):
         smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(bead, molecule)
 
         if charge == 0:

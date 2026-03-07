@@ -331,13 +331,11 @@ def collect_energies_and_combs(
 def generate_mappings(molecule, min_beads=None, max_beads=None):
     """Generate all possible mappings of atoms to beads for given molecule."""
     anchor_combs = find_bead_anchors(molecule, min_beads=min_beads, max_beads=max_beads)
-    mappings = get_partitioning(anchor_combs, molecule)
-    mapping_dicts = [{str(idx): bead for idx, bead in enumerate(mapping)} for mapping in mappings]
-    partitionings = [invert_mapping_dictionary(mapping) for mapping in mapping_dicts]
-    return mappings, partitionings
+    mappings = get_mappings(anchor_combs, molecule)
+    return mappings
 
 
-def get_partitioning(anchor_combs, molecule):
+def get_mappings(anchor_combs, molecule):
     """Get partitioning of atoms into beads for given trial combination"""
     logger.info("Finding partitioning for anchor combinations...")
     atoms, bonds = _get_ha_graph(molecule)

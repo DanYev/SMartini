@@ -504,9 +504,7 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
         # Plot in absolute wrapped coordinates so we match the potential definition.
         dihedrals = np.asarray(dihedrals, dtype=float)
         
-        # Determine shift: prefer cache, fallback to data mean
-        cache_key = (int(i), int(j), int(k), int(l), "dihedral")
-        cached = cache_section.get(cache_key)
+
         shift = circular_mean(dihedrals) 
         dihedrals_wrapped = wrap_to_180(dihedrals - shift)
         vmin, vmax = -180.0, 180.0
@@ -520,12 +518,6 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
             edgecolor="black",
             density=True,
         )
-
-        # Plot cached density if available
-        if isinstance(cached, dict) and cached.get("density") is not None:
-            density_arr = np.asarray(cached["density"], dtype=float)
-            x_density_grid = np.linspace(-180.0, 180.0, len(density_arr), endpoint=False)
-            ax.plot(x_density_grid, density_arr, color="red", linewidth=1.6)
 
         # Overlay topology-implied density p(phi) ~ exp(-U(phi)/kT)
         terms11 = dihedral_terms_11.get((i, j, k, l), [])
@@ -552,6 +544,17 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
                 linewidth=1.6,
                 label=r"funct=9",
             )
+
+        # Plot cached density if available
+        cache_key = (int(i), int(j), int(k), int(l), "dihedral")
+        cached = cache_section.get(cache_key)
+        if isinstance(cached, dict) and cached.get("density") is not None:
+            density_arr = np.asarray(cached["density"], dtype=float)
+            grid = np.linspace(-180.0, 180.0, len(density_arr), endpoint=False)
+            if terms9:
+                shift = 0.0 
+            grid = wrap_to_180(grid - shift)
+            ax.plot(grid, density_arr, color="red", linewidth=1.6)
 
         ax.set_xlabel(f"Dihedral (deg) - shift={shift:.1f}", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)

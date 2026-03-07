@@ -231,8 +231,8 @@ def gmm_pdf_1d(x, weights, means, variances):
     return np.sum(weights * exps / norm, axis=1)
 
 
-def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-12, 
-                    min_weight=0.05, min_spacing_std=2.0, min_prob=1e-3):
+def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-6, 
+                    min_weight=0.1, min_spacing_std=2.0, min_prob=1e-3):
     """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
     
     Parameters
@@ -364,9 +364,6 @@ def fit_type9_dihedral(
     kT = kB * temperature
 
     values = np.asarray(dihedrals, dtype=float)
-    if values.size < 2:
-        raise ValueError("Type-9 dihedral fit failed: not enough samples")
-
     shift = float(circular_mean(values))
     values = wrap_to_180(values - shift)
 
@@ -378,9 +375,11 @@ def fit_type9_dihedral(
     # Fit GMM with BIC selection (using module-level function)
     best_gmm = fit_gmm_1d_best(values, max_components=3)
     best_means = best_gmm[1] if best_gmm is not None else None
-
-    if best_gmm is None:
-        raise ValueError("Type-9 dihedral fit failed: Gaussian mixture could not be fit.")
+    
+    # Fit free energy from GMM density
+    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
+    density = np.clip(gmm_density, min_prob, None)
+    pmf = -kT * np.log(density)
 
     # Determine optimal n from the spacing between modes (circularly).
     # For two modes separated by ~180 deg, this yields n≈2; for ~120 deg, n≈3, etc.
@@ -398,15 +397,6 @@ def fit_type9_dihedral(
             spacing = float(np.median(spacings)) if spacings.size else 360.0
 
         optimal_n = int(np.clip(int(np.floor(360.0 / spacing)), 1, int(max_n)))
-
-    # Fit free energy from GMM density
-    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    density = np.clip(gmm_density, min_prob, None)
-    pmf = -kT * np.log(density)
-
-    dmax = float(np.max(density))
-    if not np.isfinite(dmax) or dmax <= 0.0:
-        raise ValueError("Type-9 dihedral fit failed: invalid density")
 
     optimal_n = int(max(1, min(int(optimal_n), int(max_n))))
     harmonics_to_fit = [] 
@@ -503,18 +493,16 @@ def fit_type11_cbt_dihedral(
     kT = kB * float(temperature)
 
     phi = np.asarray(dihedrals, dtype=float)
-    if phi.size < 2:
-        raise ValueError("Type-11 CBT fit failed: not enough samples")
-
     phi = wrap_to_180(phi)
     phi_centers = np.linspace(-180.0, 180.0, int(max(24, bins)), endpoint=False)
     phi_rad = np.deg2rad(phi_centers)
 
     best_gmm = fit_gmm_1d_best(phi, max_components=3)
-    if best_gmm is None:
-        raise ValueError("Type-11 CBT fit failed: Gaussian mixture could not be fit.")
 
-    density = np.clip(gmm_pdf_1d(phi_centers, *best_gmm), float(min_prob), None)
+    # Fit free energy from GMM density
+    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
+    # gmm_density -= np.min(gmm_density) + 1e-12 
+    density = np.clip(gmm_density, min_prob, None)
     pmf = -kT * np.log(density)
 
     # Build weighted least squares system: PMF(phi) ~ sum_n c_n * cos^n(phi)
@@ -530,23 +518,15 @@ def fit_type11_cbt_dihedral(
             cos_pow = cos_pow * cos_phi
         cols.append(cos_pow)
 
-    A = np.column_stack(cols)  # shape (nbins, 5)
-    # Weights: emphasize well-sampled/high-probability regions
-    w = np.power(density, 0.20)
+    w = np.pow(density, 0.20)
+    A = np.column_stack(cols)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
-    coeffs = np.asarray(coeffs, dtype=float)
-
     resid = Aw @ coeffs - bw
     score = float(np.mean(resid**2))
 
     scale = float(np.max(np.abs(coeffs)))
-    if not np.isfinite(scale) or scale < 1e-12:
-        if return_score:
-            return (0.0, [0.0, 0.0, 0.0, 0.0, 0.0]), score
-        return 0.0, [0.0, 0.0, 0.0, 0.0, 0.0]
-
     k_phi = scale
     a = (coeffs / scale).tolist()
     # Ensure length exactly 5

@@ -210,7 +210,6 @@ def boltzmann_invert_dihedrals(topo,
         if angle2:
             ill_defined_2 += angle2[0][5] < k_cutoff
 
-
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
             (kphi, a), density, score11 = fit_type11_cbt_dihedral(
@@ -220,26 +219,8 @@ def boltzmann_invert_dihedrals(topo,
                 min_prob=CFG.type9_min_prob,
                 return_score=True,
             )
-            new_dihedrals.append(
-                [
-                    i,
-                    j,
-                    k,
-                    l,
-                    11,
-                    float(kphi),
-                    float(a[0]),
-                    float(a[1]),
-                    float(a[2]),
-                    float(a[3]),
-                    float(a[4]),
-                    comment,
-                ]
-            )
-            
-            fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
-                "density": list(map(float, density))
-            }
+            new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
+            fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue
 
         fit_terms9, density9, score9 = fit_type9_dihedral(
@@ -251,49 +232,15 @@ def boltzmann_invert_dihedrals(topo,
             return_score=True,
             fc_scale=CFG.fc_scale,
         )
-        (kphi, a), density11, score11 = fit_type11_cbt_dihedral(
-            data,
-            temperature=CFG.temperature,
-            bins=CFG.type9_bins,
-            min_prob=CFG.type9_min_prob,
-            return_score=True,
-            fc_scale=CFG.fc_scale,
-        )
-        print(f"Dihedral ({i+1},{j+1},{k+1},{l+1}): score9={score9:.4f}, score11={score11:.4f}")
 
-
-        if score11 < score9:
+        for mult, k_term, phi0 in fit_terms9:
             new_dihedrals.append(
-                [
-                    i,
-                    j,
-                    k,
-                    l,
-                    11,
-                    float(kphi),
-                    float(a[0]),
-                    float(a[1]),
-                    float(a[2]),
-                    float(a[3]),
-                    float(a[4]),
-                    comment,
-                ]
+                [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
             )
-            density_out = density11
-        else:
-            for mult, k_term, phi0 in fit_terms9:
-                new_dihedrals.append(
-                    [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
-                )
-            density_out = density9
-            
-        fit_cache["dihedrals"][(int(i), int(j), int(k), int(l), "dihedral")] = {
-            "density": list(map(float, density_out))
-        }
+        density_out = density9
+        fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density_out))}
 
     updated_topo.dihedrals = new_dihedrals
-
-
     return updated_topo, fit_cache
 
 

@@ -70,10 +70,11 @@ class Topology:
     # Dihedrals data: list of [i, j, k, l, funct, angle, force_const, multiplicity]
     dihedrals: list = field(default_factory=list)
     
-    # Virtual sites (if any)
-    # Stored as a dict of Gromacs virtual-site section -> list of entries.
-    # Supported keys: virtual_sites2, virtual_sites3, virtual_sites4, virtual_sitesn
+    #Virtual sites. Stored as a dict of Gromacs virtual-site section -> list of entries.
     virtual_sites: dict[str, list] = field(default_factory=dict)
+
+    # Exclusions data: list of [i, j] pairs
+    exclusions: list = field(default_factory=list)
     
     # Rigid dihedrals (for virtual sites)
     rigid_dihedrals: list = field(default_factory=list)
@@ -87,11 +88,6 @@ class Topology:
     cgbeads: list = field(default_factory=list)
     ringbeads: list = field(default_factory=list)
     coords: np.ndarray = field(default_factory=lambda: np.array([]))
-
-    
-    # Exclusions data: list of [i, j] pairs
-    exclusions: list = field(default_factory=list)
-
     
     # Build methods - update topology data
     def build_atoms(self, mapping, bead_types, bead_coords, molname, molecule):
@@ -594,10 +590,10 @@ class Topology:
         """Format atoms list into ITP text."""
         text = ""
         text += "[atoms]\n"
-        text += "; id type resn residue atom  cgnr chrg  mass ; atomnames         ; smiles        ; logp_origin\n"
+        text += ";id type resn res    atom  cgnr chrg  mass ; atomnames         ; smiles         ; logp_origin\n"
         for atom in self.atoms:
             text += (
-                "   {:<3d} {:5s} {:d}  {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:18s}; {:15s}; {:9s}\n".format(
+                "{:<3d} {:5s} {:d}   {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:18s}; {:15s}; {:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                     atom['cgnr'], atom['charge'], atom['mass'], atom['atomnames'], atom['smiles'], atom['logp_origin']
                 )
