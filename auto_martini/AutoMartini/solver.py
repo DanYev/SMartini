@@ -142,20 +142,25 @@ class Cg_molecule:
         # Find coarse-grained bead positions 
         # -- keep all possibilities in case something goes wrong later in the code.
         import pickle
-        mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
-        if not mapping_pickle.exists():
-            mappings, parts = partitioning.generate_mappings(
+        # mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
+        # if not mapping_pickle.exists():
+        #     mappings = partitioning.generate_mappings(
+        #         self.molecule, 
+        #         min_beads=self.min_beads,
+        #         max_beads=self.max_beads,
+        #     )
+        #     logger.info("Generated %d candidate bead mappings", len(mappings))
+        #     with open(mapping_pickle, "wb") as f:
+        #         pickle.dump(mappings, f)
+        # else:
+        #     with open(mapping_pickle, "rb") as f:
+        #         mappings = pickle.load(f)
+        
+        mappings = partitioning.generate_mappings(
                 self.molecule, 
                 min_beads=self.min_beads,
                 max_beads=self.max_beads,
             )
-            logger.info("Generated %d candidate bead mappings", len(mappings))
-            with open(mapping_pickle, "wb") as f:
-                pickle.dump(mappings, f)
-        else:
-            with open(mapping_pickle, "rb") as f:
-                mappings = pickle.load(f)
-
 
         logger.info("Going through the candidate mappings")
         attempt = -1

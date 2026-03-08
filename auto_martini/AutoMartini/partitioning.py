@@ -42,56 +42,6 @@ logger = logging.getLogger(__name__)
 ### HELPER FUNCTIONS ###
 #############################################################################
 
-def read_bead_params():
-    """Returns bead parameter dictionary
-    CG Bead vdw radius (in Angstroem)"""
-    bead_params = dict()
-    bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
-    bead_params["rvdw_aromatic"] = 4.1 / 2.0 # AutoM3 change: was 4.3 / 2.0    #sigma for ring
-    bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
-    bead_params["offset_bd_weight"] = 20.0 # AutoM3 change: was 50.0    #penalty weight for nonring beads
-    bead_params["offset_bd_aromatic_weight"] = 5.0 # AutoM3 change: was 20.0    #penalty weight for ring beads
-    bead_params["lonely_atom_penalize"] = 0.28  # AutoM3 change: was 0.20
-    bead_params["bd_bd_overlap_coeff"] = 1.0 # AutoM3 change: was 9.0
-    bead_params["at_in_bd_coeff"] = 0.9
-    return bead_params
-
-
-def _get_masses(molecule):
-    """Return an array of atomic masses for all atoms in the molecule."""
-    masses = []
-    for i in range(molecule.GetNumAtoms()):
-        mass = molecule.GetAtomWithIdx(i).GetMass()
-        masses.append(mass)
-    return np.array(masses).astype(np.float32)
-
-
-def _get_bond_distances(conformer):
-    """Return a symmetric (N,N) distance matrix with a 0 diagonal.
-
-    Notes
-    -----
-    `Chem.rdMolTransforms.GetBondLength` is used here (even though it returns a
-    pairwise distance) to preserve existing behavior.
-    """
-    n = conformer.GetNumAtoms()
-    dists = np.zeros((n, n), dtype=np.float32)
-    for i in range(n):
-        for j in range(i + 1, n):
-            dist = Chem.rdMolTransforms.GetBondLength(conformer, i, j)
-            dists[i, j] = dist
-            dists[j, i] = dist
-    return dists
-
-
-def _get_ring_id_of_atom(atom, rings, dtype=np.int32):
-    """ring_id_of_atom[atom_id] = ring index, or 0 when not in any ring."""
-    for rid, ring in enumerate(rings):
-        if atom in ring:
-            return rid      
-    return -1
-
-
 def flat_set(lst):
     """Flatten a list of lists into a set of unique elements."""
     if not lst:
@@ -99,6 +49,10 @@ def flat_set(lst):
     aset = set(item for sublist in lst for item in sublist) 
     alist = sorted(aset)
     return alist
+
+def sort_nested(lst):
+    """Sort a nested list of lists."""
+    return sorted([sorted(sublist) for sublist in lst])
 
 #############################################################################
 ### GRAPH FUNCTIONS ###
@@ -137,6 +91,14 @@ def _fuse_rings(molecule):
     return rings
 
 
+def _get_ring_id_of_atom(atom, rings, dtype=np.int32):
+    """ring_id_of_atom[atom_id] = ring index, or 0 when not in any ring."""
+    for rid, ring in enumerate(rings):
+        if atom in ring:
+            return rid      
+    return -1
+    
+
 def split_into_fragments(molecule):
     """Split molecule into fragments based on rings and their neighbors."""
     atoms, bonds = _get_ha_graph(molecule)
@@ -155,7 +117,7 @@ def split_into_fragments(molecule):
                 fragments[nei_ring_id].append(atom) 
         if atom not in flat_set(fragments): # if an atom with 2+ neighbors not in any of the fragments, make a new fragmnent
             fragments.append([atom] + atom_nei) # add linear atom as its own fragment if it 2+ neighbors
-    return fragments, rings
+    return sort_nested(fragments), sort_nested(rings)
 
 #############################################################################
 ### INITIAL PARTITIONING ###
@@ -169,13 +131,22 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
    
     def _get_min_max_beads(fragment, atoms):
         is_aromatic = any(atoms[a].GetIsAromatic() for a in fragment)
+        is_in_ring = any(atoms[a].IsInRing() for a in fragment)
         n_atoms = len(fragment)
         if is_aromatic:
             min_beads = n_atoms // 2
             max_beads = n_atoms // 2 + n_atoms % 2
-        else:
-            min_beads = (n_atoms + n_atoms % 4) // 4
-            max_beads = n_atoms // 2 
+            return min_beads, max_beads
+        if is_in_ring:
+            min_beads = n_atoms // 3
+            if n_atoms % 3 != 0:
+                min_beads += 1
+            max_beads = n_atoms // 2 + n_atoms % 2
+            return min_beads, max_beads
+        min_beads = n_atoms // 4
+        if n_atoms % 4 != 0:
+            min_beads += 1
+        max_beads = n_atoms // 2 
         return min_beads, max_beads
 
     @timeit(level=logging.DEBUG)
@@ -186,7 +157,7 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         all_combs = np.array(list(itertools.combinations(fragment, nbeads)), dtype=dtype)
         logger.debug(f"Generated {all_combs.shape[0]} combinations.")
         acc_combs = opcy.find_acceptable_combinations(all_combs, bonds)
-        logger.info(f"Found {acc_combs.shape[0]} acceptable combinations")
+        logger.debug(f"Found {acc_combs.shape[0]} acceptable combinations")
         return acc_combs
 
     @timeit(level=logging.DEBUG)
@@ -203,6 +174,34 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
             filtered_list.append(trial)
         return filtered_list
 
+    def _map_fragment(combs, fragment):
+        """Map a fragment to a set of beads based on the trial combinations."""
+
+        def distribute_neis(mapping):
+            n = len(mapping)
+            mapping = [set(ns) for ns in mapping] 
+            for i in range(n):
+                s1 = mapping[i]
+                for j in range(i + 1, n):
+                    s2 = mapping[j]
+                    if len(s1) >= len(s2):
+                        s1 -= s2
+                    else:
+                        s2 -= s1
+            no_mapping = sort_nested(mapping)
+            return no_mapping 
+
+        mappings = []
+        for comb in combs:
+            mapping = [[int(i)] + ha_neis[int(i)] for i in comb]
+            mapping = distribute_neis(mapping)
+            if mapping not in mappings:
+                mappings.append(mapping) 
+                print(mapping)
+        print(len(mappings))
+        no_mappings = [] # non overlapping mappings
+        return mappings
+
     atoms, bonds = _get_ha_graph(molecule)
 
     n_heavy_atoms = len(atoms)
@@ -212,8 +211,9 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         max_beads = n_heavy_atoms // 2 
 
     fragments, rings = split_into_fragments(molecule)
+    print(fragments)
     atids = [a.GetIdx() for a in atoms]
-    ha_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
+    ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
     all_anchors = []
@@ -223,10 +223,13 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
             logger.info(f"Finding acceptable combinations for fragment with {len(fragment)} atoms and {nbeads} beads...")
             combs = _find_bead_anchors(fragment, bonds, nbeads, dtype=dtype)
-            filtered_combs = _filter_out_bad_combinations(combs, ha_atoms_and_neis, natoms=len(fragment), dtype=dtype)
-            fragment_anchors.extend(filtered_combs)
+            # filtered_combs = _filter_out_bad_combinations(combs, ha_atoms_and_neis, natoms=len(fragment), dtype=dtype)
+            mappings = _map_fragment(combs, fragment)
+            fragment_anchors.extend(combs)
+        
         all_anchors.append(fragment_anchors)
     logger.info(f"Number of combinations for fragment anchors: {len(all_anchors)}, Sizes: {[len(r) for r in all_anchors]}")
+    exit()
 
     merged_combs = all_anchors[0]
     for i in range(1, len(all_anchors)): 
@@ -265,6 +268,7 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
     return_list = [x[0] for x in sorted_combs]
+    return_list = [list(map(int, comb)) for comb in return_list]
     logger.info(f"Final number of combinations: {len(return_list)}")
     return return_list
 
@@ -280,6 +284,46 @@ def collect_energies_and_combs(
     dtype=np.int32
 ):
     """Collect energies and combinations for all acceptable trials"""
+
+    def read_bead_params():
+        """Returns bead parameter dictionary
+        CG Bead vdw radius (in Angstroem)"""
+        bead_params = dict()
+        bead_params["rvdw"] = 4.7 / 2.0     # sigma for non-ring 
+        bead_params["rvdw_aromatic"] = 4.1 / 2.0 # AutoM3 change: was 4.3 / 2.0    #sigma for ring
+        bead_params["rvdw_cross"] = 0.5 * ((4.7 / 2.0) + (4.3 / 2.0))
+        bead_params["offset_bd_weight"] = 20.0 # AutoM3 change: was 50.0    #penalty weight for nonring beads
+        bead_params["offset_bd_aromatic_weight"] = 5.0 # AutoM3 change: was 20.0    #penalty weight for ring beads
+        bead_params["lonely_atom_penalize"] = 0.28  # AutoM3 change: was 0.20
+        bead_params["bd_bd_overlap_coeff"] = 1.0 # AutoM3 change: was 9.0
+        bead_params["at_in_bd_coeff"] = 0.9
+        return bead_params
+
+    def _get_masses(molecule):
+        """Return an array of atomic masses for all atoms in the molecule."""
+        masses = []
+        for i in range(molecule.GetNumAtoms()):
+            mass = molecule.GetAtomWithIdx(i).GetMass()
+            masses.append(mass)
+        return np.array(masses).astype(np.float32)
+
+    def _get_bond_distances(conformer):
+        """Return a symmetric (N,N) distance matrix with a 0 diagonal.
+
+        Notes
+        -----
+        `Chem.rdMolTransforms.GetBondLength` is used here (even though it returns a
+        pairwise distance) to preserve existing behavior.
+        """
+        n = conformer.GetNumAtoms()
+        dists = np.zeros((n, n), dtype=np.float32)
+        for i in range(n):
+            for j in range(i + 1, n):
+                dist = Chem.rdMolTransforms.GetBondLength(conformer, i, j)
+                dists[i, j] = dist
+                dists[j, i] = dist
+        return dists
+
     logger.debug("Entering collect_energies_and_combs()") 
     # Trial positions: any heavy atom
     bead_params = read_bead_params()
@@ -320,7 +364,6 @@ def collect_energies_and_combs(
         ene_best_trial,
     )
     list_trial_comb.extend([[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))])
-    
     return list_trial_comb, ene_best_trial
 
 
@@ -332,9 +375,10 @@ def generate_mappings(molecule, min_beads=None, max_beads=None):
     """Generate all possible mappings of atoms to beads for given molecule."""
     anchor_combs = find_bead_anchors(molecule, min_beads=min_beads, max_beads=max_beads)
     mappings = get_mappings(anchor_combs, molecule)
+    exit()
     return mappings
 
-
+@timeit(level=logging.INFO)
 def get_mappings(anchor_combs, molecule):
     """Get partitioning of atoms into beads for given trial combination"""
     logger.info("Finding partitioning for anchor combinations...")
@@ -344,6 +388,21 @@ def get_mappings(anchor_combs, molecule):
     rings = _fuse_rings(molecule)
     atom_ring_ids = [_get_ring_id_of_atom(idx, rings) for idx in atom_ids]
     atom_is_in_ring = [atom_ring_ids[i] != -1 for i in atom_ids]
+
+    mappings = []
+    for comb in anchor_combs:
+        if len(comb) != 19:
+            continue
+        mapping = [set([i] + atom_neighbors[i]) for i in comb]
+        if mapping not in mappings:
+            mappings.append(mapping) 
+
+    # printing
+    for mapping in mappings[:10]:
+        print(mapping)
+    print(len(mappings))
+
+    return
 
     max_attempts = len(anchor_combs)
     all_mappings = []
@@ -392,24 +451,30 @@ def _distribute_atoms(trial_comb, atom_ids, atom_neighbors, atom_ring_ids, atom_
         return False
 
     bead_neighbors = [atom_neighbors[i] for i in trial_comb]
+    print(bead_neighbors)
     bead_is_in_ring = [atom_ring_ids[i] != -1 for i in trial_comb]
     n_atoms = len(atom_ids)
     nei_ids = set(atom_ids) - set(trial_comb)
-    mapping = [[int(i)] for i in trial_comb]
+    mapping = [set([i] + atom_neighbors[i]) for i in trial_comb]
+    print(mapping)
     mappings = [mapping]
+    print(mappings)
+    exit()
     
-    # Distribute neighbors of trial combination atoms to beads,
-    # keeping track of all possible mappings.
-    for nei_idx in nei_ids:
-        updated_mappings = []
-        for mapping in mappings:
-            for idx, bead in enumerate(mapping):
-                if nei_idx not in bead_neighbors[idx]:
-                    continue
-                tmp_mapping = [x.copy() for x in mapping]
-                tmp_mapping[idx].append(nei_idx)
-                updated_mappings.append(tmp_mapping)
-        mappings = updated_mappings
+    # # Distribute neighbors of trial combination atoms to beads,
+    # # keeping track of all possible mappings.
+    # for nei_idx in nei_ids:
+    #     updated_mappings = []
+    #     for mapping in mappings:
+    #         for idx, bead in enumerate(mapping):
+    #             if nei_idx not in bead_neighbors[idx]:
+    #                 continue
+    #             tmp_mapping = [x.copy() for x in mapping]
+    #             tmp_mapping[idx].append(nei_idx)
+    #             updated_mappings.append(tmp_mapping)
+    #     mappings = updated_mappings
+
+
 
     # Filter out mappings with single atoms in beads
     tmp_list = []
