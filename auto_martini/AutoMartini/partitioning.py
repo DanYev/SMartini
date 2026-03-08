@@ -47,8 +47,8 @@ def flat_set(lst):
     if not lst:
         return set()
     aset = set(item for sublist in lst for item in sublist) 
-    alist = sorted(aset)
-    return alist
+    # alist = sorted(aset)
+    return aset
 
 def sort_nested(lst):
     """Sort a nested list of lists."""
@@ -129,7 +129,7 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     arrangement with best energy score. Return all possible arrangements sorted by energy score.
     """
    
-    def _get_min_max_beads(fragment, atoms):
+    def get_min_max_beads(fragment, atoms):
         is_aromatic = any(atoms[a].GetIsAromatic() for a in fragment)
         is_in_ring = any(atoms[a].IsInRing() for a in fragment)
         n_atoms = len(fragment)
@@ -150,7 +150,7 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         return min_beads, max_beads
 
     @timeit(level=logging.DEBUG)
-    def _find_bead_anchors(fragment, bonds, nbeads, dtype=np.int32):
+    def find_anchors(fragment, bonds, nbeads, dtype=np.int32):
         """Find acceptable combinations of anchor atoms for a given number of beads."""
         bonds = np.asarray(bonds, dtype=dtype)
         # all_combs = opcy.generate_combinations(int(n_atoms), int(nbeads), int(start_index), int(chunk_size))
@@ -160,87 +160,121 @@ def find_bead_anchors(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         logger.debug(f"Found {acc_combs.shape[0]} acceptable combinations")
         return acc_combs
 
-    @timeit(level=logging.DEBUG)
-    def _filter_out_bad_combinations(combs, atoms_and_neighbors, natoms, dtype=np.int32):
-        """Filter out bad combinations from acceptable_trials.
-        If the sum of atoms and neighbors for a trial is greater than or equal to the total number of atoms,
-        then we discard that trial, as it would not be a valid partitioning (some atoms would be in multiple beads).
-        """
-        filtered_list = []
-        for trial in combs:
-            trial_atoms_and_neighbors = flat_set([atoms_and_neighbors[idx] for idx in trial])
-            if len(trial_atoms_and_neighbors) < natoms:
-                continue
-            filtered_list.append(trial)
-        return filtered_list
-
-    def _map_fragment(combs, fragment):
-        """Map a fragment to a set of beads based on the trial combinations."""
-
-        def distribute_neis(mapping):
-            n = len(mapping)
-            mapping = [set(ns) for ns in mapping] 
-            for i in range(n):
-                s1 = mapping[i]
-                for j in range(i + 1, n):
+    def distribute_neis(mapping):
+        n = len(mapping)
+        mapping = [set(ns) for ns in mapping]
+        mappings = [mapping]
+        for i in range(n):
+            for j in range(i + 1, n):
+                new_mappings = []
+                for mapping in mappings:
+                    s1 = mapping[i]
                     s2 = mapping[j]
-                    if len(s1) >= len(s2):
-                        s1 -= s2
-                    else:
-                        s2 -= s1
-            no_mapping = sort_nested(mapping)
-            return no_mapping 
+                    overlap = s1.intersection(s2)
+                    if overlap:
+                        new_bead_1 = s1 - overlap
+                        if len(new_bead_1) > 1:
+                            new_mapping_1 = mapping.copy()
+                            new_mapping_1[i] = new_bead_1
+                            new_mappings.append(new_mapping_1)
+                        new_bead_2 = s2 - overlap
+                        if len(new_bead_2) > 1:
+                            new_mapping_2 = mapping.copy()
+                            new_mapping_2[j] = new_bead_2
+                            new_mappings.append(new_mapping_2)
+                if new_mappings:
+                    mappings = new_mappings
+        mappings = [sort_nested(mapping) for mapping in mappings]
+        return mappings
 
+    @timeit(level=logging.DEBUG)
+    def map_fragment(combs, fragment):
+        """Map a fragment to a set of beads based on the trial combinations."""
         mappings = []
         for comb in combs:
-            mapping = [[int(i)] + ha_neis[int(i)] for i in comb]
-            mapping = distribute_neis(mapping)
-            if mapping not in mappings:
+            initial_mapping = [[int(i)] + ha_neis[int(i)] for i in comb]
+            no_mappings = distribute_neis(initial_mapping)
+            for mapping in no_mappings:
+                if mapping in mappings:
+                    continue
+
                 mappings.append(mapping) 
-                print(mapping)
-        print(len(mappings))
+        logger.debug(f"Number of mappings: {len(mappings)}")
         no_mappings = [] # non overlapping mappings
         return mappings
 
+    # STARTING
     atoms, bonds = _get_ha_graph(molecule)
-
     n_heavy_atoms = len(atoms)
-    if not min_beads:
-        min_beads = (n_heavy_atoms + n_heavy_atoms % 4) // 4 
-    if not max_beads:
-        max_beads = n_heavy_atoms // 2 
-
     fragments, rings = split_into_fragments(molecule)
-    print(fragments)
     atids = [a.GetIdx() for a in atoms]
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    all_anchors = []
+    # Map each fragment to beads, and collect all the combinations of mappings for each fragment
+    all_mappings = []
     for fragment in fragments:
-        fragment_anchors = []
-        min_fragment_beads, max_fragment_beads = _get_min_max_beads(fragment, atoms)
+        fragment_mappings = []
+        min_fragment_beads, max_fragment_beads = get_min_max_beads(fragment, atoms)
         for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
             logger.info(f"Finding acceptable combinations for fragment with {len(fragment)} atoms and {nbeads} beads...")
-            combs = _find_bead_anchors(fragment, bonds, nbeads, dtype=dtype)
-            # filtered_combs = _filter_out_bad_combinations(combs, ha_atoms_and_neis, natoms=len(fragment), dtype=dtype)
-            mappings = _map_fragment(combs, fragment)
-            fragment_anchors.extend(combs)
-        
-        all_anchors.append(fragment_anchors)
-    logger.info(f"Number of combinations for fragment anchors: {len(all_anchors)}, Sizes: {[len(r) for r in all_anchors]}")
+            combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
+            mappings = map_fragment(combs, fragment)
+            fragment_mappings.extend(mappings)
+        all_mappings.append(fragment_mappings)
+    logger.info(f"Number of combinations for fragment mappings. Sizes: {[len(r) for r in all_mappings]}")
+
+    # Fragments and their nearest neighbors
+    fns = [flat_set([[a] + ha_neis[a] for a in atids]) for atids in fragments]
+    fragment_connections = []
+    for i in range(len(fns)):
+        for j in range(i + 1, len(fns)):
+            overlap = set(fns[i]).intersection(set(fns[j]))
+            if len(overlap) > 1:
+                fragment_connections.append((i, j, list(overlap)))
+
+    # Merge all the fragments
+    merged_mappings = all_mappings[0] 
+    print(fragments)
+    for conn in fragment_connections:
+        print(conn)
+        i, j = conn[0], conn[1] 
+        overlap = conn[2]
+        fr_2_maps = all_mappings[j]
+        new_mappings = []
+        for m1 in merged_mappings:
+            for m2 in fr_2_maps:
+                ol_beads_1 = [bead for bead in m1 if any(a in bead for a in overlap)]
+                ol_beads_2 = [bead for bead in m2 if any(a in bead for a in overlap)]
+                if ol_beads_1 and ol_beads_2:
+                    ol_bead_1 = ol_beads_1[0]
+                    m1.remove(ol_bead_1)
+                    ol_bead_2 = ol_beads_2[0]
+                    m2.remove(ol_bead_2)
+                    ol_mappings = distribute_neis([ol_bead_1, ol_bead_2])
+                    for ol_mapping in ol_mappings:
+                        new_mapping = m1 + m2 + ol_mapping
+                        if new_mapping not in new_mappings:
+                            new_mappings.append(new_mapping)
+                else:
+                    new_mapping = m1 + m2
+                    if new_mapping not in new_mappings:
+                        new_mappings.append(new_mapping)
+        merged_mappings = new_mappings
+
+    mappings = [] 
+    for mapping in merged_mappings:
+        mapping_flat = flat_set(mapping)
+        all_atoms_are_covered = set(atids).issubset(mapping_flat)
+        if all_atoms_are_covered:
+            mappings.append(mapping)
+
+    mappings = sorted(mappings, key=lambda m: len(m), reverse=True) # prefer mappings with fewer beads (more atoms per bead)
+    print(len(mappings))
+    for mapping in mappings[:10]:
+        print(mapping)
     exit()
 
-    merged_combs = all_anchors[0]
-    for i in range(1, len(all_anchors)): 
-        new_combs = []
-        for comb1 in merged_combs:
-            for comb2 in all_anchors[i]:
-                merged = set(comb1).union(set(comb2))
-                if len(merged) > max_beads:
-                    continue
-                new_combs.append(list(merged))
-        merged_combs = new_combs
     logger.info(f"Total combinations of fragments: {len(merged_combs)}")
  
     logger.info("Sorting Combinations By Their Energies...")
