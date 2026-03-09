@@ -77,23 +77,24 @@ if __name__ == "__main__":
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     
-    # Use auto_martiniM3's built-in .itp writer via topfname
+    # Generate the CG molecule
+    cg_mol = am.solver.Cg_molecule(mol, smiles, molname, 
+        use_vsites=False,
+        min_beads=n_beads, 
+        max_beads=n_beads, 
+        raw_molecule=raw_mol)
+
+    # Write .itp file
     itp_path = mol_dir / f"{molname}.itp"
-    cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_mol)
+    cg_mol.to_itp()  
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)
     pdb_path = mol_dir / f"{molname}.pdb"
-    cg.output_cg_pdb(str(pdb_path))
-    logging.info(f"Wrote: {pdb_path}")
-
-    # Save CG structure (.pdb)
-    pdb_path = mol_dir / f"{molname}.pdb"
-    cg.output_cg_pdb(str(pdb_path))
+    cg_mol.to_pdb(str(pdb_path))
     logging.info(f"Wrote: {pdb_path}")
 
     # Make .map file
     map_path = mol_dir / f"{molname}.map"
-    cg.output_map(str(map_path))
+    cg_mol.output_map(str(map_path))
     logging.info(f"Wrote: {map_path}")

@@ -45,9 +45,9 @@ class Cg_molecule:
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
 
-    def __init__(self, molecule, mol_smi, molname, logp_file_name="logP_smi_extended.dat", 
-        simple_model=None, topfname=None, bartenderfname=None, bartender=None, forcepred=True,
-        min_beads=None, max_beads=None, raw_molecule=None):
+    def __init__(self, molecule, mol_smi, molname, raw_molecule=None, 
+        min_beads=None, max_beads=None, use_vsites=True, forcepred=True, 
+        bartenderfname=None, bartender=None, logp_file_name="logP_smi_extended.dat", ):
         
         # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
 
@@ -56,15 +56,14 @@ class Cg_molecule:
         self.molecule = molecule
         self.smiles = mol_smi
         self.molname = molname
-        self.simple_model = simple_model
-        self.topfname = topfname
-        self.bartenderfname = bartenderfname
-        self.bartender = bartender
-        self.logp_file = os.path.join(os.path.dirname(__file__), logp_file_name)
-        self.forcepred = forcepred
         self.min_beads = min_beads
         self.max_beads = max_beads
         self.raw_molecule = raw_molecule
+        self.use_vsites = use_vsites
+        self.forcepred = forcepred
+        self.logp_file = os.path.join(os.path.dirname(__file__), logp_file_name)
+        self.bartender = bartender
+        self.bartenderfname = bartenderfname
         
         # Initialize state attributes
         self.list_ha = None
@@ -84,7 +83,6 @@ class Cg_molecule:
         self.mapping = None
         self.bead_names = []
         self.bead_coords = []
-        self.topout = None
         self.bartender_out = None
         self.ga_graph = None
         self.aa_graph = None
@@ -92,8 +90,7 @@ class Cg_molecule:
         self.topology = Topology(molname=self.molname, mol_smi=self.smiles, nrexcl=2)
         self.force_map = False
 
-        logger.info("Starting coarse-graining for '%s' (forcepred=%s, simple_model=%s)", self.molname, self.forcepred, self.simple_model)
-        logger.debug("Inputs: topfname=%s bartender=%s bartenderfname=%s logp_file=%s", self.topfname, self.bartender, self.bartenderfname, self.logp_file)
+        logger.info("Starting coarse-graining for '%s' (forcepred=%s)", self.molname, self.forcepred)
 
         # INITIALIZE THE AA MOLECULE
         # TODO: HA and AA / RAW and MOLECULE are messy now
@@ -246,7 +243,6 @@ class Cg_molecule:
             self.build_topology(mapping, beads_rings, bead_types)
             self.topology.partitioning = self._get_aa_partitioning() # make aa_partitioning available in topology for later use in refinement
             self.update_topology(mapping, beads_rings, bead_types, attempt)
-            self.write_topology()
             break
 
     def extract_features(self):
@@ -515,7 +511,8 @@ class Cg_molecule:
 
         # Build virtual sites.
         # BEFORE angles and dihedrals so that they do not end up in any angles or dihedrals.
-        # self.topology.build_virtual_sites()
+        if self.use_vsites:
+            self.topology.build_virtual_sites()
         
         # Build angles
         self.topology.build_angles()
@@ -523,7 +520,6 @@ class Cg_molecule:
         # Build dihedrals (unless simple model)
         self.topology.build_dihedrals()
 
-        
     def update_topology(self, beads, beads_rings, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
         
@@ -555,14 +551,13 @@ class Cg_molecule:
         bonds_write = self.topology.format_bonds()
         angles_write = self.topology.format_angles()
         
-        if not self.simple_model and self.topology.dihedrals:
+        if self.topology.dihedrals:
             dihedrals_write = self.topology.format_dihedrals()
         else:
             dihedrals_write = ""
         
         virtual_sites_write = self.topology.format_virtual_sites()
 
-        self.topout = self.topology.to_itp()
 
         # Build topology output and bartender input
         # run_bartender generates complete topology including exclusions and position_restraints
@@ -573,20 +568,23 @@ class Cg_molecule:
             self.molecule, self.molname, self.topology.atoms_in_smi_dict,
             )
         
-    def write_topology(self):
+    def to_itp(self, itp_output=None):
         """Write topology and bartender files to disk."""
+        topout = self.topology.to_itp()
         
         if self.bartender and self.bartenderfname:
             with open(self.bartenderfname, "w") as btf:
                 btf.write(self.bartender_out)
             logger.info("Wrote bartender input: %s", self.bartenderfname)
         
-        if self.topfname:
-            with open(self.topfname, "w") as fp:
-                fp.write(self.topout)
-            logger.info("Wrote topology: %s", self.topfname)
+        if itp_output:
+            with open(itp_output, "w") as fp:
+                fp.write(topout)
+            logger.info("Wrote topology: %s", itp_output)
+        else:
+            return topout
 
-    def output_aa_gro(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def to_aa_gro(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
         aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
         if aa_output:
@@ -595,7 +593,7 @@ class Cg_molecule:
         else:
             return aa_out
 
-    def output_cg_gro(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def to_gro(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional coarse-grained output to GRO file
         cg_out = output.output_gro(self.bead_coords, self.bead_names, self.molname)
         if cg_output:
@@ -604,7 +602,7 @@ class Cg_molecule:
         else:
             return cg_out
 
-    def output_cg_pdb(self, cg_output=None):
+    def to_pdb(self, cg_output=None):
         """Output CG structure to PDB file with CONECT records from topology
         
         Parameters
@@ -639,6 +637,7 @@ class Cg_molecule:
         to_ff: str = "martini3001"
         ):
         output.output_map(self.topology, map_file, to_ff=to_ff)
+
 
 def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=True):
     """Determine bead types based on smiles of the the atomistic bead fragment."""
