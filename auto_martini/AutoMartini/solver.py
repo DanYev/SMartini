@@ -90,24 +90,20 @@ class Cg_molecule:
         self.force_map = False
 
         logger.info("Starting coarse-graining for '%s' (forcepred=%s)", self.molname, self.forcepred)
-
         # INITIALIZE THE AA MOLECULE
+        logger.info("Embedding the AA molecule + MMFF optimization")
+        self.molecule = Chem.Mol(self.molecule)
+        AllChem.EmbedMolecule(self.molecule, randomSeed=1)
+        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
+        if not self.raw_molecule:
+            self.raw_molecule = self.molecule  
+        self.conformer = self.raw_molecule.GetConformer()
+
         # TODO: HA and AA / RAW and MOLECULE are messy now
         self.ha_graph = self.build_ha_graph()  # Heavy atom graph for partitioning
         self.ha_neighbors = [a["neighbors"] for a in self.ha_graph["atoms"]]  # Precompute neighbors for partitioning
         self.list_ha = [a for a in self.ha_graph["atoms"]]
         self.ha_coords = self.ha_graph["ha_coords"]
-
-        ## AutoM3 : MINIMIZATION with RDkit ###
-        self.molecule = Chem.Mol(self.molecule)
-        logger.debug("Embedding + MMFF optimization")
-        AllChem.EmbedMolecule(self.molecule, randomSeed=1)
-        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
-        AllChem.NormalizeDepiction(self.molecule, scaleFactor=1.12) 
-        if not self.raw_molecule:
-            self.raw_molecule = self.molecule  
-        
-        self.conformer = self.raw_molecule.GetConformer()
 
         # Extract features and build all-atom graph structure
         self.feats = self.extract_features()
@@ -248,7 +244,7 @@ class Cg_molecule:
         logger.debug("Entering build_aa_graph()")
         
         # Get list of heavy atoms and their names
-        conformer = self.molecule.GetConformer()
+        conformer = self.conformer
         num_atoms = conformer.GetNumAtoms()
         list_aa = []
         list_aa_names = []
@@ -337,20 +333,8 @@ class Cg_molecule:
     def build_ha_graph(self):
         """Get graph representation of molecule based on heavy atoms only"""
         # --- Graph representation of the molecule ---
-        if self.raw_molecule:
-            mol = self.raw_molecule
-        elif self.smiles:
-            mol = Chem.MolFromSmiles(self.smiles)
-        else:
-            raise ValueError("Either mol or smiles must be provided")
-        
-        # Ensure molecule has conformer and extract coordinates
-        mol = Chem.RemoveAllHs(mol)  # Keep Hs for accurate graph, but sanitize to ensure valid molecule
-        if mol.GetNumConformers() == 0:
-            AllChem.EmbedMolecule(mol, randomSeed=1)
-            AllChem.MMFFOptimizeMolecule(mol, maxIters=1000, mmffVariant='MMFF94s')
-        
-        conformer = mol.GetConformer()
+        mol = self.raw_molecule
+        conformer = self.conformer
         
         # Extract heavy atom coordinates
         ha_coords = []
@@ -629,9 +613,10 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
     bead_smiles = []
     bead_atomnames = []
     charges = []
+    at_counts = {}
 
     for idx, bead in enumerate(mapping):
-        smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi = substruct2smi(bead, molecule)
+        smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi, at_counts = substruct2smi(bead, molecule, at_counts)
 
         if charge == 0:
             alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, idx + 1, converted_smi, real_smi, logp_file)
@@ -656,25 +641,33 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
     return bead_types, bead_smiles, bead_atomnames, charges
 
 
-def substruct2smi(bead, molecule):
+def substruct2smi(bead, molecule, at_counts={}):
     """Substructure to smiles conversion; also output Wildman-Crippen log_p;
     and charge of group."""
     logger.debug("Entering substruct2smi() for bead %d", bead)
     frag = rdchem.EditableMol(molecule)
-    # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
-    num_atoms = molecule.GetConformer().GetNumAtoms()
+
+    # # Extract heavy atom coordinates
+    # ha_coords = []
+    # for i in range(mol.GetNumAtoms()):
+    #     if mol.GetAtomWithIdx(i).GetSymbol() != "H":
+    #         coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
+    #         ha_coords.append(coord)
+    # # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
+
+    num_atoms = molecule.GetNumAtoms()
     # First delete all hydrogens
     for i in range(num_atoms):
         if molecule.GetAtomWithIdx(i).GetSymbol() == "H":
             # find atom from coordinates
             submol = frag.GetMol()
-            for j in range(submol.GetConformer().GetNumAtoms()):
+            for j in range(submol.GetNumAtoms()):
                 if (
                     molecule.GetConformer().GetAtomPosition(i)[0]
                     == submol.GetConformer().GetAtomPosition(j)[0]
                 ):
                     frag.RemoveAtom(j)
-    n_heavy = frag.GetMol().GetConformer().GetNumAtoms()
+    n_heavy = frag.GetMol().GetNumAtoms()
     
     # Then heavy atoms that aren't part of the CG bead #(except those
     # involved in the same ring).
@@ -682,7 +675,7 @@ def substruct2smi(bead, molecule):
         if atom_idx not in bead: # AutoM3 change
             # find atom from coordinates
             submol = frag.GetMol()
-            for j in range(submol.GetConformer().GetNumAtoms()):
+            for j in range(submol.GetNumAtoms()):
                 if (
                     molecule.GetConformer().GetAtomPosition(atom_idx)[0]
                     == submol.GetConformer().GetAtomPosition(j)[0]
@@ -697,22 +690,29 @@ def substruct2smi(bead, molecule):
 
     smi = Chem.MolToSmiles(Chem.rdmolops.AddHs(frag.GetMol(), addCoords=True))
     ### AutoM3 ###
-    atoms_in_smi = " ; atoms: "
+    atoms_in_smi = ""
     converted_smi = False
     real_smi = None
     for at in range(n_heavy):
         if at in bead:
             at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
-            atom_label = at_symbol + str(at+1)
-            atoms_in_smi += atom_label + ", "
+            if at_symbol not in at_counts.keys():
+                at_counts[at_symbol] = 1
+            else:                
+                at_counts[at_symbol] += 1 
+            atom_label = at_symbol + str(at_counts[at_symbol])
+            atoms_in_smi += atom_label + " "
     if "c" in smi or "n" in smi or "s" in smi:
         converted_smi = True
         real_smi = smi
         smi = cyclic_smi_conversion(smi)
+    print(at_counts)
     # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
     # smi = smi.lower() if smi.islower() else smi.upper()
-    atoms_in_smi = atoms_in_smi.replace(" ; atoms: ", "")[:-2]
-    return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi
+    atoms_in_smi = atoms_in_smi
+    print(bead)
+    print(atoms_in_smi)
+    return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi, at_counts
 
 
 def letter_occurrences(string):

@@ -315,8 +315,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                         new_mapping = sort_nested(new_mapping)
                         mapping_flat = flat_set(new_mapping)
                         all_atoms_are_covered = set(merged_fragment).issubset(mapping_flat)
-                        # if not all_atoms_are_covered:
-                        #     continue
+                        if not all_atoms_are_covered:
+                            continue
                         if new_mapping in new_mappings:
                             continue
                         new_mappings.append(new_mapping)
@@ -332,7 +332,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         merged_mappings = new_mappings
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
-    mappings = [m for m in mappings if len(m) < 10]
+    # mappings = [m for m in mappings if len(m) < 10]
     print(len(mappings))
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
