@@ -26,7 +26,7 @@ runname = CFG.cg_runname
 def setup_martini(sysdir, sysname):
     ### FOR CG PROTEIN+/RNA SYSTEMS ###
     mdsys = GmxSystem(sysdir, sysname)
-    mdsys.prepare_files(pour_martini=True)
+    # mdsys.prepare_files(pour_martini=True)
     shutil.copy("md_cg.mdp", mdsys.mdpdir / "md_cg.mdp")
    
     # LIGANDS 

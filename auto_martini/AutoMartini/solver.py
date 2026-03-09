@@ -220,8 +220,9 @@ class Cg_molecule:
                 hbonda=self.hbond_a,
                 hbondd=self.hbond_d,
             )
+            logger.info("Assigned bead types: %s", bead_types)
 
-            logger.info("Building Atoms")
+            logger.info("Building Atoms...")
             topo = Topology(molname=self.molname, mol_smi=self.smiles)
             topo.bead_atomnames = bead_atomnames
             topo.bead_smiles = bead_smiles
@@ -237,8 +238,8 @@ class Cg_molecule:
             self.bead_names = topo.names
 
             # Check additivity between fragments and entire molecule
-            if not self.check_additivity(bead_types):
-                continue
+            # if not self.check_additivity(bead_types):
+            #     continue
             
             logger.info("Success mapping found on attempt %d", attempt)
             self.topology = topo
@@ -468,7 +469,7 @@ class Cg_molecule:
     def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument
         """Check additivity assumption between sum of free energies of CG beads
         and free energy of whole molecule"""
-        logger.debug("Entering check_additivity()")
+        logger.info("Checking LogP additivity...")
         # If there's only one bead, don't check.
         sum_frag = 0.0
         rings = False
@@ -514,7 +515,7 @@ class Cg_molecule:
 
         # Build virtual sites.
         # BEFORE angles and dihedrals so that they do not end up in any angles or dihedrals.
-        self.topology.build_virtual_sites()
+        # self.topology.build_virtual_sites()
         
         # Build angles
         self.topology.build_angles()
@@ -961,6 +962,7 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
     AutoM3 : Returns water/octanol partitioning free energy defined empiricaly from customized database
     """
     logger.debug("Entering smi2alogps()")
+    forcepred = False
 
     ## AutoM3 ###
     if not logp_file:

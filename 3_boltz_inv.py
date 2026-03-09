@@ -1,6 +1,7 @@
 import copy
-import pickle
 import logging
+import pickle
+import os
 from pathlib import Path
 
 import AutoMartini as am
@@ -205,10 +206,10 @@ def boltzmann_invert_dihedrals(topo,
         angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
         angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
         ill_defined_2 = False
-        # if angle1:
-        #     ill_defined_2 += angle1[0][5] < k_cutoff
-        # if angle2:
-        #     ill_defined_2 += angle2[0][5] < k_cutoff
+        if angle1:
+            ill_defined_2 += angle1[0][5] < k_cutoff
+        if angle2:
+            ill_defined_2 += angle2[0][5] < k_cutoff
 
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
@@ -403,7 +404,7 @@ if __name__ == "__main__":
     # DIHEDRALS
     topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
-    # topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"

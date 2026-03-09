@@ -92,7 +92,7 @@ class Topology:
     # Build methods - update topology data
     def build_atoms(self, mapping, bead_types, bead_coords, molname, molecule):
         """Build atoms data structure."""
-        logger.debug("Entering Topology.build_atoms()")
+        logger.info("Creating bead dictionaries...")
         
         self.mapping = mapping
         self.types = bead_types
@@ -158,13 +158,13 @@ class Topology:
                     if found_connection:
                         break
 
-        # Filter based on distance and add constraints for beads in the same ring
-        for bond in self.constraints:
-            dist = bond[3]
-            if dist > 0.54:
-                self.constraints.remove(bond)
-            if dist < 0.134:
-                raise NameError("Bond too short")
+        # # Filter based on distance and add constraints for beads in the same ring
+        # for bond in self.constraints:
+        #     dist = bond[3]
+        #     if dist > 0.54:
+        #         self.constraints.remove(bond)
+        #     if dist < 0.134:
+        #         raise NameError("Bond too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 

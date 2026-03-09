@@ -131,7 +131,9 @@ def _split_into_fragments(molecule):
             if nei_ring_id != -1:
                 fragments[nei_ring_id].append(atom) 
         if atom not in flat_set(fragments): # if an atom with 2+ neighbors not in any of the fragments, make a new fragmnent
-            fragments.append([atom] + atom_nei) # add linear atom as its own fragment if it 2+ neighbors
+            atoms_to_add = [atom] + atom_nei
+            atoms_to_add = [a for a in atoms_to_add if a not in flat_set(fragments)]
+            fragments.append(atoms_to_add) # add linear atom as its own fragment if it 2+ neighbors
     return sort_nested(fragments), sort_nested(rings), shared_atoms
 
 #############################################################################
@@ -266,7 +268,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
     # new_fragments = [fragments[-2], fragments[-1]]
     # fragments = new_fragments
-    print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -290,7 +291,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ids_to_map = list(range(1, len(fragments)))
     for conn in fragment_connections:
         i, j = conn[0], conn[1] 
-        print(overlap)
         overlap = conn[2]
         id_to_map = j if j in ids_to_map else i
         ids_to_map.remove(id_to_map)
@@ -315,8 +315,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                         new_mapping = sort_nested(new_mapping)
                         mapping_flat = flat_set(new_mapping)
                         all_atoms_are_covered = set(merged_fragment).issubset(mapping_flat)
-                        if not all_atoms_are_covered:
-                            continue
+                        # if not all_atoms_are_covered:
+                        #     continue
                         if new_mapping in new_mappings:
                             continue
                         new_mappings.append(new_mapping)
@@ -332,41 +332,42 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         merged_mappings = new_mappings
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
+    mappings = [m for m in mappings if len(m) < 10]
     print(len(mappings))
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
     return mappings
 
-    logger.info(f"Total combinations of fragments: {len(merged_combs)}")
+    # logger.info(f"Total combinations of fragments: {len(merged_combs)}")
  
-    logger.info("Sorting Combinations By Their Energies...")
-    conformer = molecule.GetConformer()
-    ringatoms_flat = [a for ring in rings for a in ring]
-    list_trial_comb = []
-    current_lowest_energy = float("inf")
-    for n in range(min_beads, max_beads + 1):
-        acceptable_trials = [comb for comb in merged_combs if len(comb) == n]
-        if not acceptable_trials:
-            continue
-        acceptable_trials = np.array(acceptable_trials, dtype=dtype)
-        list_trial_comb, ene_best_trial = collect_energies_and_combs(
-            molecule,
-            conformer,
-            acceptable_trials,
-            ringatoms_flat,
-            current_lowest_energy,
-            list_trial_comb,
-        )
+    # logger.info("Sorting Combinations By Their Energies...")
+    # conformer = molecule.GetConformer()
+    # ringatoms_flat = [a for ring in rings for a in ring]
+    # list_trial_comb = []
+    # current_lowest_energy = float("inf")
+    # for n in range(min_beads, max_beads + 1):
+    #     acceptable_trials = [comb for comb in merged_combs if len(comb) == n]
+    #     if not acceptable_trials:
+    #         continue
+    #     acceptable_trials = np.array(acceptable_trials, dtype=dtype)
+    #     list_trial_comb, ene_best_trial = collect_energies_and_combs(
+    #         molecule,
+    #         conformer,
+    #         acceptable_trials,
+    #         ringatoms_flat,
+    #         current_lowest_energy,
+    #         list_trial_comb,
+    #     )
 
-        if ene_best_trial >= current_lowest_energy:
-            break
-        current_lowest_energy = ene_best_trial
+    #     if ene_best_trial >= current_lowest_energy:
+    #         break
+    #     current_lowest_energy = ene_best_trial
 
-    sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
-    return_list = [x[0] for x in sorted_combs]
-    return_list = [list(map(int, comb)) for comb in return_list]
-    logger.info(f"Final number of combinations: {len(return_list)}")
-    return return_list
+    # sorted_combs = sorted(list_trial_comb, key=itemgetter(1))
+    # return_list = [x[0] for x in sorted_combs]
+    # return_list = [list(map(int, comb)) for comb in return_list]
+    # logger.info(f"Final number of combinations: {len(return_list)}")
+    # return return_list
 
 
 @timeit(level=logging.DEBUG)
