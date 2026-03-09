@@ -200,8 +200,14 @@ class Cg_molecule:
                     hbonda=self.hbond_a,
                     hbondd=self.hbond_d,
                 )
+                print(bead_smiles)
+                if attempt == 10:
+                    break
+                continue
             except:
-                continue  # If get_bead_types fails for any reason, skip to the next mapping
+                print(mapping)
+                print("OOOPS!")
+                # continue  # If get_bead_types fails for any reason, skip to the next mapping
             logger.info("Assigned bead types: %s", bead_types)
 
             # Build the topology instance for this mapping

@@ -247,8 +247,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         overlap = s1.intersection(s2)
         if not overlap:
             return [sort_nested(mapping)]
-        # if len(overlap) > 1:
-        #     return []
+        if len(overlap) > 1:
+            return []
         mappings = []
         new_bead_1 = s1 - overlap
         if len(new_bead_1) > 1:
