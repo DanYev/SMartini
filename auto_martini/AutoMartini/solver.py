@@ -506,6 +506,7 @@ class Cg_molecule:
         """Update topology with formatted output strings after successful mapping."""
         
         # Store convenience references
+        self.topology.aa_mapping = self.aa_mapping
         self.bead_names = self.topology.names
         
         logger.info("Final CG model: %d beads", len(self.bead_names))
@@ -532,14 +533,8 @@ class Cg_molecule:
         atoms_write = self.topology.format_atoms()
         bonds_write = self.topology.format_bonds()
         angles_write = self.topology.format_angles()
-        
-        if self.topology.dihedrals:
-            dihedrals_write = self.topology.format_dihedrals()
-        else:
-            dihedrals_write = ""
-        
+        dihedrals_write = self.topology.format_dihedrals()
         virtual_sites_write = self.topology.format_virtual_sites()
-
 
         # Build topology output and bartender input
         # run_bartender generates complete topology including exclusions and position_restraints

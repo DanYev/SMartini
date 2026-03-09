@@ -295,6 +295,7 @@ def update_angles(
             angle[3] = 1
         if float(angle[5]) < float(k_cutoff):
             angle[3] = 1
+        angle[5] *= CFG.fc_scale
 
     return updated_topo
 
@@ -341,7 +342,7 @@ def update_dihedrals(
 
         group = tuple(sorted(key))
         n_perm = int(perm_group_size.get(group, 1))
-        scale = 1.0 / float(n_perm) # * CFG.fc_scale
+        scale = 1.0 / float(n_perm) * CFG.fc_scale
 
         # Apply scaling to "other" terms when supported.
         # - funct=11: scale kphi (index 5)

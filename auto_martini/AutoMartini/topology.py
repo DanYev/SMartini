@@ -576,7 +576,7 @@ class Topology:
             + "; updated to Martini 3 force field by Magdalena Szczuka\n"
             + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
             + "; SMILES code : " + self.mol_smi + "\n"
-            + "; Mapping: " + str(self.mapping) + "\n"
+            + "; Mapping: " + str(self.aa_mapping) + "\n"
             + "; Ringbeads: " + str(self.ringbeads) + "\n"
             + "\n"
             + "[moleculetype]\n"
@@ -1006,7 +1006,7 @@ def read_itp(itp_file):
                 import ast
                 mapping_str = line.split('Mapping:')[1].strip()
                 try:
-                    topo.mapping = ast.literal_eval(mapping_str)
+                    topo.aa_mapping = ast.literal_eval(mapping_str)
                 except (ValueError, SyntaxError):
                     logger.warning(f"Could not parse mapping from ITP: {mapping_str}")
             # Extract Ringbeads from header comment
