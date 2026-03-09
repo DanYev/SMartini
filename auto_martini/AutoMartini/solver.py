@@ -66,10 +66,8 @@ class Cg_molecule:
         self.bartenderfname = bartenderfname
         
         # Initialize state attributes
-        self.list_ha = None
-        self.list_ha_names = None
-        self.conf = None
-        self.ha_coords = None
+        self.ha_list = None
+        self.ha_bonds = None
         self.aa_coords = None
         self.ring_atoms = None
         self.ring_atoms_flat = None
@@ -100,10 +98,8 @@ class Cg_molecule:
         self.conformer = self.raw_molecule.GetConformer()
 
         # TODO: HA and AA / RAW and MOLECULE are messy now
-        self.ha_graph = self.build_ha_graph()  # Heavy atom graph for partitioning
-        self.ha_neighbors = [a["neighbors"] for a in self.ha_graph["atoms"]]  # Precompute neighbors for partitioning
-        self.list_ha = [a for a in self.ha_graph["atoms"]]
-        self.ha_coords = self.ha_graph["ha_coords"]
+        self.ha_list, self.ha_bonds = self.build_ha_graph()  # Heavy atom graph for partitioning
+        self.ha_neighbors = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in self.ha_list]
 
         # Extract features and build all-atom graph structure
         self.feats = self.extract_features()
@@ -123,7 +119,7 @@ class Cg_molecule:
         self.list_bonds = self.aa_graph["bonds"]
         
         # self.output_aa(f"{self.molname}_aa.gro") 
-        logger.info("Detected %d heavy atoms", len(self.list_ha))
+        logger.info("Detected %d heavy atoms", len(self.ha_list))
         logger.info("Ring atoms: %d (aromatic=%s, aromatic_count=%d)", 
                     len(self.ring_atoms_flat), 
                     self.is_arom, 
@@ -197,12 +193,15 @@ class Cg_molecule:
                 ringbeads.append(new_ring)
 
             # Get bead types based on mapping and features of the atoms in each bead
-            bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
-                mapping=mapping,
-                molecule=self.molecule,
-                hbonda=self.hbond_a,
-                hbondd=self.hbond_d,
-            )
+            try:
+                bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
+                    mapping=mapping,
+                    molecule=self.molecule,
+                    hbonda=self.hbond_a,
+                    hbondd=self.hbond_d,
+                )
+            except:
+                continue  # If get_bead_types fails for any reason, skip to the next mapping
             logger.info("Assigned bead types: %s", bead_types)
 
             # Build the topology instance for this mapping
@@ -320,82 +319,19 @@ class Cg_molecule:
         }
 
 
-    def get_ha_bonds(self):
-        # List of bonds between heavy atoms
-        list_bonds = []
-        for i in range(len(self.list_ha)):
-            for j in range(i + 1, len(self.list_ha)):
-                if self.molecule.GetBondBetweenAtoms(int(self.list_ha[i]), int(self.list_ha[j])) is not None:
-                    list_bonds.append([self.list_ha[i], self.list_ha[j]])
-        return list_bonds
-
-
     def build_ha_graph(self):
-        """Get graph representation of molecule based on heavy atoms only"""
-        # --- Graph representation of the molecule ---
-        mol = self.raw_molecule
-        conformer = self.conformer
-        
-        # Extract heavy atom coordinates
-        ha_coords = []
-        for i in range(mol.GetNumAtoms()):
-            if mol.GetAtomWithIdx(i).GetSymbol() != "H":
-                coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
-                ha_coords.append(coord)
-        
-        # --- Node list (atoms) ---
-        nodes = []
-        ha_idx = 0
-        for a in mol.GetAtoms():
-            # Get heavy atom coordinate if this is a heavy atom
-            coord = None
-            if a.GetSymbol() != "H":
-                coord = ha_coords[ha_idx]
-                ha_idx += 1
-            
-            heavy_neighbors = [n for n in a.GetNeighbors() if n.GetAtomicNum() > 1]
-            neighbor_ids = [n.GetIdx() for n in heavy_neighbors]
-            neighbor_bonds = []
-            for n in heavy_neighbors:
-                bond_id = (int(a.GetIdx()), int(n.GetIdx()))
-                b = mol.GetBondBetweenAtoms(*bond_id)
-                if b is None:
-                    continue
-                neighbor_bonds.append(bond_id)
-            nodes.append({
-                "idx": a.GetIdx(),                    # 0-based
-                "atomic_num": a.GetAtomicNum(),       # 6 for C, 7 for N
-                "formal_charge": a.GetFormalCharge(),
-                "is_aromatic": a.GetIsAromatic(),
-                "is_in_ring": a.IsInRing(),
-                "degree": a.GetDegree(),              # total neighbors (includes H only if explicit)
-                "heavy_degree": len(heavy_neighbors),
-                "neighbors": neighbor_ids,             # heavy-atom neighbors only
-                "neighbor_bonds": neighbor_bonds,      # heavy-atom neighbor + bond metadata
-                "num_h": a.GetTotalNumHs(),            # implicit H count (unless you add Hs)
-                "coord": coord,                        # coordinates (only for heavy atoms)
-            })
-
-        # --- Edge list (bonds) ---
-        edges = []
-        for b in mol.GetBonds():
-            i = b.GetBeginAtomIdx()
-            j = b.GetEndAtomIdx()
-            edges.append({
-                "ij": (i, j),
-                "bond_type": str(b.GetBondType()),     # 'SINGLE', 'DOUBLE', 'AROMATIC', ...
-                "is_aromatic": b.GetIsAromatic(),
-                "is_conjugated": b.GetIsConjugated(),
-                "stereo": str(b.GetStereo()),
-            })
-
-        terminal_atoms = [
-            a.GetIdx()
-            for a in mol.GetAtoms()
-            if sum(1 for n in a.GetNeighbors() if n.GetAtomicNum() > 1) == 1
-        ]
-
-        return {"atoms": nodes, "bonds": edges, "terminal_atoms": terminal_atoms, "ha_coords": ha_coords}
+        """Extract molecule info needed for partitioning."""
+        molecule = self.molecule
+        atoms = molecule.GetAtoms()
+        ha_list = [a for a in atoms if a.GetAtomicNum() > 1]
+        bonds = []
+        for ai in ha_list:
+            for aj in ha_list:
+                i = ai.GetIdx()
+                j = aj.GetIdx()
+                if i < j and molecule.GetBondBetweenAtoms(int(i), int(j)) is not None:
+                    bonds.append([i, j])
+        return ha_list, bonds
 
 
     def get_aa_mapping(self):
@@ -617,6 +553,8 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
 
     for idx, bead in enumerate(mapping):
         smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi, at_counts = substruct2smi(bead, molecule, at_counts)
+        if "." in smi_frag:
+            raise ValueError(f"Fragment SMILES contains a dot ('.'), your atoms in bead {bead}: {smi_frag} are disconnected. Please check your molecule and mapping.")
 
         if charge == 0:
             alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, idx + 1, converted_smi, real_smi, logp_file)
@@ -646,14 +584,6 @@ def substruct2smi(bead, molecule, at_counts={}):
     and charge of group."""
     logger.debug("Entering substruct2smi() for bead %d", bead)
     frag = rdchem.EditableMol(molecule)
-
-    # # Extract heavy atom coordinates
-    # ha_coords = []
-    # for i in range(mol.GetNumAtoms()):
-    #     if mol.GetAtomWithIdx(i).GetSymbol() != "H":
-    #         coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
-    #         ha_coords.append(coord)
-    # # fragment smi: [H]N([H])c1nc(N([H])[H])n([H])n1
 
     num_atoms = molecule.GetNumAtoms()
     # First delete all hydrogens
@@ -706,12 +636,9 @@ def substruct2smi(bead, molecule, at_counts={}):
         converted_smi = True
         real_smi = smi
         smi = cyclic_smi_conversion(smi)
-    print(at_counts)
     # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
     # smi = smi.lower() if smi.islower() else smi.upper()
     atoms_in_smi = atoms_in_smi
-    print(bead)
-    print(atoms_in_smi)
     return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi, at_counts
 
 
