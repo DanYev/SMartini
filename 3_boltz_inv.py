@@ -205,10 +205,10 @@ def boltzmann_invert_dihedrals(topo,
         angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
         angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
         ill_defined_2 = False
-        if angle1:
-            ill_defined_2 += angle1[0][5] < k_cutoff
-        if angle2:
-            ill_defined_2 += angle2[0][5] < k_cutoff
+        # if angle1:
+        #     ill_defined_2 += angle1[0][5] < k_cutoff
+        # if angle2:
+        #     ill_defined_2 += angle2[0][5] < k_cutoff
 
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
@@ -407,6 +407,7 @@ if __name__ == "__main__":
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"
+    os.remove(fit_cache_file) if fit_cache_file.exists() else None
     logger.info("Saving fit cache to %s", fit_cache_file)
     with open(fit_cache_file, "wb") as f:
         pickle.dump(master_fit_cache, f)

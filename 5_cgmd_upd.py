@@ -296,7 +296,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
             if funct == 9 and len(updated) >= 8:
                 mult = int(updated[7])
-                if mult == len(terms): 
+                if mult == len(terms) or mult == 1: 
                     scale = float(sigma_cg / sigma_aa) ** 0.7
                 k_new = float(updated[6]) * scale
                 k_new = max(k_new, float(CFG.dihedral_k_cutoff))

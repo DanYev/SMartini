@@ -63,7 +63,7 @@ def process_ligand(ligand_name):
     model.addSolvent(forcefield, 
         model='tip3p', 
         boxShape='cube', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.0 * unit.nanometer,
+        padding=1.2 * unit.nanometer,
         ionicStrength=0.0 * unit.molar,
         positiveIon='Na+',
         negativeIon='Cl-')    
