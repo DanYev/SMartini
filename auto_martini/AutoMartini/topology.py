@@ -193,7 +193,6 @@ class Topology:
         logger.info("Building angles...")
 
         bondlist = self.bonds + self.constraints
-        partitioning = self.partitioning
         coords = self.coords
         nbeads = self.nbeads
 

@@ -81,7 +81,7 @@ def output_pdb(sites, site_names, molname, bonds=None, constraints=None):
     str
         PDB format string with ATOM and CONECT records
     """
-    logger.info("Writing PDB file")
+    logger.debug("Writing PDB file")
     num_beads = len(sites)
     pdb_out = ""
     
