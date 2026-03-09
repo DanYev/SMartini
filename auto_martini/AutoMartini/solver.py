@@ -79,7 +79,6 @@ class Cg_molecule:
         self.hbond_d = None
         self.list_bonds = None
         self.neighbors = None
-        self.partitioning = None
         self.mapping = None
         self.bead_names = []
         self.bead_coords = []
@@ -165,6 +164,7 @@ class Cg_molecule:
         attempt = -1
         self.max_attempts = len(mappings) 
         for mapping in mappings:
+
             attempt += 1
             if attempt % 100 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
@@ -172,7 +172,6 @@ class Cg_molecule:
             mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
             self.mapping = mapping
             self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
-
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
 
             # Extract position of coarse-grained beads
@@ -180,18 +179,6 @@ class Cg_molecule:
             self.aa_mapping = self.get_aa_mapping()  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
             self.bead_coords = self.get_bead_coords()
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
-
-            # CG beads should take atom rings number if ring atom in bead 
-            beads_rings = mapping.copy()
-            for i, b in enumerate(mapping):
-                if b not in self.ring_atoms_flat:
-                    atoms_in_b = []
-                    for at,bd in self.partitioning.items():
-                        if bd == i : atoms_in_b.append(at)
-                    for a in atoms_in_b:
-                        if a in self.ring_atoms_flat:
-                            beads_rings[i] = a
-            logger.info("CG beads rings updated")
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
@@ -203,7 +190,6 @@ class Cg_molecule:
                             for at in atom_indices:
                                 if at not in ring:
                                     ring.append(at)
-
             ringbeads = []
             for ring in self.ring_atoms:
                 new_ring = []
@@ -214,6 +200,7 @@ class Cg_molecule:
                             new_ring.sort()
                 ringbeads.append(new_ring)
 
+            # Get bead types based on mapping and features of the atoms in each bead
             bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
                 mapping=mapping,
                 molecule=self.molecule,
@@ -222,6 +209,7 @@ class Cg_molecule:
             )
             logger.info("Assigned bead types: %s", bead_types)
 
+            # Build the topology instance for this mapping
             logger.info("Building Atoms...")
             topo = Topology(molname=self.molname, mol_smi=self.smiles)
             topo.bead_atomnames = bead_atomnames
@@ -243,16 +231,17 @@ class Cg_molecule:
             
             logger.info("Success mapping found on attempt %d", attempt)
             self.topology = topo
-            self.build_topology(mapping, beads_rings, bead_types)
-            # self.topology.partitioning = self._get_aa_partitioning() # make aa_partitioning available in topology for later use in refinement
-            self.update_topology(mapping, beads_rings, bead_types, attempt)
+            self.build_topology(mapping)
+            self.update_topology(mapping, bead_types, attempt)
             break
+
 
     def extract_features(self):
         """Extract features of molecule (H-bond donors/acceptors, etc.)"""
         logger.debug("Entering extract_features()")
         features = Cg_molecule._factory.GetFeaturesForMol(self.molecule)
         return features
+
 
     def build_aa_graph(self):
         """Build all-atom graph data structure with heavy atoms, coords, rings, H-bonds, etc."""
@@ -334,6 +323,7 @@ class Cg_molecule:
             "bonds": bonds,
         }
 
+
     def get_ha_bonds(self):
         # List of bonds between heavy atoms
         list_bonds = []
@@ -342,6 +332,7 @@ class Cg_molecule:
                 if self.molecule.GetBondBetweenAtoms(int(self.list_ha[i]), int(self.list_ha[j])) is not None:
                     list_bonds.append([self.list_ha[i], self.list_ha[j]])
         return list_bonds
+
 
     def build_ha_graph(self):
         """Get graph representation of molecule based on heavy atoms only"""
@@ -439,6 +430,7 @@ class Cg_molecule:
             aa_mapping.append(bead)
         return aa_mapping
 
+
     def get_bead_coords(self):
         # Extract atom coordinates
         aa_coords = []
@@ -457,6 +449,7 @@ class Cg_molecule:
             bead_cog /= len(bead)
             bead_coords.append(bead_cog)
         return bead_coords
+
 
     def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument
         """Check additivity assumption between sum of free energies of CG beads
@@ -491,32 +484,25 @@ class Cg_molecule:
         else:
             return False
 
-    def build_topology(self, beads, beads_rings, bead_types):
+
+    def build_topology(self, beads):
         """Build topology data using Topology instance methods."""
-        
-        # Override beadtypes if provided
-        if bead_types is not None:
-            self.topology.beadtypes = bead_types
-        
         # Build bonds and constraints
         self.topology.build_bonds(ha_neighbors=self.ha_neighbors)
-
         # Build exclusions 
         # BEFORE virtual sites so that we can duplicate default nrexcl exclusions for virtual sites
         self.topology.build_exclusions()
-
         # Build virtual sites.
         # BEFORE angles and dihedrals so that they do not end up in any angles or dihedrals.
         if self.use_vsites:
             self.topology.build_virtual_sites()
-        
         # Build angles
         self.topology.build_angles()
-        
         # Build dihedrals (unless simple model)
         self.topology.build_dihedrals()
 
-    def update_topology(self, beads, beads_rings, bead_types, attempt):
+
+    def update_topology(self, beads, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
         
         # Store convenience references
@@ -564,6 +550,7 @@ class Cg_molecule:
             self.molecule, self.molname, self.topology.atoms_in_smi_dict,
             )
         
+
     def to_itp(self, itp_output=None):
         """Write topology and bartender files to disk."""
         topout = self.topology.to_itp()
@@ -580,6 +567,7 @@ class Cg_molecule:
         else:
             return topout
 
+
     def to_aa_gro(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional all-atom output to GRO file
         aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
@@ -589,6 +577,7 @@ class Cg_molecule:
         else:
             return aa_out
 
+
     def to_gro(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
         # Optional coarse-grained output to GRO file
         cg_out = output.output_gro(self.bead_coords, self.bead_names, self.molname)
@@ -597,6 +586,7 @@ class Cg_molecule:
                 fp.write(cg_out)
         else:
             return cg_out
+
 
     def to_pdb(self, cg_output=None):
         """Output CG structure to PDB file with CONECT records from topology
@@ -627,6 +617,7 @@ class Cg_molecule:
                 fp.write(cg_out)
         else:
             return cg_out
+
 
     def output_map(self, 
         map_file: str = None, 

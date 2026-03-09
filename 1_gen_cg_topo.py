@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     # Write .itp file
     itp_path = mol_dir / f"{molname}.itp"
-    cg_mol.to_itp()  
+    cg_mol.to_itp(itp_path)  
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)

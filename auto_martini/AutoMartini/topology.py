@@ -56,7 +56,8 @@ class Topology:
     bead_atomnames: list = field(default_factory=list)
     bead_smiles: list = field(default_factory=list)
     logp_origins: list = field(default_factory=list)
-    partitioning: dict = field(default_factory=dict)
+    mapping: list = field(default_factory=list)
+    aa_mapping: list = field(default_factory=list)
     
     # Bonds data: list of [i, j, funct, dist, k]
     bonds: list = field(default_factory=list)
@@ -158,13 +159,13 @@ class Topology:
                     if found_connection:
                         break
 
-        # # Filter based on distance and add constraints for beads in the same ring
-        # for bond in self.constraints:
-        #     dist = bond[3]
-        #     if dist > 0.54:
-        #         self.constraints.remove(bond)
-        #     if dist < 0.134:
-        #         raise NameError("Bond too short")
+        # Filter based on distance and add constraints for beads in the same ring
+        for bond in self.constraints:
+            dist = bond[3]
+            if dist > 0.54:
+                self.constraints.remove(bond)
+            if dist < 0.134:
+                raise NameError("Bond too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 
@@ -575,7 +576,7 @@ class Topology:
             + "; updated to Martini 3 force field by Magdalena Szczuka\n"
             + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
             + "; SMILES code : " + self.mol_smi + "\n"
-            + "; Partitioning: " + str(self.partitioning) + "\n"
+            + "; Mapping: " + str(self.mapping) + "\n"
             + "; Ringbeads: " + str(self.ringbeads) + "\n"
             + "\n"
             + "[moleculetype]\n"
@@ -1000,14 +1001,14 @@ def read_itp(itp_file):
             # Extract SMILES from header comment
             if 'SMILES code :' in line:
                 topo.mol_smi = line.split('SMILES code :')[1].strip()
-            # Extract Partitioning from header comment
-            if 'Partitioning:' in line:
+            # Extract mapping from header comment
+            if 'mapping:' in line:
                 import ast
-                partitioning_str = line.split('Partitioning:')[1].strip()
+                mapping_str = line.split('Mapping:')[1].strip()
                 try:
-                    topo.partitioning = ast.literal_eval(partitioning_str)
+                    topo.mapping = ast.literal_eval(mapping_str)
                 except (ValueError, SyntaxError):
-                    logger.warning(f"Could not parse partitioning from ITP: {partitioning_str}")
+                    logger.warning(f"Could not parse mapping from ITP: {mapping_str}")
             # Extract Ringbeads from header comment
             if 'Ringbeads:' in line:
                 import ast
