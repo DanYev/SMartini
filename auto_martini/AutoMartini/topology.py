@@ -1002,7 +1002,7 @@ def read_itp(itp_file):
             if 'SMILES code :' in line:
                 topo.mol_smi = line.split('SMILES code :')[1].strip()
             # Extract mapping from header comment
-            if 'mapping:' in line:
+            if 'Mapping:' in line:
                 import ast
                 mapping_str = line.split('Mapping:')[1].strip()
                 try:

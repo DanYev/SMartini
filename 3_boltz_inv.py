@@ -382,7 +382,7 @@ if __name__ == "__main__":
         aa_pdb = aa_dir / "topology.pdb"
         aa_xtc = aa_dir / "samples.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
-        aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.partitioning, 
+        aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.mapping, 
             selection=CFG.aa_selection, stop=CFG.cg_traj_stop)
         logger.info("Calculating internal coordinates from AA trajectory")
         internal_coords = calculate_internal_coordinates(aa_traj, topo)

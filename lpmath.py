@@ -9,7 +9,7 @@ import ligpar_cy
 logger = logging.getLogger(__name__)
 
 
-def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=-2, selection="all"):
+def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, selection="all"):
     """Read AA trajectory and calculate COG trajectory for CG beads.
 
     Parameters
@@ -18,8 +18,9 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=-2, selectio
         Path to atomistic PDB file
     in_xtc : str or Path
         Path to atomistic XTC trajectory
-    partitioning : dict
-        Mapping of atom indices to bead indices {atom_idx: bead_idx}
+    mapping : list[list[int]]
+        A list of lists, where each inner list contains the 0-based atom indices
+        belonging to a CG bead.
     start : int
         Starting frame index to read from the trajectory
     stop : int
@@ -35,24 +36,24 @@ def read_cog_trajectory(in_pdb, in_xtc, partitioning, start=0, stop=-2, selectio
     """
     logger.info("Reading AA trajectory: %s, %s, selection='%s'", in_pdb, in_xtc, selection)
 
+    if not mapping:
+        raise ValueError("Input 'mapping' is empty. Cannot compute COG trajectory for 0 beads.")
+
     u = Universe(str(in_pdb), str(in_xtc))
     
     # Select atoms based on selection string
     atom_group = u.select_atoms(selection)
     logger.info("Selected %s atoms with selection '%s'", len(atom_group), selection)
 
-    n_beads = max(partitioning.values()) + 1
-    bead_to_atoms = {i: [] for i in range(n_beads)}
-    for atom_idx, bead_idx in partitioning.items():
-        bead_to_atoms[bead_idx].append(atom_idx)
-
+    n_beads = len(mapping)
+    
     # Read frames into list first to avoid zeros from frame mismatch
     frames = []
     for ts in u.trajectory[start:stop]:
         frame_beads = np.zeros((n_beads, 3))
-        for bead_idx in range(n_beads):
-            atom_indices = bead_to_atoms[bead_idx]
+        for bead_idx, atom_indices in enumerate(mapping):
             if atom_indices:
+                # MDAnalysis atom indices are 0-based, which matches our mapping
                 positions = atom_group[atom_indices].positions
                 frame_beads[bead_idx] = positions.mean(axis=0) / 10.0
         frames.append(frame_beads)
