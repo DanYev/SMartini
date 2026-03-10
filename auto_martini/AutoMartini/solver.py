@@ -161,9 +161,12 @@ class Cg_molecule:
             if attempt % 100 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
 
-            mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
-            self.mapping = mapping
-            self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
+            try:
+                mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
+                self.mapping = mapping
+                self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
+            except:
+                continue
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
 
             # Extract position of coarse-grained beads
@@ -200,14 +203,8 @@ class Cg_molecule:
                     hbonda=self.hbond_a,
                     hbondd=self.hbond_d,
                 )
-                print(bead_smiles)
-                if attempt == 10:
-                    break
-                continue
             except:
-                print(mapping)
-                print("OOOPS!")
-                # continue  # If get_bead_types fails for any reason, skip to the next mapping
+                continue  # If get_bead_types fails for any reason, skip to the next mapping
             logger.info("Assigned bead types: %s", bead_types)
 
             # Build the topology instance for this mapping
@@ -560,7 +557,9 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
     for idx, bead in enumerate(mapping):
         smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi, at_counts = substruct2smi(bead, molecule, at_counts)
         if "." in smi_frag:
-            raise ValueError(f"Fragment SMILES contains a dot ('.'), your atoms in bead {bead}: {smi_frag} are disconnected. Please check your molecule and mapping.")
+            logger.info((f"Fragment SMILES contains a dot ('.'), your atoms in bead {bead}: {smi_frag} are disconnected. "
+            "Skipping to the next one."))
+            raise ValueError
 
         if charge == 0:
             alogps, logp_origin = smi2alogps(forcepred, smi_frag, wc_log_p, idx + 1, converted_smi, real_smi, logp_file)
