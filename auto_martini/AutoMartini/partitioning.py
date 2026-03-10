@@ -72,9 +72,6 @@ def _get_ha_graph(molecule):
     return ha_list, bonds
 
 
-
-
-
 def _remove_shared_atoms_from_bonds(bonds, shared_atoms):
     """Remove bonds between shared atoms, since they will be part of the same fragment.
     Otherwise, the mapping of the shared atoms to beads may not be consistent across fragments.
@@ -138,7 +135,7 @@ def split_into_fragments(molecule):
             atoms_to_add = [atom] + atom_nei
             # atoms_to_add = [a for a in atoms_to_add if a not in flat_set(fragments)]
             fragments.append(atoms_to_add) # add linear atom as its own fragment if it 2+ neighbors
-    return sort_nested(fragments), sort_nested(rings), shared_atoms
+    return fragments, rings, shared_atoms # ! RINGS MUST BE FIRST IN THE LIST OF FRAGMENTS!
 
 #############################################################################
 ### PARTITIONING ###
@@ -228,7 +225,7 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
     fragment_mappings = []
     min_fragment_beads, max_fragment_beads = get_min_max_beads(fragment, atoms)
     for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
-        logger.info(f"Finding acceptable combinations for fragment with {len(fragment)} atoms and {nbeads} beads...")
+        logger.info(f"Finding combinations for fragment {fragment} with {nbeads} beads...")
         combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
         mappings = find_no_overlap_mappings(combs, fragment)
         fragment_mappings.extend(mappings)
@@ -244,24 +241,31 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     def find_overlap(frag, other_frags):
         # Fragments and their nearest neighbors
         fns = flat_set([[a] + ha_neis[a] for a in frag])
-        other_fns_list = [flat_set([[a] + ha_neis[a] for a in atids]) for atids in other_frags]
         for idx in range(len(other_frags)):
-            other_fns = other_fns_list[idx]
-            overlap = fns.intersection(other_fns)
+            other_frag = other_frags[idx]
+            other_frag_set = set(other_frag) - set(frag) # This way connections will be along the linear frag 
+            other_frag_fns = flat_set([[a] + ha_neis[a] for a in other_frag_set])
+            overlap = fns.intersection(other_frag_fns)
+            if len(overlap) > 2:
+                frag_set = set(frag) - set(other_frag)
+                frag_fns = flat_set([[a] + ha_neis[a] for a in frag_set])
+                other_frag_set = set(other_frag)
+                other_frag_fns = flat_set([[a] + ha_neis[a] for a in other_frag_set])
+                overlap = frag_fns.intersection(other_frag_fns)
             if len(overlap) > 1:
                 other_frag = other_frags.pop(idx)
-                print(f"Overlap of {overlap} between fragments {frag} and {other_frag}")
+                logger.info(f"Overlap of {overlap} between fragments {frag} and {other_frag}")
                 return other_frag, idx, overlap
         raise ValueError(
             f"No overlap found for fragment {frag} with any of the other fragments. "
             "Check your fragments"
         )
 
-    def map_overlap(mapping):
-        n = len(mapping)
-        if len(flat_set(mapping)) < 4:
-            return [[sorted(list(flat_set(mapping)))]]
-        mapping = [set(ns) for ns in mapping]
+    def map_overlap(overlap):
+        n = len(overlap)
+        if len(flat_set(overlap)) < 4:
+            return [[sorted(list(flat_set(overlap)))]]
+        mapping = [set(ns) for ns in overlap]
         s1 = mapping[0]
         s2 = mapping[1]
         overlap = s1.intersection(s2)
@@ -280,18 +284,24 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
             mappings.append(new_mapping_2)
         return mappings
     
+    logger.info("Extracting heavy-atom graph...")
     atoms, bonds = _get_ha_graph(molecule)
+
+    logger.info("Splitting molecule into fragments...")
     fragments, rings, shared_atoms = split_into_fragments(molecule)
+    logger.info(f"Total Number of Fragments: {len(fragments)}, Number of Rings: {len(rings)}")
+
     bonds = _remove_shared_atoms_from_bonds(bonds, shared_atoms)
     atids = [a.GetIdx() for a in atoms]
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    # # DEBUG
-    # print(fragments)
-    # new_fragments = [fragments[i] for i in [0, 1, 2, 4, 5, 3]]
-    # fragments = new_fragments
-    # print(fragments)
+    # DEBUG
+    print(fragments)
+    alist = [3, 1, 4, 5, 6] 
+    new_fragments = [fragments[i] for i in alist]
+    fragments = new_fragments
+    print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -306,7 +316,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     merged_frag = fragments.pop(0)
     for x in range(len(fragments)):
         other_frag, other_index, overlap = find_overlap(merged_frag, fragments)
-        print(other_frag, other_index, overlap)
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
@@ -315,14 +324,16 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                 ol_beads_1 = [bead for bead in m1 if any(a in bead for a in overlap)]
                 ol_beads_2 = [bead for bead in m2 if any(a in bead for a in overlap)]
                 if ol_beads_1 and ol_beads_2:
-                    ol_bead_1 = ol_beads_1[0]
+                    overlapping_beads = ol_beads_1 + ol_beads_2
+                    if len(overlapping_beads) > 2:
+                        continue
                     m1_copy = m1.copy()
+                    ol_bead_1 = overlapping_beads[0]
                     m1_copy.remove(ol_bead_1)
-                    ol_bead_2 = ol_beads_2[0]
                     m2_copy = m2.copy()
+                    ol_bead_2 = overlapping_beads[1]
                     m2_copy.remove(ol_bead_2)
-                    connection = [ol_bead_1, ol_bead_2]
-                    mappings = map_overlap(connection)
+                    mappings = map_overlap(overlapping_beads)
                     for mapping in mappings:
                         new_mapping = m1_copy + m2_copy + mapping
                         new_mapping = sort_nested(new_mapping)
@@ -347,8 +358,10 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
     # mappings = [m for m in mappings if len(m) < 10]
     print(len(mappings))
-    for mapping in mappings[:10]:
-        print(len(mapping), mapping)
+    for mapping in mappings:
+        if [0, 1, 7] in mapping:
+            print(len(mapping), mapping)
+    exit()
     return mappings
 
     # logger.info(f"Total combinations of fragments: {len(merged_combs)}")
