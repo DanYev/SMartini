@@ -590,10 +590,10 @@ class Topology:
         """Format atoms list into ITP text."""
         text = ""
         text += "[atoms]\n"
-        text += ";id type resn res    atom  cgnr chrg  mass ; atomnames         ; smiles         ; logp_origin\n"
+        text += ";id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin\n"
         for atom in self.atoms:
             text += (
-                "{:<3d} {:5s} {:d}   {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:18s}; {:15s}; {:9s}\n".format(
+                "{:<3d} {:5s} {:d}   {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:15s}; {:15s}; {:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                     atom['cgnr'], atom['charge'], atom['mass'], atom['atomnames'], atom['smiles'], atom['logp_origin']
                 )

@@ -206,10 +206,10 @@ def boltzmann_invert_dihedrals(topo,
         angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
         angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
         ill_defined_2 = False
-        if angle1:
-            ill_defined_2 += angle1[0][5] < k_cutoff
-        if angle2:
-            ill_defined_2 += angle2[0][5] < k_cutoff
+        # if angle1:
+        #     ill_defined_2 += angle1[0][5] < k_cutoff
+        # if angle2:
+        #     ill_defined_2 += angle2[0][5] < k_cutoff
 
         ill_defined = ill_defined_1 or ill_defined_2
         if ill_defined:
@@ -383,7 +383,7 @@ if __name__ == "__main__":
         aa_pdb = aa_dir / "topology.pdb"
         aa_xtc = aa_dir / "samples.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
-        aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.mapping, 
+        aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.aa_mapping, 
             selection=CFG.aa_selection, stop=CFG.cg_traj_stop)
         logger.info("Calculating internal coordinates from AA trajectory")
         internal_coords = calculate_internal_coordinates(aa_traj, topo)
