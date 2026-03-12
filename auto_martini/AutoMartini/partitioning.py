@@ -166,6 +166,8 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
             max_beads = n_atoms // 2 
             return min_beads, max_beads
         min_beads = n_atoms // 4
+        if min_beads == 0:
+            min_beads = 1
         # if n_atoms % 4 != 0:
         #     min_beads += 1
         max_beads = n_atoms // 2 + 1
@@ -263,9 +265,18 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         )
 
     def map_overlap(beads, overlap):
+        """Map overlapping beads when connecting the fragments"""
+
+        def bead_is_connected(bead):
+            return True
+            for i in range(len(bead)):
+                for j in range(i + 1, len(bead)):
+                    if not [bead[i], bead[j]] in bonds and not [bead[j], bead[i]] in bonds:
+                        return False
+            return True
+        
+        logger.debug(f"Mapping overlap of {overlap} with beads {beads}")
         beads_set = flat_set(beads)
-        if len(beads_set) < 4:
-            return [[sorted(list(beads_set))]]
         if len(overlap) == 2 and len(beads_set) == 4:
             s = list(beads_set - set(overlap))
             overlap = list(overlap)
@@ -273,12 +284,21 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                 return [sort_nested([[s[0], overlap[0]], [s[1], overlap[1]]])]
             else:
                 return [sort_nested([[s[0], overlap[1]], [s[1], overlap[0]]])]
+        mappings = []
+        if len(beads_set) < 4:
+            mappings.append([sorted(list(beads_set))])
         s1 = set(beads[0])
         s2 = set(beads[1])
         overlap = set(overlap)
-        mapping_1 = sort_nested([s1 - overlap, s2])
-        mapping_2 = sort_nested([s1, s2 - overlap])
-        return [mapping_1, mapping_2] 
+        nb1 = list(s1 - overlap)
+        nb2 = list(s2 - overlap)
+        if len(nb1) > 1 and bead_is_connected(nb1):
+            mapping_1 = sort_nested([nb1, s2])
+            mappings.append(mapping_1)
+        if len(nb2) > 1 and bead_is_connected(nb2):
+            mapping_2 = sort_nested([s1, nb2])
+            mappings.append(mapping_2)
+        return mappings
 
     logger.info("Extracting heavy-atom graph...")
     atoms, bonds = _get_ha_graph(molecule)
@@ -291,13 +311,13 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    # DEBUG
-    print(fragments)
-    print(frag_is_symmetric)
-    # alist = [0, 1, 3, 4, 2]
+    # # DEBUG
+    # print(fragments)
+    # print(frag_is_symmetric)
+    # alist = [1, 3, 2, 4]
     # new_fragments = [fragments[i] for i in alist]
     # fragments = new_fragments
-    print(fragments)
+    # print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -359,7 +379,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
-    exit()
     return mappings
 
 

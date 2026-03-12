@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "FTA"
+    molname: str = "LIB"
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")

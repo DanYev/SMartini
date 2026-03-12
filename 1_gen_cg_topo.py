@@ -4,7 +4,7 @@ import rdkit
 import AutoMartini as am
 
 from pathlib import Path
-from openff.toolkit import ForceField, Molecule, Topology 
+from openff.toolkit import Molecule
 from rdkit import Chem
 from config import CFG
 
