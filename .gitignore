@@ -63,6 +63,8 @@ nosetests.xml
 *.pyd
 *.dll
 *.dylib
+*.so
+
 
 # Cython build artifacts
 *.c
@@ -70,8 +72,8 @@ nosetests.xml
 *.html
 
 # ---- HPC / cluster outputs ----
-slurm-*.out
-slurm-*.err
+slurm*.out
+slurm*.err
 
 # ---- Data / outputs (project-specific) ----
 # keep top-level entries above; add common scratch patterns

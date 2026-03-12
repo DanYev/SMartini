@@ -375,11 +375,12 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
     print(len(mappings))
-    mappings = filter_mappings(mappings, molecule, max_bead_size=3)
+    # mappings = filter_mappings(mappings, molecule, max_bead_size=3)
     print(len(mappings))
 
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
+    exit()
     return mappings
 
 
