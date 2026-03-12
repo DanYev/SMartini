@@ -76,7 +76,7 @@ def _kT_kjmol(temperature: float) -> float:
 def _normalize_density(x_grid, unnorm):
     x_grid = np.asarray(x_grid, dtype=float)
     unnorm = np.asarray(unnorm, dtype=float)
-    area = float(np.trapz(unnorm, x_grid))
+    area = float(np.trapezoid(unnorm, x_grid))
     if not np.isfinite(area) or area <= 0.0:
         return None
     return unnorm / area

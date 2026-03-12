@@ -315,7 +315,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     # DEBUG
     print(fragments)
     print(frag_is_symmetric)
-    alist = [0]
+    alist = [0, 1, 2]
     new_fragments = [fragments[i] for i in alist]
     fragments = new_fragments
     print(fragments)
