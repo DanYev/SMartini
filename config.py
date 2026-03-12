@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "THC"
+    molname: str = "ANP"
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
@@ -42,8 +42,8 @@ class LigParConfig:
     type9_min_prob: float = 1e-6
 
     # Post-fit filtering / topology cleanup
-    constraint_k_cutoff: float = 20000.0
-    angle_k_cutoff: float = 25.0
+    constraint_k_cutoff: float = 15000.0
+    angle_k_cutoff: float = 20.0
     dihedral_k_cutoff: float = 0.0
     angle_cutoff: float = 150.0
 

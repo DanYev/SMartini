@@ -401,6 +401,7 @@ def fit_type9_dihedral(
 
     optimal_n = int(max(1, min(int(optimal_n), int(max_n))))
     harmonics_to_fit = [] 
+    # optimal_n = max_n
     for n in range(1, optimal_n + 1):
         harmonics_to_fit.append(n)
 
@@ -415,7 +416,7 @@ def fit_type9_dihedral(
     if len(harmonics_to_fit) == 1:
         w = np.pow(density, 1.0)
     else:
-        w = np.pow(density, 0.20)
+        w = np.pow(density, 0.2)
 
     A = np.column_stack(cols)
     Aw = A * w[:, None]
