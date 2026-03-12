@@ -156,7 +156,7 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
         is_in_ring = any(atoms[a].IsInRing() for a in fragment)
         n_atoms = len(fragment)
         if is_aromatic:
-            min_beads = n_atoms // 2 
+            min_beads = n_atoms // 3
             max_beads = n_atoms // 2
             return min_beads, max_beads
         if is_in_ring:
@@ -189,13 +189,14 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
         mappings = []
         for comb in combs:
             mapping = [[int(i)] + ha_neis[int(i)] for i in comb]
-            mapping = sort_nested(mapping)
+            # mapping = sort_nested(mapping)
             mapping_flat = flat_set(mapping)
             all_atoms_are_covered = set(fragment).issubset(mapping_flat)
             if not all_atoms_are_covered:
                 continue
             no_mappings = distribute_neis(mapping)
             for mapping in no_mappings:
+                mapping = sort_nested(mapping)
                 if mapping in mappings:
                     continue
                 mappings.append(mapping) 
@@ -311,13 +312,13 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    # # DEBUG
-    # print(fragments)
-    # print(frag_is_symmetric)
-    # alist = [1, 3, 2, 4]
-    # new_fragments = [fragments[i] for i in alist]
-    # fragments = new_fragments
-    # print(fragments)
+    # DEBUG
+    print(fragments)
+    print(frag_is_symmetric)
+    alist = [0]
+    new_fragments = [fragments[i] for i in alist]
+    fragments = new_fragments
+    print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -374,7 +375,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
     print(len(mappings))
-    mappings = filter_mappings(mappings, molecule)
+    mappings = filter_mappings(mappings, molecule, max_bead_size=3)
     print(len(mappings))
 
     for mapping in mappings[:10]:
