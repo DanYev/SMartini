@@ -59,6 +59,7 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
     # smiles = "Nc1ncnc2n(cnc12)[C@@H]3O[C@H](CO[P](O)(=O)O[P](O)(=O)N[P](O)(O)=O)[C@@H](O)[C@H]3O" # ANP
     # smiles = "CN(C)c1ccc(C2N(C)c3ccccc3N2C)cc1" # DMBI
+    smiles = "CCC1=C(C2=Cc3c(c(c4n3[Mg]56[N]2=C1C=C7N5C8=C([C@H](C(=O)C8=C7C)C(=O)OC)C9=[N]6C(=C4)[C@H]([C@@H]9CCC(=O)OC/C=C(\C)/CCC[C@H](C)CCC[C@H](C)CCCC(C)C)C)C)C=C)C" # CLA
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
@@ -73,7 +74,7 @@ if __name__ == "__main__":
 
 
     ligand_sdf = wdir / f"{molname}.sdf"
-    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf, from_smiles=None)
+    mol, raw_mol = gen_aa_molecule(molname, from_file=None, from_smiles=smiles)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     

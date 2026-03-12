@@ -167,28 +167,92 @@ class Topology:
             if dist < 0.134:
                 raise NameError("Bond too short")
 
-        # If we have 4 bonds corrected in a ring, we can add a constraint between 
-        # the two non-bonded beads in the ring with the shortest distance. 
-        # This is to help maintain ring structure during simulations.
-        for ring in self.ringbeads:
-            if len(ring) == 4:
-                # Add constraint between the two non-bonded beads in the ring with the shortest distance
-                min_dist = float('inf')
-                min_pair = None
-                n_bonds = 0
-                for i in range(len(ring)):
-                    for j in range(i + 1, len(ring)):
-                        pair = (ring[i], ring[j])
-                        if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
-                            n_bonds += 1
-                            continue
-                        dist = np.linalg.norm(coords[pair[0]] - coords[pair[1]]) * 0.1
-                        if dist < min_dist:
-                            min_dist = dist
-                            min_pair = pair
-                if n_bonds == 4: 
-                    self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
-              
+        # # If we have 4 bonds corrected in a ring, we can add a constraint between 
+        # # the two non-bonded beads in the ring with the shortest distance. 
+        # # This is to help maintain ring structure during simulations.
+        # for ring in self.ringbeads:
+        #     if len(ring) == 4:
+        #         # Add constraint between the two non-bonded beads in the ring with the shortest distance
+        #         min_dist = float('inf')
+        #         min_pair = None
+        #         n_bonds = 0
+        #         for i in range(len(ring)):
+        #             for j in range(i + 1, len(ring)):
+        #                 pair = (ring[i], ring[j])
+        #                 if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
+        #                     n_bonds += 1
+        #                     continue
+        #                 dist = np.linalg.norm(coords[pair[0]] - coords[pair[1]]) * 0.1
+        #                 if dist < min_dist:
+        #                     min_dist = dist
+        #                     min_pair = pair
+        #         if n_bonds == 4: 
+        #             self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
+        
+        # Find any 4-bond cycle in the current constraint graph and add the shortest
+        # missing diagonal (if not already present). This helps stabilize ring shape.
+        def _has_constraint(bead_i, bead_j):
+            return any(
+                (bead_i == c[0] and bead_j == c[1]) or (bead_i == c[1] and bead_j == c[0])
+                for c in self.constraints
+            )
+
+        adjacency = {idx: set() for idx in range(nbeads)}
+        for c in self.constraints:
+            bead_i, bead_j = c[0], c[1]
+            adjacency[bead_i].add(bead_j)
+            adjacency[bead_j].add(bead_i)
+
+        def _add_ring_diagonal_if_needed(ring_nodes):
+            # Detect exact 4-cycle topology on these 4 nodes:
+            # 4 internal edges, each node degree 2.
+            internal_edges = []
+            for a in range(4):
+                for b in range(a + 1, 4):
+                    bead_i = ring_nodes[a]
+                    bead_j = ring_nodes[b]
+                    if bead_j in adjacency[bead_i]:
+                        internal_edges.append((bead_i, bead_j))
+
+            if len(internal_edges) != 4:
+                return
+
+            degree = {node: 0 for node in ring_nodes}
+            for bead_i, bead_j in internal_edges:
+                degree[bead_i] += 1
+                degree[bead_j] += 1
+            if any(degree[node] != 2 for node in ring_nodes):
+                return
+
+            # Exactly two pairs are non-bonded in a 4-cycle; add shortest one if absent.
+            min_dist = float("inf")
+            min_pair = None
+            for a in range(4):
+                for b in range(a + 1, 4):
+                    bead_i = ring_nodes[a]
+                    bead_j = ring_nodes[b]
+                    if bead_j in adjacency[bead_i]:
+                        continue
+                    if _has_constraint(bead_i, bead_j):
+                        continue
+                    dist = np.linalg.norm(coords[bead_i] - coords[bead_j]) * 0.1
+                    if dist < min_dist:
+                        min_dist = dist
+                        min_pair = (bead_i, bead_j)
+
+            if min_pair is not None:
+                bead_i, bead_j = min_pair
+                self.constraints.append([bead_i, bead_j, 1, min_dist, "ring_diagonal"])
+                adjacency[bead_i].add(bead_j)
+                adjacency[bead_j].add(bead_i)
+
+        for i in range(nbeads - 3):
+            for j in range(i + 1, nbeads - 2):
+                for k in range(j + 1, nbeads - 1):
+                    for l in range(k + 1, nbeads):
+                        _add_ring_diagonal_if_needed((i, j, k, l))
+
+                    
     def build_angles(self):
         """Build angles data structure."""
         logger.info("Building angles...")
@@ -593,7 +657,7 @@ class Topology:
         text += ";id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin\n"
         for atom in self.atoms:
             text += (
-                "{:<3d} {:5s} {:d}   {:5s}  {:5s}  {:<3d}  {:2d}  {:3d}   ; {:15s}; {:15s}; {:9s}\n".format(
+                "{:<3d} {:5s} {:d}   {:5s}  {:5s}  {:<3d}  {:2.1f}  {:3.1f}   ; {:15s}; {:15s}; {:9s}\n".format(
                     atom['id'], atom['type'], atom['resnr'], atom['residue'], atom['atom'],
                     atom['cgnr'], atom['charge'], atom['mass'], atom['atomnames'], atom['smiles'], atom['logp_origin']
                 )
@@ -1040,8 +1104,8 @@ def read_itp(itp_file):
                 residue = parts[3]
                 atom_name = parts[4]
                 cgnr = int(parts[5])
-                charge = int(parts[6])
-                mass = int(parts[7])
+                charge = float(parts[6])
+                mass = float(parts[7])
                 
                 # Extract extended info from comment (if present)
                 atomnames_part = ""

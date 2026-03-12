@@ -313,12 +313,12 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
     # DEBUG
-    print(fragments)
-    print(frag_is_symmetric)
-    alist = [0, 1, 2]
-    new_fragments = [fragments[i] for i in alist]
-    fragments = new_fragments
-    print(fragments)
+    # print(fragments)
+    # print(frag_is_symmetric)
+    # alist = [0, 1, 2]
+    # new_fragments = [fragments[i] for i in alist]
+    # fragments = new_fragments
+    # print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -375,12 +375,11 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
     print(len(mappings))
-    # mappings = filter_mappings(mappings, molecule, max_bead_size=3)
+    mappings = filter_mappings(mappings, molecule, max_bead_size=4)
     print(len(mappings))
 
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
-    exit()
     return mappings
 
 

@@ -1,5 +1,5 @@
 integrator                  = md
-dt                          = 0.020
+dt                          = 0.010
 nsteps                      = 200000 ;
 nstxout                     = 0
 nstvout                     = 0
