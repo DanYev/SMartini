@@ -197,12 +197,6 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
                 if mapping in mappings:
                     continue
                 mappings.append(mapping) 
-        # for mapping in mappings:
-        #     for bead in mapping:
-        #         for atom in bead:
-        #             if atom not in fragment:
-        #                 bead.remove(atom)
-        logger.debug(f"Number of mappings: {len(mappings)}")
         return mappings
 
     def distribute_neis(mapping):
@@ -230,12 +224,7 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
                     else:
                         new_mappings.append(mapping)
                 mappings = new_mappings
-        unique_mappings = []
-        for mapping in mappings:
-            mapping = sort_nested(mapping)
-            if mapping not in unique_mappings:
-                unique_mappings.append(mapping)
-        return unique_mappings
+        return mappings
 
     frag_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
     is_ring = any(atoms[a].IsInRing() for a in fragment)
@@ -263,51 +252,40 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         for idx in range(len(other_frags)):
             other_frag = set(other_frags[idx])
             overlap = frag.intersection(other_frag)
-            # if len(overlap) > 2:
-            #     frag_set = set(frag) - set(other_frag)
-            #     frag_fns = flat_set([[a] + ha_neis[a] for a in frag_set])
-            #     other_frag_set = set(other_frag)
-            #     other_frag_fns = flat_set([[a] + ha_neis[a] for a in other_frag_set])
-            #     overlap = frag_fns.intersection(other_frag_fns)
-            # if len(overlap) > 1:
-            if overlap:
-                other_frag = other_frags.pop(idx)
-                logger.info(f"Overlap of {overlap} between fragments {frag} and {other_frag}")
-                return other_frag, idx, overlap
+            if not overlap:
+                continue
+            other_frag = other_frags.pop(idx)
+            logger.info(f"Overlap of {overlap} between fragments {frag} and {other_frag}")
+            return other_frag, idx, overlap
         raise ValueError(
             f"No overlap found for fragment {frag} with any of the other fragments. "
             "Check your fragments"
         )
 
-    def map_overlap(overlap):
-        n = len(overlap)
-        overlap_set = flat_set(overlap)
-        if len(overlap_set) < 4:
-            return [[sorted(list(overlap_set))]]
-        s1 = set(overlap[0])
-        s2 = set(overlap[1])
-        overlap = s1.intersection(s2)
-        if len(overlap) > 2:
-            return []
-        mappings = []
-        new_bead_1 = s1 - overlap
-        if len(new_bead_1) > 1:
-            new_mapping_1 = sort_nested([new_bead_1, s2])
-            mappings.append(new_mapping_1)
-        new_bead_2 = s2 - overlap
-        if len(new_bead_2) > 1:
-            new_mapping_2 = sort_nested([s1, new_bead_2])
-            mappings.append(new_mapping_2)
-        return mappings
-    
+    def map_overlap(beads, overlap):
+        beads_set = flat_set(beads)
+        if len(beads_set) < 4:
+            return [[sorted(list(beads_set))]]
+        if len(overlap) == 2 and len(beads_set) == 4:
+            s = list(beads_set - set(overlap))
+            overlap = list(overlap)
+            if [s[0], overlap[0]] in bonds or [overlap[0], s[0]] in bonds:
+                return [sort_nested([[s[0], overlap[0]], [s[1], overlap[1]]])]
+            else:
+                return [sort_nested([[s[0], overlap[1]], [s[1], overlap[0]]])]
+        s1 = set(beads[0])
+        s2 = set(beads[1])
+        overlap = set(overlap)
+        mapping_1 = sort_nested([s1 - overlap, s2])
+        mapping_2 = sort_nested([s1, s2 - overlap])
+        return [mapping_1, mapping_2] 
+
     logger.info("Extracting heavy-atom graph...")
     atoms, bonds = _get_ha_graph(molecule)
-
     logger.info("Splitting molecule into fragments...")
     fragments, top_ranks_list, rings, shared_atoms = split_into_fragments(molecule)
     frag_is_symmetric = [len(set(ranks)) < len(ranks) for ranks in top_ranks_list]
     logger.info(f"Total Number of Fragments: {len(fragments)}, Number of Rings: {len(rings)}")
-
     bonds = _remove_shared_atoms_from_bonds(bonds, shared_atoms)
     atids = [a.GetIdx() for a in atoms]
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
@@ -316,9 +294,9 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     # DEBUG
     print(fragments)
     print(frag_is_symmetric)
-    alist = [0, 1]
-    new_fragments = [fragments[i] for i in alist]
-    fragments = new_fragments
+    # alist = [0, 1, 3, 4, 2]
+    # new_fragments = [fragments[i] for i in alist]
+    # fragments = new_fragments
     print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
@@ -351,7 +329,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                     m2_copy = m2.copy()
                     ol_bead_2 = overlapping_beads[1]
                     m2_copy.remove(ol_bead_2)
-                    mappings = map_overlap(overlapping_beads)
+                    mappings = map_overlap(overlapping_beads, overlap)
                     for mapping in mappings:
                         new_mapping = m1_copy + m2_copy + mapping
                         new_mapping = sort_nested(new_mapping)
@@ -364,6 +342,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                         new_mappings.append(new_mapping)
                 else:
                     new_mapping = m1 + m2
+                    new_mapping = sort_nested(new_mapping)
                     mapping_flat = flat_set(new_mapping)
                     all_atoms_are_covered = set(merged_frag).issubset(mapping_flat)
                     if not all_atoms_are_covered:
@@ -375,7 +354,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
     print(len(mappings))
-    mappings = filter_mappings(mappings, molecule)
+    # mappings = filter_mappings(mappings, molecule)
     print(len(mappings))
 
     for mapping in mappings[:10]:
