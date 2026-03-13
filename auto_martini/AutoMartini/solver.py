@@ -160,17 +160,20 @@ class Cg_molecule:
             attempt += 1
             if attempt % 100 == 0:  # Log every 1000 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
+            print(mapping)
 
+            # NOT NEEDED ANYMORE BUT USEFUL FOR DEBUGGING 
             try:
                 mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
-                self.mapping = mapping
                 self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
             except:
+                logger.warning("Failed to create partitioning dictionary for attempt %d: %s", attempt, mapping)
                 continue
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
 
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
+            self.mapping = mapping
             self.aa_mapping = self.get_aa_mapping()  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
             self.bead_coords = self.get_bead_coords()
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))

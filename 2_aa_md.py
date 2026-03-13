@@ -22,7 +22,7 @@ GAMMA = 1 / unit.picosecond
 PRESSURE = 1 * unit.bar
 # Either steps or time
 TSTEP = 2 * unit.femtoseconds
-TOTAL_STEPS = int(1e9)
+TOTAL_STEPS = int(1e7)
 # Reporting: save every NOUT steps
 TRJ_NOUT = 10000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
@@ -183,6 +183,6 @@ def _get_reporters(append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    # process_ligand(ligand_name)
+    process_ligand(ligand_name)
     md_npt()
     trjconv()

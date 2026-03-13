@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=0-02:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
+#SBATCH --time=0-04:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
 #SBATCH --partition=htc
 #SBATCH --qos=public
 #SBATCH --nodes=1

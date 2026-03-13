@@ -167,27 +167,28 @@ class Topology:
             if dist < 0.134:
                 raise NameError("Bond too short")
 
-        # # If we have 4 bonds corrected in a ring, we can add a constraint between 
-        # # the two non-bonded beads in the ring with the shortest distance. 
-        # # This is to help maintain ring structure during simulations.
-        # for ring in self.ringbeads:
-        #     if len(ring) == 4:
-        #         # Add constraint between the two non-bonded beads in the ring with the shortest distance
-        #         min_dist = float('inf')
-        #         min_pair = None
-        #         n_bonds = 0
-        #         for i in range(len(ring)):
-        #             for j in range(i + 1, len(ring)):
-        #                 pair = (ring[i], ring[j])
-        #                 if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
-        #                     n_bonds += 1
-        #                     continue
-        #                 dist = np.linalg.norm(coords[pair[0]] - coords[pair[1]]) * 0.1
-        #                 if dist < min_dist:
-        #                     min_dist = dist
-        #                     min_pair = pair
-        #         if n_bonds == 4: 
-        #             self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
+        # If we have 4 bonds corrected in a ring, we can add a constraint between 
+        # the two non-bonded beads in the ring with the shortest distance. 
+        # This is to help maintain ring structure during simulations.
+        for ring in self.ringbeads:
+            if len(ring) == 4:
+                # Add constraint between the two non-bonded beads in the ring with the shortest distance
+                min_dist = float('inf')
+                min_pair = None
+                n_bonds = 0
+                for i in range(len(ring)):
+                    for j in range(i + 1, len(ring)):
+                        pair = (ring[i], ring[j])
+                        if any((pair[0] == b[0] and pair[1] == b[1]) or (pair[0] == b[1] and pair[1] == b[0]) for b in self.constraints):
+                            n_bonds += 1
+                            continue
+                        dist = np.linalg.norm(coords[pair[0]] - coords[pair[1]]) * 0.1
+                        if dist < min_dist:
+                            min_dist = dist
+                            min_pair = pair
+                if n_bonds == 4: 
+                    self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
+        return 
         
         # Find any 4-bond cycle in the current constraint graph and add the shortest
         # missing diagonal (if not already present). This helps stabilize ring shape.

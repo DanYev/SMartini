@@ -273,6 +273,40 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
             "Check your fragments"
         )
 
+    def merge_fragments(m1, m2, overlaps):
+        """m1 and m2 are the mappings of the two fragments to be merged along ONE connection, and overlap is ONE atom.
+        Each connection will have to be merged separately, and the resulting mappings will be merged together at the end.
+        """
+        initial_mapping = m1 + m2
+        mappings = [initial_mapping]
+        for overlap in overlaps:
+            stitched_mappings = []
+            for mapping in mappings:
+                overlapping_beads = [bead for bead in mapping if overlap in bead]
+                if len(overlapping_beads) != 2:
+                    raise ValueError(
+                        f"Expected 2 overlapping beads for overlap {overlap} between fragments with mappings {m1} and {m2}, "
+                        f"but found {len(overlapping_beads)}: {overlapping_beads}. Check your fragments and their overlaps."
+                    )
+                mapping_copy = mapping.copy()
+                ol_bead_1 = overlapping_beads[0]
+                ol_bead_2 = overlapping_beads[1]
+                mapping_copy.remove(ol_bead_1)
+                mapping_copy.remove(ol_bead_2)
+                overlap_mappings = map_overlap(overlapping_beads, overlap)
+                for mapping in overlap_mappings:
+                    new_mapping = mapping_copy + mapping
+                    new_mapping = sort_nested(new_mapping)
+                    # mapping_flat = flat_set(new_mapping)
+                    # all_atoms_are_covered = set(merged_frag).issubset(mapping_flat)
+                    # if not all_atoms_are_covered:
+                    #     continue
+                    if new_mapping in stitched_mappings:
+                        continue
+                    stitched_mappings.append(new_mapping)
+            mappings = stitched_mappings
+        return mappings
+
     def map_overlap(beads, overlap):
         """Map overlapping beads when connecting the fragments"""
 
@@ -301,36 +335,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         if len(nb2) > 1 and bead_is_connected(nb2):
             mapping_2 = sort_nested([b1, nb2])
             mappings.append(mapping_2)
-        return mappings
-
-    def merge_overlap(m1, m2, overlap):
-        """m1 and m2 are the mappings of the two fragments to be merged along ONE connection, and overlap is ONE atom.
-        Each connection will have to be merged separately, and the resulting mappings will be merged together at the end.
-        """
-        mappings = []
-        ol_beads_1 = [bead for bead in m1 if overlap in bead]
-        ol_beads_2 = [bead for bead in m2 if overlap in bead]
-        overlapping_beads = ol_beads_1 + ol_beads_2
-        if len(overlapping_beads) != 2:
-            raise ValueError(
-                f"Expected 2 overlapping beads for overlap {overlap} between fragments with mappings {m1} and {m2}, "
-                f"but found {len(overlapping_beads)}: {overlapping_beads}. Check your fragments and their overlaps."
-            )
-        m1_copy = m1.copy()
-        ol_bead_1 = overlapping_beads[0]
-        m1_copy.remove(ol_bead_1)
-        m2_copy = m2.copy()
-        ol_bead_2 = overlapping_beads[1]
-        m2_copy.remove(ol_bead_2)
-        overlap_mappings = map_overlap(overlapping_beads, overlap)
-        for mapping in overlap_mappings:
-            new_mapping = m1_copy + m2_copy + mapping
-            new_mapping = sort_nested(new_mapping)
-            mapping_flat = flat_set(new_mapping)
-            all_atoms_are_covered = set(merged_frag).issubset(mapping_flat)
-            if not all_atoms_are_covered:
-                continue
-            mappings.append(new_mapping)
         return mappings
 
     logger.info("Extracting heavy-atom graph...")
@@ -370,11 +374,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         new_mappings = []
         for m1 in merged_mappings:
             for m2 in mappings_to_add:
-                for overlap in overlaps:
-                    mappings = merge_overlap(m1, m2, overlap)
-                    for mapping in mappings:
-                        if mapping not in new_mappings:
-                            new_mappings.append(mapping)
+                merged_mappings = merge_fragments(m1, m2, overlaps)
+                new_mappings.extend(merged_mappings)
         merged_mappings = new_mappings
     mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
 
