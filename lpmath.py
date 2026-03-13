@@ -9,7 +9,7 @@ import ligpar_cy
 logger = logging.getLogger(__name__)
 
 
-def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, selection="all"):
+def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, step=1, selection="all"):
     """Read AA trajectory and calculate COG trajectory for CG beads.
 
     Parameters
@@ -49,7 +49,7 @@ def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, selection="al
     
     # Read frames into list first to avoid zeros from frame mismatch
     frames = []
-    for ts in u.trajectory[start:stop]:
+    for ts in u.trajectory[start:stop:step]:
         frame_beads = np.zeros((n_beads, 3))
         for bead_idx, atom_indices in enumerate(mapping):
             if atom_indices:
@@ -67,7 +67,7 @@ def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, selection="al
     return cg_trajectory
 
 
-def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
+def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, step=1,selection="all"):
     """Read CG trajectory and return positions in nm.
 
     Parameters
@@ -99,7 +99,7 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, selection="all"):
     
     # Read frames into list first to avoid zeros from frame mismatch
     frames = []
-    for ts in u.trajectory[start:stop]:
+    for ts in u.trajectory[start:stop:step]:
         frames.append(atom_group.positions / 10.0)
     
     # Convert list to numpy array

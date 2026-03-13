@@ -389,7 +389,7 @@ if __name__ == "__main__":
         aa_internal = pickle.load(f)
 
     logger.info("Reading CG trajectory from %s", cg_dir)
-    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None)  
+    cg_traj = read_cg_trajectory(cg_pdb, cg_xtc, start=0, stop=None, step=100)  
     cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
     # Refine the CG topology based on CG-vs-AA distribution mismatch.

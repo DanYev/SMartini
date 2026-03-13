@@ -135,8 +135,10 @@ def split_into_fragments(molecule):
     nt_linear_atoms = [a.GetIdx() for a in atoms if a.GetIdx() not in flat_set(ring_fragments) and a.GetDegree() > 1]
     ring_attached_atoms = flat_set(ring_fragments) - flat_set(rings)
     nt_ring_attached_atoms = [a.GetIdx() for a in atoms if a.GetIdx() in ring_attached_atoms and a.GetDegree() > 1]
+    nt_atoms = nt_linear_atoms + nt_ring_attached_atoms
+    nt_atoms = sorted(nt_atoms, key=lambda a: atoms[a].GetDegree(), reverse=True) # sort by rank so that we start mapping from the most important atoms (e.g. branching points) to try to preserve them as anchors if possible
     linear_fragments = []
-    for atom in nt_linear_atoms + nt_ring_attached_atoms:
+    for atom in nt_atoms:
         if atom in flat_set(linear_fragments):
             continue
         atom_neis = ha_neis[atom]
@@ -144,7 +146,22 @@ def split_into_fragments(molecule):
         atoms_to_add = [nei for nei in atom_and_neis if nei not in flat_set(rings)]
         if len(atoms_to_add) > 1:
             linear_fragments.append(atoms_to_add) # add linear atom as its own fragment if it 2+ neighbors
+    # Add leftover atoms to existing fragment
+    fragments = ring_fragments + linear_fragments
+    fragments_flat = flat_set(fragments)
+    leftover_atoms = [a.GetIdx() for a in atoms if a.GetIdx() not in fragments_flat]
+    for atom in leftover_atoms:
+        for nei in ha_neis[atom]:
+            for frag in (linear_fragments + ring_fragments):
+                if nei in frag:
+                    frag.append(atom)
+                    break
+            break
+    # Combine and sort fragments
     fragments = sort_nested(ring_fragments) + sort_nested(linear_fragments)
+    if not len(flat_set(fragments)) == len(atoms):
+        missing_atoms = set(atids) - flat_set(fragments)
+        raise ValueError(f"Error in fragment generation: {missing_atoms} atoms are missing from the fragments. Check your fragments. Fragments: {fragments}")
     frag_ranks_list = [[ranks[a] for a in frag] for frag in fragments]
     return fragments, frag_ranks_list, rings, shared_atoms 
 
@@ -297,10 +314,10 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                 for mapping in overlap_mappings:
                     new_mapping = mapping_copy + mapping
                     new_mapping = sort_nested(new_mapping)
-                    # mapping_flat = flat_set(new_mapping)
-                    # all_atoms_are_covered = set(merged_frag).issubset(mapping_flat)
-                    # if not all_atoms_are_covered:
-                    #     continue
+                    mapping_flat = flat_set(new_mapping)
+                    all_atoms_are_covered = set(merged_frag).issubset(mapping_flat)
+                    if not all_atoms_are_covered:
+                        continue
                     if new_mapping in stitched_mappings:
                         continue
                     stitched_mappings.append(new_mapping)
