@@ -22,9 +22,9 @@ GAMMA = 1 / unit.picosecond
 PRESSURE = 1 * unit.bar
 # Either steps or time
 TSTEP = 2 * unit.femtoseconds
-TOTAL_STEPS = int(1e6)
+TOTAL_STEPS = int(1e9)
 # Reporting: save every NOUT steps
-TRJ_NOUT = 1000 # normally you want ~10000 here
+TRJ_NOUT = 10000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
 CHK_NOUT = 100000 
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
@@ -49,7 +49,9 @@ def process_ligand(ligand_name):
     aa_dir.mkdir(parents=True, exist_ok=True)
     input_file = wdir / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
+    # smiles = "CCC1=C(C2=Cc3c(c(c4n3[Mg@]56[N]2=C1C=C7N5C8=C([C@H](C(=O)C8=C7C)C(=O)OC)C9=[N]6C(=C4)[C@H]([C@@H]9CCC(=O)OC/C=C(\C)/CCC[C@H](C)CCC[C@H](C)CCCC(C)C)C)C)C=C)C"
     ligand = Molecule.from_file(str(input_file))
+    # ligand = Molecule.from_smiles(smiles)
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
     forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
     # Ligand FF
@@ -181,6 +183,6 @@ def _get_reporters(append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    process_ligand(ligand_name)
+    # process_ligand(ligand_name)
     md_npt()
     trjconv()
