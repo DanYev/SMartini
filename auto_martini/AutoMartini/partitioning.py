@@ -135,17 +135,22 @@ def split_into_fragments(molecule):
     nt_linear_atoms = [a.GetIdx() for a in atoms if a.GetIdx() not in flat_set(ring_fragments) and a.GetDegree() > 1]
     ring_attached_atoms = flat_set(ring_fragments) - flat_set(rings)
     nt_ring_attached_atoms = [a.GetIdx() for a in atoms if a.GetIdx() in ring_attached_atoms and a.GetDegree() > 1]
-    nt_atoms = nt_linear_atoms + nt_ring_attached_atoms
-    nt_atoms = sorted(nt_atoms, key=lambda a: atoms[a].GetDegree(), reverse=True) # sort by rank so that we start mapping from the most important atoms (e.g. branching points) to try to preserve them as anchors if possible
+    nt_linear_atoms = sorted(nt_linear_atoms, key=lambda a: atoms[a].GetDegree(), reverse=True) # sort by rank so that we start mapping from the most important atoms (e.g. branching points) to try to preserve them as anchors if possible
     linear_fragments = []
-    for atom in nt_atoms:
+    for atom in nt_linear_atoms:
         if atom in flat_set(linear_fragments):
             continue
         atom_neis = ha_neis[atom]
         atom_and_neis = [atom] + atom_neis
         atoms_to_add = [nei for nei in atom_and_neis if nei not in flat_set(rings)]
-        if len(atoms_to_add) > 1:
+        if len(atoms_to_add) > 2: # don't allow small fragments, they will constaring mapping
             linear_fragments.append(atoms_to_add) # add linear atom as its own fragment if it 2+ neighbors
+    for atom in nt_ring_attached_atoms:
+        for frag in linear_fragments:
+            atom_neis = ha_neis[atom]
+            if any(nei in frag for nei in atom_neis):
+                frag.append(atom)
+                break
     # Add leftover atoms to existing fragment
     fragments = ring_fragments + linear_fragments
     fragments_flat = flat_set(fragments)
@@ -157,7 +162,6 @@ def split_into_fragments(molecule):
                     frag.append(atom)
                     break
             break
-    # Combine and sort fragments
     fragments = sort_nested(ring_fragments) + sort_nested(linear_fragments)
     if not len(flat_set(fragments)) == len(atoms):
         missing_atoms = set(atids) - flat_set(fragments)
@@ -389,22 +393,39 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
-        for m1 in merged_mappings:
+        for m1 in merged_mappings[:1000]:
             for m2 in mappings_to_add:
                 merged_mappings = merge_fragments(m1, m2, overlaps)
                 new_mappings.extend(merged_mappings)
-        merged_mappings = new_mappings
-    mappings = sorted(merged_mappings, key=lambda m: len(m), reverse=True)    
+        merged_mappings = filter_mappings(new_mappings, molecule, max_bead_size=5, max_ring_bead_size=3)
+        merged_mappings = sorted(merged_mappings, key=lambda m: -len(m))  
+    mappings = merged_mappings
+    logger.info(f"Total combinations of mappings: {len(mappings)}")
 
-    print(len(mappings))
-    mappings = filter_mappings(mappings, molecule, max_bead_size=4)
-    print(len(mappings))
+    logger.info("Filtering and sorting the mappings...")
+    mappings = filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=2)
+    # mappings = [mapping for mapping in mappings if len(mapping) == 17]
+    mappings = sort_mappings(mappings, molecule, rings)
     for mapping in mappings[:10]:
         print(len(mapping), mapping)
     return mappings
 
 
-def filter_mappings(mappings, molecule, max_bead_size=4):
+def sort_mappings(mappings, molecule, rings):
+
+    def num_nonring_beads(mapping):
+        count = 0
+        for bead in mapping:
+            is_in_ring = any(atom in flat_set(rings) for atom in bead)
+            if not is_in_ring:
+                count += 1
+        return count
+        
+    mappings = sorted(mappings, key=lambda m: (-len(m), -num_nonring_beads(m)))    
+    return mappings
+
+
+def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 
     def single_atom_in_mapping(mapping):
@@ -413,20 +434,19 @@ def filter_mappings(mappings, molecule, max_bead_size=4):
                 return True
         return False
 
-    def aromatic_beads_are_tiny(mapping):
+    def aromatic_beads_are_small(mapping):
         for bead in mapping:
             is_aromatic = all(atom_is_aromatic[a] for a in bead)
-            if is_aromatic and len(bead) > 2:
+            if is_aromatic and len(bead) > max_ring_bead_size:
                 return False
         return True
 
-    def ring_beads_are_together(mapping):
-        for bead, ring in zip(mapping, bead_is_in_ring):
-            if not ring:
-                continue
-            for atom in bead:
-                if not atom_is_in_ring[atom]:
-                    return False
+    def ring_beads_are_together(mapping, ring):
+        for bead in mapping:
+            any_in_ring = any(atom in ring for atom in bead)
+            all_in_ring = all(atom in ring for atom in bead)
+            if any_in_ring and not all_in_ring:
+                return False
         return True
 
     def beads_are_big(mapping):
@@ -462,27 +482,40 @@ def filter_mappings(mappings, molecule, max_bead_size=4):
     if len(mappings) == 1:
         return mappings
 
+    # Prefer keeping ring beads together (no mixing ring/non-ring)
+    rings = [rings[0]]
+    for ring in rings:
+        tmp_list = []
+        for mapping in mappings:
+            if not ring_beads_are_together(mapping, ring):
+                continue
+            tmp_list.append(mapping)
+        if tmp_list:
+            mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings[0]
+
     # Prefer keeping aromatic beads small
     tmp_list = []
     for mapping in mappings:
-        if not aromatic_beads_are_tiny(mapping):
+        if not aromatic_beads_are_small(mapping):
             continue
         tmp_list.append(mapping)
     if tmp_list:
         mappings = tmp_list
     if len(mappings) == 1:
         return mappings
-
-    # # Prefer keeping ring beads together (no mixing ring/non-ring)
-    # tmp_list = []
-    # for mapping in mappings:
-    #     if not ring_beads_are_together(mapping):
-    #         continue
-    #     tmp_list.append(mapping)
-    # if tmp_list:
-    #     mappings = tmp_list
-    # if len(mappings) == 1:
-    #     return mappings[0]
+    
+    # Remove duplicates
+    tmp_list = []
+    for mapping in mappings:
+        if mapping in tmp_list:
+            continue
+        tmp_list.append(mapping)
+    if tmp_list:
+        mappings = tmp_list
+    if len(mappings) == 1:
+        return mappings
 
     # TODO: SYMMETRIZE MAPPINGS
     if len(mappings) == 2:
