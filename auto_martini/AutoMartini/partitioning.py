@@ -371,13 +371,13 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    # # DEBUG
-    # print(fragments)
-    # print(frag_is_symmetric)
-    # alist = [0, 1, 2, 3]
-    # new_fragments = [fragments[i] for i in alist]
-    # fragments = new_fragments
-    # print(fragments)
+    # DEBUG
+    print(fragments)
+    print(frag_is_symmetric)
+    alist = [0, 1, 2, 3]
+    new_fragments = [fragments[i] for i in alist]
+    fragments = new_fragments
+    print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []

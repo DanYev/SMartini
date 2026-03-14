@@ -168,15 +168,8 @@ class Cg_molecule:
                 self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
             except:
                 logger.warning("Failed to create partitioning dictionary for attempt %d: %s", attempt, mapping)
-                continue
+                # continue
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
-
-            # Extract position of coarse-grained beads
-            logger.info("Extracting coordinates for CG beads")
-            self.mapping = mapping
-            self.aa_mapping = self.get_aa_mapping()  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
-            self.bead_coords = self.get_bead_coords()
-            logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
 
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
@@ -209,6 +202,14 @@ class Cg_molecule:
             except:
                 continue  # If get_bead_types fails for any reason, skip to the next mapping
             logger.info("Assigned bead types: %s", bead_types)
+
+            # Extract position of coarse-grained beads
+            logger.info("Extracting coordinates for CG beads")
+            self.mapping = mapping
+            sym_mapping = self.symmetrize_rings_in_mapping(mapping, return_1_or_2=2)
+            self.aa_mapping = self.get_aa_mapping(sym_mapping)  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
+            self.bead_coords = self.get_bead_coords(mapping=self.aa_mapping)  # Get bead coordinates based on AA mapping
+            logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
 
             # Build the topology instance for this mapping
             logger.info("Building Atoms...")
@@ -340,10 +341,40 @@ class Cg_molecule:
         return ha_list, bonds
 
 
-    def get_aa_mapping(self):
+    def symmetrize_rings_in_mapping(self, mapping, return_1_or_2=1):
+
+        def sort_nested(lst):
+            """Sort a nested list of lists."""
+            return sorted([sorted(sublist) for sublist in lst])
+
+        molecule = self.molecule
+        rings = molecule.GetRingInfo().AtomRings()
+        ring = rings[0]
+        ring_beads = [bead for bead in mapping if all(atom in ring for atom in bead)]
+        m = mapping.copy()
+        for bead in ring_beads:
+            if bead in m:
+                m.remove(bead)
+        mapping_1 = m.copy()
+        for i in range(0, len(ring), 2):
+            bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]] 
+            mapping_1.append(bead)
+        mapping_1 = sort_nested(mapping_1)
+        mapping_2 = m.copy()
+        for i in range(1, len(ring) + 1, 2):
+            bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]] 
+            mapping_2.append(bead)
+        mapping_2 = sort_nested(mapping_2)
+        if return_1_or_2 == 1:
+            return mapping_1
+        else:
+            return mapping_2
+
+
+    def get_aa_mapping(self, mapping):
         """Update HA partitioning to include hydrogens in the same bead as their heavy atom neighbors"""
         aa_mapping = []
-        for bead in self.mapping:
+        for bead in mapping:
             bead = bead.copy()
             for atom_idx in bead:
                 atom = self.molecule.GetAtomWithIdx(int(atom_idx))
@@ -357,7 +388,7 @@ class Cg_molecule:
         return aa_mapping
 
 
-    def get_bead_coords(self):
+    def get_bead_coords(self, mapping):
         # Extract atom coordinates
         aa_coords = []
         mol = self.raw_molecule
@@ -366,7 +397,6 @@ class Cg_molecule:
             coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
             aa_coords.append(coord)
         # Map
-        mapping = self.aa_mapping if hasattr(self, "aa_mapping") else self.mapping
         bead_coords = []
         for bead in mapping:
             bead_cog = np.zeros(3)
@@ -430,7 +460,8 @@ class Cg_molecule:
 
     def update_topology(self, beads, bead_types, attempt):
         """Update topology with formatted output strings after successful mapping."""
-        
+
+
         # Store convenience references
         self.topology.aa_mapping = self.aa_mapping
         self.bead_names = self.topology.names
