@@ -311,7 +311,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                 lonely_bead = lonely_beads[0]
                 lonely_atom = lonely_bead[0]
                 neighboring_beads = [bead for bead in mapping if any(atom in bead for atom in ha_neis[lonely_atom])]
-                print(lonely_atom, neighboring_beads)
                 if not neighboring_beads:
                     new_mappings.append(mapping)
                     continue
@@ -321,8 +320,9 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                     new_mapping.remove(neighboring_bead)
                     new_bead = neighboring_bead + lonely_bead
                     new_mapping.append(new_bead)
-                    new_mappings.append(new_mapping)
-                    print(new_mapping)
+                    new_mapping = sort_nested(new_mapping)
+                    if new_mapping not in new_mappings:
+                        new_mappings.append(new_mapping)
             return new_mappings
 
         initial_mapping = m1 + m2
@@ -345,7 +345,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
                 for mapping in overlap_mappings:
                     new_mapping = mapping_copy + mapping
                     stitched_mappings.append(new_mapping)
-                # stitched_mappings = distribute_lonely_atoms(stitched_mappings)
+                stitched_mappings = distribute_lonely_atoms(stitched_mappings)
             mappings = stitched_mappings
         return mappings
 
@@ -394,7 +394,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     print(fragments)
     print(frag_is_symmetric)
     alist = [0, 1, 2, 3, 4, 5, 6]
-    alist = [1, 2, 3, 6]
+    alist = [0, 1, 2, 3, 6]
     new_fragments = [fragments[i] for i in alist]
     fragments = new_fragments
     print(fragments)
@@ -430,9 +430,12 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     mappings = filter_mappings(mappings, molecule, fused_rings, PART_MAX_BEAD_SIZE, PART_MAX_RING_BEAD_SIZE)
     mappings = sort_mappings(mappings, molecule, fused_rings)
     print(len(mappings))
+    tmp_mappings = []
     for mapping in mappings:
-        if [17, 18, 20] in mapping and [25, 26, 28] in mapping:
+        if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping:
             print(len(mapping), mapping)
+            tmp_mappings.append(mapping)
+    mappings = tmp_mappings
     return mappings
 
 
