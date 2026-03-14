@@ -18,6 +18,15 @@ from lpmath import (
 logger = logging.getLogger(__name__)
 
 
+PLOT_COLUMNS = 6
+HIST_BINS_LINEAR = 20
+HIST_BINS_DIHEDRAL = 48
+LINEAR_GRID_POINTS = 250
+DIHEDRAL_GRID_POINTS = 360
+AX_WIDTH_INCH = 3.0
+AX_HEIGHT_INCH = 2.5
+
+
 def _pair_key(i: int, j: int):
     i = int(i)
     j = int(j)
@@ -269,10 +278,14 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
         return
     logger.info("Plotting %s bonds/constraints", n_plots)
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -289,7 +302,13 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
             distances = np.asarray([], dtype=float)
 
         if len(distances) > 0:
-            ax.hist(distances, bins=30, alpha=0.7, edgecolor="black", density=True)
+            ax.hist(
+                distances,
+                bins=HIST_BINS_LINEAR,
+                alpha=0.7,
+                edgecolor="black",
+                density=True,
+            )
             
             # Check for cached fit density
             cache_key = (pair[0], pair[1], str(bond_type))
@@ -306,9 +325,9 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
                 r0 = float(b[3])
                 k = float(b[4])
                 if len(distances) > 0:
-                    x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                    x_grid = np.linspace(np.min(distances), np.max(distances), LINEAR_GRID_POINTS)
                 else:
-                    x_grid = np.linspace(r0 - 0.02, r0 + 0.02, 400)
+                    x_grid = np.linspace(r0 - 0.02, r0 + 0.02, LINEAR_GRID_POINTS)
                 U = _bond_U_harmonic(x_grid, r0, k)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
                 if p is not None:
@@ -319,11 +338,11 @@ def _plot_bonds(bonds_data, topo, output_file, temperature: float, cache=None):
                 r0 = float(c[3])
                 # Constraints are delta-like; approximate with a very stiff harmonic.
                 if len(distances) > 0:
-                    x_grid = np.linspace(np.min(distances), np.max(distances), 400)
+                    x_grid = np.linspace(np.min(distances), np.max(distances), LINEAR_GRID_POINTS)
                     if float(np.ptp(x_grid)) <= 0:
-                        x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, 400)
+                        x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, LINEAR_GRID_POINTS)
                 else:
-                    x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, 400)
+                    x_grid = np.linspace(r0 - 1e-3, r0 + 1e-3, LINEAR_GRID_POINTS)
                 k_eff = 1.0e6  # kJ/mol/nm^2 (visualization-only)
                 U = _bond_U_harmonic(x_grid, r0, k_eff)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=x_grid**2)
@@ -387,10 +406,14 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         return
     logger.info("Plotting %s angles", n_plots)
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -406,7 +429,14 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
             vmin -= 1e-3
             vmax += 1e-3
 
-        ax.hist(angles, bins=30, range=(vmin, vmax), alpha=0.7, edgecolor="black", density=True)
+        ax.hist(
+            angles,
+            bins=HIST_BINS_LINEAR,
+            range=(vmin, vmax),
+            alpha=0.7,
+            edgecolor="black",
+            density=True,
+        )
 
         # Check for cached fit density
         ik0, ik1 = (int(i), int(k))
@@ -424,7 +454,7 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
             if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
                 theta0 = float(angle[4])
                 k_param = float(angle[5])
-                x_grid = np.linspace(vmin, vmax, 400)
+                x_grid = np.linspace(vmin, vmax, LINEAR_GRID_POINTS)
                 U = _angle_U_harmonic(x_grid, theta0, k_param)
                 jac = np.clip(np.sin(np.deg2rad(x_grid)), 0.0, None)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=jac)
@@ -488,10 +518,14 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
     dihedral_terms = _dihedral_terms(topo)
     dihedral_terms_11 = _dihedral_terms_type11(topo)
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -508,11 +542,11 @@ def _plot_dihedrals(dihedrals_data, topo, output_file, temperature: float, cache
         shift = circular_mean(dihedrals) 
         dihedrals_wrapped = wrap_to_180(dihedrals - shift)
         vmin, vmax = -180.0, 180.0
-        x_grid = np.linspace(vmin, vmax, 600)
+        x_grid = np.linspace(vmin, vmax, DIHEDRAL_GRID_POINTS)
 
         ax.hist(
             dihedrals_wrapped,
-            bins=72,
+            bins=HIST_BINS_DIHEDRAL,
             range=(vmin, vmax),
             alpha=0.7,
             edgecolor="black",
@@ -612,9 +646,13 @@ def _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file):
     if n_plots == 0:
         return
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -625,7 +663,7 @@ def _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file):
         i, j, bond_type = key
         aa_vals = bonds_aa.get(key)
         cg_vals = bonds_cg.get(key)
-        bins = _common_bins(aa_vals, cg_vals, bins=30)
+        bins = _common_bins(aa_vals, cg_vals, bins=HIST_BINS_LINEAR)
         hist_range = _preferred_range(aa_vals, cg_vals)
 
         _plot_hist_pair(ax, aa_vals, cg_vals, bins=bins, hist_range=hist_range)
@@ -668,9 +706,13 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
     if n_plots == 0:
         return
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -682,7 +724,7 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
         aa_vals = angles_aa.get(key)
         cg_vals = angles_cg.get(key)
 
-        bins = _common_bins(aa_vals, cg_vals, bins=30)
+        bins = _common_bins(aa_vals, cg_vals, bins=HIST_BINS_LINEAR)
         hist_range = _preferred_range(aa_vals, cg_vals)
 
         _plot_hist_pair(ax, aa_vals, cg_vals, bins=bins, hist_range=hist_range)
@@ -731,9 +773,13 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
     if n_plots == 0:
         return
 
-    n_cols = min(4, n_plots)
+    n_cols = min(PLOT_COLUMNS, n_plots)
     n_rows = int(np.ceil(n_plots / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(AX_WIDTH_INCH * n_cols, AX_HEIGHT_INCH * n_rows),
+    )
     if n_plots == 1:
         axes = [axes]
     else:
@@ -752,7 +798,7 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         aa_shifted = wrap_to_180(aa_vals - aa_shift)
         cg_shifted = wrap_to_180(cg_vals - aa_shift)
 
-        _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=30)
+        _plot_hist_pair(ax, aa_shifted, cg_shifted, bins=HIST_BINS_DIHEDRAL)
 
         ax.set_xlabel(f"Dihedral - {aa_shift:.1f} deg", fontsize=9)
         ax.set_title(f"Dihedral: {i+1}-{j+1}-{k+1}-{l+1}", fontsize=10)
@@ -770,7 +816,7 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
     _save_or_show(output_file, "dihedrals")
 
 
-def _common_bins(aa_vals, cg_vals, bins=30):
+def _common_bins(aa_vals, cg_vals, bins=HIST_BINS_LINEAR):
     all_vals = []
     if aa_vals is not None:
         all_vals.append(aa_vals)
@@ -787,7 +833,7 @@ def _common_bins(aa_vals, cg_vals, bins=30):
     return np.linspace(vmin, vmax, bins + 1)
 
 
-def _plot_hist_pair(ax, aa_vals, cg_vals, bins=30, hist_range=None):
+def _plot_hist_pair(ax, aa_vals, cg_vals, bins=HIST_BINS_LINEAR, hist_range=None):
     if aa_vals is not None:
         ax.hist(
             aa_vals,
@@ -879,7 +925,7 @@ def _save_or_show(output_file, suffix):
         out_path = Path(output_file).parent / f"{base}_{suffix}.png" if isinstance(output_file, (str, Path)) else f"{suffix}.png"
         out_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Saving %s plot to %s", suffix, out_path)
-        plt.savefig(out_path, dpi=100, bbox_inches="tight")
+        plt.savefig(out_path, bbox_inches="tight")
         plt.close()
     else:
         plt.show()

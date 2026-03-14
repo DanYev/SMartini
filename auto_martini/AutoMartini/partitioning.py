@@ -394,7 +394,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     print(fragments)
     print(frag_is_symmetric)
     alist = [0, 1, 2, 3, 4, 5, 6]
-    alist = [0, 1, 2, 3, 6]
+    # alist = [0, 1, 2, 3, 6]
     new_fragments = [fragments[i] for i in alist]
     fragments = new_fragments
     print(fragments)
@@ -415,14 +415,14 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
-        for m1 in merged_mappings[:PART_MAX_MAPPINGS_TO_KEEP+1000]: # only keep top mappings at each step to avoid combinatorial explosion
+        for m1 in merged_mappings[:PART_MAX_MAPPINGS_TO_KEEP]: # only keep top mappings at each step to avoid combinatorial explosion
             for m2 in mappings_to_add:
                 merged_mappings = merge_fragments(m1, m2, overlaps)
                 new_mappings.extend(merged_mappings)
         merged_mappings = new_mappings
-        # merged_mappings = filter_mappings(merged_mappings, molecule, PART_MAX_BEAD_SIZE + 1, PART_MAX_RING_BEAD_SIZE)
-        # merged_mappings = sort_mappings(merged_mappings, molecule, fused_rings)
-        merged_mappings = sorted(merged_mappings, key=lambda m: -len(m))  
+        merged_mappings = filter_mappings(merged_mappings, molecule, PART_MAX_BEAD_SIZE + 1, PART_MAX_RING_BEAD_SIZE)
+        merged_mappings = sort_mappings(merged_mappings, molecule, fused_rings)
+        # merged_mappings = sorted(merged_mappings, key=lambda m: -len(m))  
     mappings = merged_mappings
     logger.info(f"Total combinations of mappings: {len(mappings)}")
 
@@ -430,12 +430,14 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     mappings = filter_mappings(mappings, molecule, fused_rings, PART_MAX_BEAD_SIZE, PART_MAX_RING_BEAD_SIZE)
     mappings = sort_mappings(mappings, molecule, fused_rings)
     print(len(mappings))
-    tmp_mappings = []
-    for mapping in mappings:
-        if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping:
-            print(len(mapping), mapping)
-            tmp_mappings.append(mapping)
-    mappings = tmp_mappings
+    for mapping in mappings[:10]:
+        print(mapping)
+    # tmp_mappings = []
+    # for mapping in mappings:
+    #     if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping:
+    #         print(len(mapping), mapping)
+    #         tmp_mappings.append(mapping)
+    # mappings = tmp_mappings
     return mappings
 
 
@@ -450,7 +452,7 @@ def sort_mappings(mappings, molecule, fused_rings):
     def num_nonring_beads(mapping):
         count = 0
         for bead in mapping:
-            is_in_ring = any(atom in flat_set(rings) for atom in bead)
+            is_in_ring = any(atom in flat_set(fused_rings) for atom in bead)
             if not is_in_ring:
                 count += 1
         return count
