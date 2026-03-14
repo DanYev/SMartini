@@ -22,9 +22,9 @@ GAMMA = 1 / unit.picosecond
 PRESSURE = 1 * unit.bar
 # Either steps or time
 TSTEP = 2 * unit.femtoseconds
-TOTAL_STEPS = int(1e7)
+TOTAL_STEPS = int(1e6)  # 1e6 = 2 ns with 2 fs timestep. 1000 frames with 1000 step reporting. Adjust as needed for longer simulations.
 # Reporting: save every NOUT steps
-TRJ_NOUT = 10000 # normally you want ~10000 here
+TRJ_NOUT = 1000 # normally you want ~10000 here
 LOG_NOUT = 10000 # 100000 or more
 CHK_NOUT = 100000 
 TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do

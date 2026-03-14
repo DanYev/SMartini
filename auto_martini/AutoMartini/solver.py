@@ -206,7 +206,8 @@ class Cg_molecule:
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
             self.mapping = mapping
-            sym_mapping = self.symmetrize_rings_in_mapping(mapping, return_1_or_2=2)
+            # sym_mapping = self.symmetrize_rings_in_mapping(mapping, return_1_or_2=2)
+            sym_mapping = mapping
             self.aa_mapping = self.get_aa_mapping(sym_mapping)  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
             self.bead_coords = self.get_bead_coords(mapping=self.aa_mapping)  # Get bead coordinates based on AA mapping
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
