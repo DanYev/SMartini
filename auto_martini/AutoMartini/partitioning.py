@@ -27,17 +27,19 @@ If not, see http://www.gnu.org/licenses . See also top-level README
 and LICENSE files.
 """
 
-from sys import exit
 from .common import *
-from . import topology # AutoM3 change
 from .utils import timeit, memprofit
 from . import optimization_cy as opcy
-import math
 import multiprocessing as mp
-import os
 
 logger = logging.getLogger(__name__)
 
+PART_MAX_RING_LEN = 12
+PART_MAX_MAPPINGS_TO_KEEP = 1000
+PART_MAX_BEAD_SIZE = 4
+PART_MAX_RING_BEAD_SIZE = 3
+PART_KEEP_RINGS_TOGETHER = True
+    
 #############################################################################
 ### HELPER FUNCTIONS ###
 #############################################################################
@@ -98,7 +100,7 @@ def split_into_fragments(molecule):
     def fuse_rings(molecule):
         # Get ring atoms (systems of joined rings)
         rings = molecule.GetRingInfo().AtomRings()
-        rings = [set(ring) for ring in rings if len(ring) < 10] # ignore 3-membered rings since they are not stable and often an artifact of the input molecule
+        rings = [set(ring) for ring in rings if len(ring) < PART_MAX_RING_LEN] # Large rings are usually not aromatic and can be broken up into smaller fragments
         n_rings = len(rings)
         fused_rings = []
         overlaps = []
@@ -393,17 +395,17 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
-        for m1 in merged_mappings[:1000]:
+        for m1 in merged_mappings[:PART_MAX_MAPPINGS_TO_KEEP]: # only keep top mappings at each step to avoid combinatorial explosion
             for m2 in mappings_to_add:
                 merged_mappings = merge_fragments(m1, m2, overlaps)
                 new_mappings.extend(merged_mappings)
-        merged_mappings = filter_mappings(new_mappings, molecule, max_bead_size=5, max_ring_bead_size=3)
+        merged_mappings = filter_mappings(new_mappings, molecule, PART_MAX_BEAD_SIZE + 1, PART_MAX_RING_BEAD_SIZE + 1)
         merged_mappings = sorted(merged_mappings, key=lambda m: -len(m))  
     mappings = merged_mappings
     logger.info(f"Total combinations of mappings: {len(mappings)}")
 
     logger.info("Filtering and sorting the mappings...")
-    mappings = filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=2)
+    mappings = filter_mappings(mappings, molecule, PART_MAX_BEAD_SIZE, PART_MAX_RING_BEAD_SIZE)
     # mappings = [mapping for mapping in mappings if len(mapping) == 17]
     mappings = sort_mappings(mappings, molecule, rings)
     for mapping in mappings[:10]:
@@ -425,7 +427,13 @@ def sort_mappings(mappings, molecule, rings):
     return mappings
 
 
-def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
+def filter_mappings(
+    mappings, 
+    molecule, 
+    max_bead_size=PART_MAX_BEAD_SIZE, 
+    max_ring_bead_size=PART_MAX_RING_BEAD_SIZE,
+    keep_rings_together=PART_KEEP_RINGS_TOGETHER,
+    ):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 
     def single_atom_in_mapping(mapping):
@@ -434,10 +442,10 @@ def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
                 return True
         return False
 
-    def aromatic_beads_are_small(mapping):
+    def ring_beads_are_small(mapping):
         for bead in mapping:
-            is_aromatic = all(atom_is_aromatic[a] for a in bead)
-            if is_aromatic and len(bead) > max_ring_bead_size:
+            is_in_ring = all(atom_is_in_ring[a] for a in bead)
+            if is_in_ring and len(bead) > max_ring_bead_size:
                 return False
         return True
 
@@ -458,6 +466,7 @@ def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
     atoms, bonds = _get_ha_graph(molecule)
     atids = [a.GetIdx() for a in atoms]
     rings = molecule.GetRingInfo().AtomRings()
+    rings = [ring for ring in rings if len(ring) > 5] 
     atom_is_aromatic = [a.GetIsAromatic() for a in atoms]
     atom_is_in_ring = [a.IsInRing() for a in atoms]
 
@@ -482,30 +491,33 @@ def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
     if len(mappings) == 1:
         return mappings
 
-    # Prefer keeping ring beads together (no mixing ring/non-ring)
-    rings = [rings[0]]
-    for ring in rings:
+    if keep_rings_together:
+        # Prefer keeping rings together (no mixing ring/non-ring)
         tmp_list = []
         for mapping in mappings:
-            if not ring_beads_are_together(mapping, ring):
-                continue
-            tmp_list.append(mapping)
+            is_valid = True
+            for ring in rings:
+                if not ring_beads_are_together(mapping, ring):
+                    is_valid = False
+                    break
+            if is_valid:
+                tmp_list.append(mapping)
         if tmp_list:
             mappings = tmp_list
-    if len(mappings) == 1:
-        return mappings[0]
+        if len(mappings) == 1:
+            return mappings
 
-    # Prefer keeping aromatic beads small
+    # Prefer keeping ring beads small
     tmp_list = []
     for mapping in mappings:
-        if not aromatic_beads_are_small(mapping):
+        if not ring_beads_are_small(mapping):
             continue
         tmp_list.append(mapping)
     if tmp_list:
         mappings = tmp_list
     if len(mappings) == 1:
         return mappings
-    
+
     # Remove duplicates
     tmp_list = []
     for mapping in mappings:
@@ -514,16 +526,6 @@ def filter_mappings(mappings, molecule, max_bead_size=4, max_ring_bead_size=3):
         tmp_list.append(mapping)
     if tmp_list:
         mappings = tmp_list
-    if len(mappings) == 1:
-        return mappings
-
-    # TODO: SYMMETRIZE MAPPINGS
-    if len(mappings) == 2:
-        return mappings
-    
-    if not mappings:
-        return None
-
     return mappings
 
     # logger.info(f"Total combinations of fragments: {len(merged_combs)}")
@@ -651,8 +653,6 @@ def collect_energies_and_combs(
     list_trial_comb.extend([[acceptable_trials[i], energies_array[i]] for i in range(len(energies_array))])
     return list_trial_comb, ene_best_trial
 
-
-
 #############################################################################
 ### HELPER FUNCTIONS FOR MAPPING DICTIONARIES ###
 #############################################################################
@@ -678,8 +678,28 @@ def invert_mapping_dictionary(mapping_dict):
     return dict(sorted(atom_partitioning.items()))
 
 
-### AutoM3 change :  Including Ertl Functional Groups Finder algorithm (merge, identify_functional_groups) ###
 def identify_functional_groups(mol): # AutoM3 change
+    """AutoM3 change :  Including Ertl Functional Groups Finder algorithm (merge, identify_functional_groups)"""
+
+    def merge(mol, marked, aset): # AutoM3 change
+        #  Original authors: Richard Hall and Guillaume Godin
+        #  This file is part of the RDKit.
+        #  The contents are covered by the terms of the BSD license
+        #  which is included in the file license.txt, found at the root
+        #  of the RDKit source tree.
+        bset = set()
+        for idx in aset:
+            atom = mol.GetAtomWithIdx(idx)
+            for nbr in atom.GetNeighbors():
+                jdx = nbr.GetIdx()
+                if jdx in marked:
+                    marked.remove(jdx)
+                    bset.add(jdx)
+        if not bset:
+            return
+        merge(mol, marked, bset)
+        aset.update(bset)
+
     # atoms connected by non-aromatic double or triple bond to any heteroatom
     PATT_DOUBLE_TRIPLE = Chem.MolFromSmarts('A=,#[!#6]')
     # atoms in non-aromatic carbon-carbon double or triple bonds
@@ -690,7 +710,6 @@ def identify_functional_groups(mol): # AutoM3 change
     PATT_OXIRANE_ETC = Chem.MolFromSmarts('[O,N,S]1CC1')
     # the bridge between two aromatic cycles
     PATT_BRIDGE_AROMATIC = Chem.MolFromSmarts("[x;!x2]")
-
     PATT_TUPLE = (PATT_DOUBLE_TRIPLE, PATT_CC_DOUBLE_TRIPLE, PATT_ACETAL, PATT_OXIRANE_ETC, PATT_BRIDGE_AROMATIC)
 
     marked = set()
@@ -743,22 +762,3 @@ def identify_functional_groups(mol): # AutoM3 change
     """
     return ifgs
 
-
-def merge(mol, marked, aset): # AutoM3 change
-    #  Original authors: Richard Hall and Guillaume Godin
-    #  This file is part of the RDKit.
-    #  The contents are covered by the terms of the BSD license
-    #  which is included in the file license.txt, found at the root
-    #  of the RDKit source tree.
-    bset = set()
-    for idx in aset:
-        atom = mol.GetAtomWithIdx(idx)
-        for nbr in atom.GetNeighbors():
-            jdx = nbr.GetIdx()
-            if jdx in marked:
-                marked.remove(jdx)
-                bset.add(jdx)
-    if not bset:
-        return
-    merge(mol, marked, bset)
-    aset.update(bset)
