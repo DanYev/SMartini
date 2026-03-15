@@ -13,6 +13,7 @@ from lpmath import (
     boltzmann_inversion_angle,
     boltzmann_inversion_bond,
     calculate_internal_coordinates,
+    fit_type2_angle,
     fit_type9_dihedral,
     fit_type11_dihedral,
     read_cog_trajectory,
@@ -22,6 +23,9 @@ from plots import plot_internal_coordinates
 logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)
 
+################################################################################
+### Helper Functions for Topology Analysis and Post-processing ###
+################################################################################
 
 def _pair_key(i: int, j: int):
     return (int(i), int(j)) if int(i) <= int(j) else (int(j), int(i))
@@ -80,6 +84,44 @@ def _build_bead_to_rings(topo):
     return bead_to_rings
 
 
+def _build_bead_bond_degree(topo):
+    """Return bead index -> bonded degree map using bonds and constraints."""
+    bead_bond_degree = {}
+    for bond in topo.bonds:
+        for idx in (0, 1):
+            bead = int(bond[idx])
+            bead_bond_degree[bead] = bead_bond_degree.get(bead, 0) + 1
+    for constraint in topo.constraints:
+        for idx in (0, 1):
+            bead = int(constraint[idx])
+            bead_bond_degree[bead] = bead_bond_degree.get(bead, 0) + 1
+    return bead_bond_degree
+
+
+def _build_ring_bead_set(topo):
+    """Return set of all bead indices that belong to any ring."""
+    ring_beads = set()
+    for ring in topo.ringbeads:
+        for bead in ring:
+            ring_beads.add(int(bead))
+    return ring_beads
+
+
+def _is_linear_fragment(i: int, j: int, k: int, bead_bond_degree, ring_beads) -> bool:
+    """Return True for 3-bead linear fragments outside rings.
+
+    Criterion: each bead in i-j-k has degree <= 2 and none is in a ring.
+    """
+    return (
+        bead_bond_degree.get(int(i), 0) <= 2
+        and bead_bond_degree.get(int(j), 0) <= 2
+        and bead_bond_degree.get(int(k), 0) <= 2
+        and int(i) not in ring_beads
+        and int(j) not in ring_beads
+        and int(k) not in ring_beads
+    )
+
+
 def _connects_two_different_rings(i: int, j: int, bead_to_rings) -> bool:
     """Return True if i-j connects two different rings (per topo.ringbeads).
 
@@ -91,6 +133,17 @@ def _connects_two_different_rings(i: int, j: int, bead_to_rings) -> bool:
         return False
     return rings_i.isdisjoint(rings_j)
 
+
+def flat_set(lst):
+    """Flatten a list of lists into a set of unique elements."""
+    if not lst:
+        return set()
+    aset = set(item for sublist in lst for item in sublist) 
+    return aset
+
+#################################################################################
+### Main Inversion Logic ###
+#################################################################################
 
 def boltzmann_invert_bonds(
     topo,
@@ -133,18 +186,32 @@ def boltzmann_invert_bonds(
 def boltzmann_invert_angles(topo, internal_coords):
     updated_topo = copy.deepcopy(topo)
     fit_cache = {"angles": {}}
+    bead_bond_degree = _build_bead_bond_degree(updated_topo)
+    ring_beads = _build_ring_bead_set(updated_topo)
 
     for idx, angle in enumerate(updated_topo.angles):
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
-        if (i, j, k, "angle") not in internal_coords:
-            continue
         samples = internal_coords[(i, j, k, "angle")]
-        theta0_calc, k_calc, density = boltzmann_inversion_angle(samples, 
-            temperature=CFG.temperature, fc_scale=CFG.fc_scale)
+
+        if _is_linear_fragment(i, j, k, bead_bond_degree, ring_beads):
+            (theta0_calc, k_calc), density = fit_type2_angle(
+                samples,
+                temperature=CFG.temperature,
+                fc_scale=CFG.fc_scale,
+            )
+            angle_funct = 2
+        else:
+            theta0_calc, k_calc, density = boltzmann_inversion_angle(
+                samples,
+                temperature=CFG.temperature,
+                fc_scale=CFG.fc_scale,
+            )
+            angle_funct = 10
+
         if float(k_calc) < CFG.angle_k_cutoff:
             k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
-        updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
+        updated_topo.angles[idx] = [i, j, k, angle_funct, float(theta0_calc), float(k_calc), comment]
         
         # Store in fit cache for plotting
         if density is not None:
@@ -178,13 +245,14 @@ def boltzmann_invert_dihedrals(topo,
     angle_lookup = _build_angle_lookup(updated_topo)
     length_lookup = _build_length_lookup(updated_topo)
 
-    # Collect angles already marked type 2 (linear fragments set by update_angles).
-    type1_angle_set = set()
+    # Collect angles already marked as linear-fragment style (funct=2),
+    # while also accepting funct=1 for backward compatibility.
+    linear_angle_set = set()
     for a in updated_topo.angles:
-        if int(a[3]) == 1:
+        if int(a[3]) in (1, 2):
             ai, aj, ak = int(a[0]), int(a[1]), int(a[2])
-            type1_angle_set.add((ai, aj, ak))
-            type1_angle_set.add((ak, aj, ai))
+            linear_angle_set.add((ai, aj, ak))
+            linear_angle_set.add((ak, aj, ai))
 
     dihedrals_by_key = {}
     for d in updated_topo.dihedrals:
@@ -209,19 +277,18 @@ def boltzmann_invert_dihedrals(topo,
         ill_defined = (a1 is None or a2 is None)
         # If either flanking angle is a linear-fragment angle (type 2),
         # the dihedral is ill-defined and must use type 11 (CBT).
-        has_type1_angle = (
-            (i, j, k) in type1_angle_set
-            or (j, k, l) in type1_angle_set
+        has_linear_angle = (
+            (i, j, k) in linear_angle_set
+            or (j, k, l) in linear_angle_set
         )
-        ill_defined = ill_defined or has_type1_angle
+        ill_defined = ill_defined or has_linear_angle
 
         if ill_defined:
-            (kphi, a), density, score11 = fit_type11_dihedral(
+            (kphi, a), density = fit_type11_dihedral(
                 data,
                 temperature=CFG.temperature,
                 bins=CFG.type9_bins,
                 min_prob=CFG.type9_min_prob,
-                return_score=True,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
@@ -231,13 +298,12 @@ def boltzmann_invert_dihedrals(topo,
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue
 
-        fit_terms9, density9, score9 = fit_type9_dihedral(
+        fit_terms9, density9 = fit_type9_dihedral(
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
             bins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
-            return_score=True,
             fc_scale=CFG.fc_scale,
         )
 
@@ -295,25 +361,8 @@ def update_angles(
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
 
-    # Build bond-degree per bead (bonds + constraints).
-    bead_bond_degree = {}
-    for bond in updated_topo.bonds:
-        for idx in (0, 1):
-            b = int(bond[idx])
-            bead_bond_degree[b] = bead_bond_degree.get(b, 0) + 1
-    for constraint in updated_topo.constraints:
-        for idx in (0, 1):
-            b = int(constraint[idx])
-            bead_bond_degree[b] = bead_bond_degree.get(b, 0) + 1
-
-    # Set of all beads that belong to any ring.
-    ring_beads = set()
-    for ring in updated_topo.ringbeads:
-        try:
-            for b in ring:
-                ring_beads.add(int(b))
-        except Exception:
-            continue
+    bead_bond_degree = _build_bead_bond_degree(updated_topo)
+    ring_beads = _build_ring_bead_set(updated_topo)
 
     for angle in updated_topo.angles:
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
@@ -323,17 +372,10 @@ def update_angles(
             angle[5] = float(CFG.angle_k_upper_cutoff)
 
         # Linear fragment: 3 consecutive beads each with <= 2 bonds, none in a ring.
-        is_linear_fragment = (
-            bead_bond_degree.get(i, 0) <= 2
-            and bead_bond_degree.get(j, 0) <= 2
-            and bead_bond_degree.get(k, 0) <= 2
-            and i not in ring_beads
-            and j not in ring_beads
-            and k not in ring_beads
-        )
+        is_linear_fragment = _is_linear_fragment(i, j, k, bead_bond_degree, ring_beads)
 
         if is_linear_fragment:
-            angle[3] = 1
+            angle[3] = 2
         else:
             # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
             if float(angle[4]) > float(angle_cutoff):

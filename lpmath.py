@@ -8,6 +8,34 @@ import ligpar_cy
 
 logger = logging.getLogger(__name__)
 
+################################################################################
+### Helper functions ###
+################################################################################
+
+def circular_mean(angles):
+    """Calculate circular mean of angles in degrees."""
+    angles_rad = np.deg2rad(angles)
+    sin_mean = np.mean(np.sin(angles_rad))
+    cos_mean = np.mean(np.cos(angles_rad))
+    mean_rad = np.arctan2(sin_mean, cos_mean)
+    return np.rad2deg(mean_rad)
+
+
+def wrap_to_180(angles):
+    """Wrap angles to [-180, 180] range."""
+    return (angles + 180) % 360 - 180
+
+
+def flat_set(lst):
+    """Flatten a list of lists into a set of unique elements."""
+    if not lst:
+        return set()
+    aset = set(item for sublist in lst for item in sublist) 
+    return aset
+
+################################################################################
+### Trajectory Reading ###
+################################################################################
 
 def read_cog_trajectory(in_pdb, in_xtc, mapping, start=0, stop=-2, step=1, selection="all"):
     """Read AA trajectory and calculate COG trajectory for CG beads.
@@ -110,6 +138,9 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, step=1,selection="all
     logger.info("Loaded CG trajectory: %s frames, %s beads", n_frames, n_beads)
     return cg_trajectory
 
+################################################################################
+### Internal Coordinates ###
+################################################################################
 
 def calculate_internal_coordinates(cg_trajectory, topo):
     """Calculate internal coordinates (bonds, angles, dihedrals) from CG trajectory."""
@@ -145,84 +176,9 @@ def calculate_internal_coordinates(cg_trajectory, topo):
 
     return internal_coords
 
-
-def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0, max_components=1):
-    """Estimate harmonic bond parameters from samples.
-
-    This is a *mean-based harmonic approximation* (not PMF-minimum based):
-    - Equilibrium value r0 is the sample mean.
-    - Force constant k is computed from fluctuations: k = kT / var(r).
-    
-    Returns:
-        r0 (float), k (float), gmm (tuple or None)
-    """
-    kB = 0.008314462618  # kJ/mol/K
-    kT = kB * temperature
-
-    distances = np.asarray(distances, dtype=float)
-    r0 = float(np.mean(distances))
-
-    variance = float(np.var(distances))
-    k = float(fc_scale * kT / variance)
-
-    gmm = fit_gmm_1d_best(distances, max_components=max_components)
-    
-    density = None
-    if gmm is not None:
-        min_prob = 1e-3
-        x_centers = np.linspace(np.percentile(distances, 1), np.percentile(distances, 99), 100)
-        gmm_density = gmm_pdf_1d(x_centers, *gmm)
-        density = np.clip(gmm_density, min_prob, None)
-
-    return r0, k, density
-
-
-def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0, max_components=1):
-    """Estimate harmonic angle parameters from samples.
-
-    Mean-based harmonic approximation:
-    - Equilibrium value theta0 is the sample mean (degrees).
-    - Force constant k is computed from fluctuations in radians:
-      k = kT / var(theta_rad).
-
-    Returns:
-        theta0 (float), k (float), gmm (tuple or None)
-    """
-    kB = 0.008314462618  # kJ/mol/K
-    kT = kB * temperature
-
-    angles = np.asarray(angles, dtype=float)
-    theta0 = float(np.mean(angles))
-
-    residual_rad = np.deg2rad(angles - theta0)
-    variance_rad = float(np.var(residual_rad))
-    k = float(fc_scale * kT / variance_rad)
-
-    gmm = fit_gmm_1d_best(angles, max_components=max_components)
-    
-    density = None
-    if gmm is not None:
-        min_prob = 1e-3
-        x_centers = np.linspace(np.percentile(angles, 1), np.percentile(angles, 99), 100)
-        gmm_density = gmm_pdf_1d(x_centers, *gmm)
-        density = np.clip(gmm_density, min_prob, None)
-
-    return theta0, k, density
-
-
-def circular_mean(angles):
-    """Calculate circular mean of angles in degrees."""
-    angles_rad = np.deg2rad(angles)
-    sin_mean = np.mean(np.sin(angles_rad))
-    cos_mean = np.mean(np.cos(angles_rad))
-    mean_rad = np.arctan2(sin_mean, cos_mean)
-    return np.rad2deg(mean_rad)
-
-
-def wrap_to_180(angles):
-    """Wrap angles to [-180, 180] range."""
-    return (angles + 180) % 360 - 180
-
+################################################################################
+### Fitting ###
+################################################################################
 
 def gmm_pdf_1d(x, weights, means, variances):
     """Compute 1D Gaussian mixture PDF."""
@@ -314,6 +270,124 @@ def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e
     return best
 
 
+def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0, max_components=1):
+    """Estimate harmonic bond parameters from samples.
+
+    This is a *mean-based harmonic approximation* (not PMF-minimum based):
+    - Equilibrium value r0 is the sample mean.
+    - Force constant k is computed from fluctuations: k = kT / var(r).
+    
+    Returns:
+        r0 (float), k (float), gmm (tuple or None)
+    """
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * temperature
+
+    distances = np.asarray(distances, dtype=float)
+    r0 = float(np.mean(distances))
+
+    variance = float(np.var(distances))
+    k = float(fc_scale * kT / variance)
+
+    gmm = fit_gmm_1d_best(distances, max_components=max_components)
+    
+    density = None
+    if gmm is not None:
+        min_prob = 1e-3
+        x_centers = np.linspace(np.percentile(distances, 1), np.percentile(distances, 99), 100)
+        gmm_density = gmm_pdf_1d(x_centers, *gmm)
+        density = np.clip(gmm_density, min_prob, None)
+
+    return r0, k, density
+
+
+def boltzmann_inversion_angle(angles, temperature=300.0, fc_scale=1.0, max_components=1):
+    """Estimate harmonic angle parameters from samples.
+
+    Mean-based harmonic approximation:
+    - Equilibrium value theta0 is the sample mean (degrees).
+    - Force constant k is computed from fluctuations in radians:
+      k = kT / var(theta_rad).
+
+    Returns:
+        theta0 (float), k (float), gmm (tuple or None)
+    """
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * temperature
+
+    angles = np.asarray(angles, dtype=float)
+    theta0 = float(np.mean(angles))
+
+    residual_rad = np.deg2rad(angles - theta0)
+    variance_rad = float(np.var(residual_rad))
+    k = float(fc_scale * kT / variance_rad)
+
+    gmm = fit_gmm_1d_best(angles, max_components=max_components)
+    
+    density = None
+    if gmm is not None:
+        min_prob = 1e-3
+        x_centers = np.linspace(np.percentile(angles, 1), np.percentile(angles, 99), 100)
+        gmm_density = gmm_pdf_1d(x_centers, *gmm)
+        density = np.clip(gmm_density, min_prob, None)
+
+    return theta0, k, density
+
+
+def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=1e-3):
+    """Fit GROMACS angle type-2 parameters from sampled angles.
+
+    Type-2 form:
+        U(theta) = 0.5 * k * (cos(theta) - cos(theta0))^2
+
+    For 0-180 degree angles, the geometric Jacobian contributes sin(theta):
+        p(theta) ~ sin(theta) * exp(-U(theta)/kT)
+    so we fit PMF from the Jacobian-corrected density p(theta) / sin(theta).
+
+    Returns
+    -------
+    tuple
+        (theta0_deg, k_kjmol), fit_density
+        where fit_density is the Jacobian-corrected histogram density on bin centers.
+    """
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * float(temperature)
+
+    angles = np.asarray(angles, dtype=float)
+    angles = np.clip(angles, 0.0, 180.0)
+
+    n_bins = int(max(24, bins))
+    theta_edges = np.linspace(0.0, 180.0, n_bins + 1)
+    theta_centers = 0.5 * (theta_edges[:-1] + theta_edges[1:])
+    theta_rad = np.deg2rad(theta_centers)
+
+    raw_density = np.histogram(angles, bins=theta_edges, density=True)[0]
+    raw_density = np.clip(raw_density, min_prob, None)
+
+    jac = np.sin(theta_rad)
+    jac = np.clip(jac, 1e-6, None)
+    fit_density = raw_density / jac
+    fit_density = np.clip(fit_density, min_prob, None)
+    pmf = -kT * np.log(fit_density)
+
+    c = np.cos(theta_rad)
+    A = np.column_stack([c * c, c, np.ones_like(c)])
+    w = np.power(raw_density, 0.30)
+    Aw = A * w[:, None]
+    bw = pmf * w
+
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    alpha, beta, _ = [float(x) for x in coeffs]
+
+    # U(theta) = alpha*c^2 + beta*c + const = 0.5*k*(c-c0)^2 + const
+    k_param = max(1e-8, 2.0 * alpha)
+    cos_theta0 = np.clip(-beta / k_param, -1.0, 1.0)
+    theta0 = float(np.rad2deg(np.arccos(cos_theta0)))
+    k_param = float(fc_scale * k_param)
+
+    return (theta0, k_param), fit_density
+
+
 def boltzmann_inversion_improper(dihedrals, temperature=300.0, fc_scale=1.0):
     """Estimate harmonic improper dihedral parameters from samples.
 
@@ -342,7 +416,6 @@ def fit_type9_dihedral(
     max_n=6,
     bins=360,
     min_prob=1e-2,
-    return_score: bool = False,
     fc_scale: float = 1.0,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
@@ -447,9 +520,7 @@ def fit_type9_dihedral(
             k *= fc_scale
         terms.append((int(n), float(k), float(phi)))
 
-    if return_score:
-        return terms, density, score
-    return terms, density, None
+    return terms, density
 
 
 def fit_type11_dihedral(
@@ -500,9 +571,7 @@ def fit_type11_dihedral(
     phi_centers = 0.5 * (phi_edges[:-1] + phi_edges[1:])
     phi_rad = np.deg2rad(phi_centers)
 
-    # best_gmm = fit_gmm_1d_best(phi, max_components=3)
-
-    # Fit free energy from GMM density
+    # Fit free energy from the distribution density
     density = np.histogram(dihs, bins=phi_edges, density=True)[0]
     density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
