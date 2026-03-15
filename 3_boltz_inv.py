@@ -14,7 +14,7 @@ from lpmath import (
     boltzmann_inversion_bond,
     calculate_internal_coordinates,
     fit_type9_dihedral,
-    fit_type11_cbt_dihedral,
+    fit_type11_dihedral,
     read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
@@ -146,6 +146,7 @@ def boltzmann_invert_angles(topo, internal_coords):
         comment = angle[6] if len(angle) >= 7 else ""
         updated_topo.angles[idx] = [i, j, k, 10, float(theta0_calc), float(k_calc), comment]
         
+        # Store in fit cache for plotting
         if density is not None:
             ik0, ik1 = (int(i), int(k))
             if ik0 > ik1: ik0, ik1 = ik1, ik0
@@ -160,6 +161,17 @@ def boltzmann_invert_dihedrals(topo,
     internal_coords, 
     angle_cutoff: float = 150.0, 
     ):
+
+    def get_eq_angle(i, j, k):
+        if (i, j, k) in angle_lookup:
+            return angle_lookup[(i, j, k)]
+        # If this angle isn't explicitly defined in the topology, use the
+        # geometric mean from the trajectory (if available).
+        adj = internal_coords.get((i, j, k, "adj_angle"))
+        if adj is not None and len(adj) > 0:
+            return float(np.mean(adj))
+        return _angle_from_triangle(length_lookup, i, j, k)
+        
     updated_topo = copy.deepcopy(topo)
     fit_cache = {"dihedrals": {}}
 
@@ -173,16 +185,6 @@ def boltzmann_invert_dihedrals(topo,
             ai, aj, ak = int(a[0]), int(a[1]), int(a[2])
             type1_angle_set.add((ai, aj, ak))
             type1_angle_set.add((ak, aj, ai))
-
-    def _eq_angle(i, j, k):
-        if (i, j, k) in angle_lookup:
-            return angle_lookup[(i, j, k)]
-        # If this angle isn't explicitly defined in the topology, use the
-        # geometric mean from the trajectory (if available).
-        adj = internal_coords.get((i, j, k, "adj_angle"))
-        if adj is not None and len(adj) > 0:
-            return float(np.mean(adj))
-        return _angle_from_triangle(length_lookup, i, j, k)
 
     dihedrals_by_key = {}
     for d in updated_topo.dihedrals:
@@ -202,34 +204,19 @@ def boltzmann_invert_dihedrals(topo,
 
         # If the dihedral is ill-defined due to near-linear adjacent angles,
         # only fit CBT (funct=11).
-        a1 = _eq_angle(i, j, k)
-        a2 = _eq_angle(j, k, l)
-        ill_defined_1 = (
-            a1 is None
-            or a2 is None
-            or float(a1) >= angle_cutoff
-            or float(a2) >= angle_cutoff
-        )
-
-        k_cutoff = CFG.angle_k_cutoff
-        angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
-        angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
-        ill_defined_2 = False
-        if angle1:
-            ill_defined_2 += angle1[0][5] < k_cutoff
-        if angle2:
-            ill_defined_2 += angle2[0][5] < k_cutoff
-
+        a1 = get_eq_angle(i, j, k)
+        a2 = get_eq_angle(j, k, l)
+        ill_defined = (a1 is None or a2 is None)
         # If either flanking angle is a linear-fragment angle (type 2),
         # the dihedral is ill-defined and must use type 11 (CBT).
-        has_type2_angle = (
+        has_type1_angle = (
             (i, j, k) in type1_angle_set
             or (j, k, l) in type1_angle_set
         )
+        ill_defined = ill_defined or has_type1_angle
 
-        ill_defined = ill_defined_1 or ill_defined_2 or has_type2_angle
         if ill_defined:
-            (kphi, a), density, score11 = fit_type11_cbt_dihedral(
+            (kphi, a), density, score11 = fit_type11_dihedral(
                 data,
                 temperature=CFG.temperature,
                 bins=CFG.type9_bins,
@@ -238,8 +225,8 @@ def boltzmann_invert_dihedrals(topo,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
-            scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 1e-2)
-            # kphi /= scale
+            scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
+            kphi /= scale
             new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue

@@ -58,9 +58,9 @@ def md_npt(sysdir, sysname, runname, nsteps=None):
     ntomp = get_ntomp()
     mdrun.empp(f=mdrun.mdpdir / "em_cg.mdp")
     mdrun.mdrun(deffnm="em", ntomp=ntomp)
-    mdrun.eqpp(f=mdrun.mdpdir / "eq_cg.mdp", c="em.gro", r="em.gro", maxwarn="1") 
-    mdrun.mdrun(deffnm="eq", ntomp=ntomp)
-    mdrun.mdpp(f=mdrun.mdpdir / "md_cg.mdp", maxwarn="1")    
+    # mdrun.eqpp(f=mdrun.mdpdir / "eq_cg.mdp", c="em.gro", r="em.gro", maxwarn="1") 
+    # mdrun.mdrun(deffnm="eq", ntomp=ntomp)
+    mdrun.mdpp(f=mdrun.mdpdir / "md_cg.mdp", c="em.gro", maxwarn="1")    
     if nsteps is None:
         nsteps = NSTEPS
     mdrun.mdrun(deffnm="md", ntomp=ntomp, nsteps=nsteps, ) # bonded="gpu")

@@ -30,14 +30,16 @@ tc-grps                     = System
 tau-t                       = 1.0 
 ref-t                       = 300 
 
-Pcoupl                      = Parrinello-Rahman
-Pcoupltype                  = isotropic
-tau-p                       = 12.0
-compressibility             = 3.4e-4 
-ref-p                       = 1.0
+Pcoupl                          = c-rescale
+Pcoupltype                      = isotropic
+tau-p                           = 4.0
+compressibility                 = 3.4e-4 
+ref-p                           = 1.0 
+refcoord-scaling                = all
 
-gen_vel                     = no
-continuation                = yes
+gen_vel                         = yes
+gen_temp                        = 300
+;continuation                = no
 
 lincs-warnangle             = 30
 lincs-order                 = 6

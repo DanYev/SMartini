@@ -452,13 +452,12 @@ def fit_type9_dihedral(
     return terms, density, None
 
 
-def fit_type11_cbt_dihedral(
+def fit_type11_dihedral(
     dihedrals,
     temperature=300.0,
-    bins=360,
+    bins=180,
     min_prob=1e-2,
     cos_power_max: int = 4,
-    return_score: bool = False,
     fc_scale: float = 1.0,
 ):
     r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).
@@ -494,17 +493,18 @@ def fit_type11_cbt_dihedral(
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * float(temperature)
 
-    phi = np.asarray(dihedrals, dtype=float)
-    phi = wrap_to_180(phi)
-    phi_centers = np.linspace(-180.0, 180.0, int(max(24, bins)), endpoint=False)
+    dihs = np.asarray(dihedrals, dtype=float)
+    dihs = wrap_to_180(dihs)
+    n_bins = int(max(24, bins))
+    phi_edges = np.linspace(-180.0, 180.0, n_bins + 1)
+    phi_centers = 0.5 * (phi_edges[:-1] + phi_edges[1:])
     phi_rad = np.deg2rad(phi_centers)
 
-    best_gmm = fit_gmm_1d_best(phi, max_components=3)
+    # best_gmm = fit_gmm_1d_best(phi, max_components=3)
 
     # Fit free energy from GMM density
-    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    # gmm_density -= np.min(gmm_density) + 1e-12 
-    density = np.clip(gmm_density, min_prob, None)
+    density = np.histogram(dihs, bins=phi_edges, density=True)[0]
+    density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
 
     # Build weighted least squares system: PMF(phi) ~ sum_n c_n * cos^n(phi)
@@ -520,13 +520,12 @@ def fit_type11_cbt_dihedral(
             cos_pow = cos_pow * cos_phi
         cols.append(cos_pow)
 
-    w = np.pow(density, 0.20)
+    w = np.pow(density, 0.30)
     A = np.column_stack(cols)
     Aw = A * w[:, None]
     bw = pmf * w
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
     resid = Aw @ coeffs - bw
-    score = float(np.mean(resid**2))
 
     scale = float(np.max(np.abs(coeffs)))
     k_phi = scale
@@ -534,6 +533,4 @@ def fit_type11_cbt_dihedral(
     # Ensure length exactly 5
     a = [float(x) for x in a[:5]]
     result = (float(k_phi), a)
-    if return_score:
-        return result, density, score
-    return result, density, None
+    return result, density

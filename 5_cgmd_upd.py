@@ -139,7 +139,6 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float) -> float
         return k_old
     if sigma_target <= 0 or sigma_current <= 0:
         return k_old
-
     scale = (sigma_current / sigma_target) ** 2
     return float(k_old * scale)
 
@@ -290,7 +289,6 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         scale = float((sigma_cg / sigma_aa))
         print(scale)
 
-
         for term in terms:
             updated = list(term)
             funct = int(updated[4])
@@ -308,7 +306,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
             elif funct == 11:
                 kphi_new = float(updated[5]) * scale**2
-                # kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
+                kphi_new = max(kphi_new, float(CFG.dihedral_k_cutoff))
                 updated[5] = float(kphi_new)
                 n_dihedrals_updated += 1
 
