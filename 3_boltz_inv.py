@@ -165,6 +165,14 @@ def boltzmann_invert_dihedrals(topo,
     angle_lookup = _build_angle_lookup(updated_topo)
     length_lookup = _build_length_lookup(updated_topo)
 
+    # Collect angles already marked type 2 (linear fragments set by update_angles).
+    type2_angle_set = set()
+    for a in updated_topo.angles:
+        if int(a[3]) == 2:
+            ai, aj, ak = int(a[0]), int(a[1]), int(a[2])
+            type2_angle_set.add((ai, aj, ak))
+            type2_angle_set.add((ak, aj, ai))
+
     def _eq_angle(i, j, k):
         if (i, j, k) in angle_lookup:
             return angle_lookup[(i, j, k)]
@@ -206,12 +214,19 @@ def boltzmann_invert_dihedrals(topo,
         angle1 = [x for x in topo.angles if (i, j, k) == (x[0], x[1], x[2]) or (k, j, i) == (x[0], x[1], x[2])]
         angle2 = [x for x in topo.angles if (j, k, l) == (x[0], x[1], x[2]) or (l, k, j) == (x[0], x[1], x[2])]
         ill_defined_2 = False
-        # if angle1:
-        #     ill_defined_2 += angle1[0][5] < k_cutoff
-        # if angle2:
-        #     ill_defined_2 += angle2[0][5] < k_cutoff
+        if angle1:
+            ill_defined_2 += angle1[0][5] < k_cutoff
+        if angle2:
+            ill_defined_2 += angle2[0][5] < k_cutoff
 
-        ill_defined = ill_defined_1 or ill_defined_2
+        # If either flanking angle is a linear-fragment angle (type 2),
+        # the dihedral is ill-defined and must use type 11 (CBT).
+        has_type2_angle = (
+            (i, j, k) in type2_angle_set
+            or (j, k, l) in type2_angle_set
+        )
+
+        ill_defined = ill_defined_1 or ill_defined_2 or has_type2_angle
         if ill_defined:
             (kphi, a), density, score11 = fit_type11_cbt_dihedral(
                 data,
@@ -287,14 +302,52 @@ def update_angles(
 ):
     """update/post-process angle terms."""
     updated_topo = copy.deepcopy(topo)
-    # updated_topo.angles = [a for a in updated_topo.angles if float(a[5]) >= float(k_cutoff)]
 
-    # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
+    # Build bond-degree per bead (bonds + constraints).
+    bead_bond_degree = {}
+    for bond in updated_topo.bonds:
+        for idx in (0, 1):
+            b = int(bond[idx])
+            bead_bond_degree[b] = bead_bond_degree.get(b, 0) + 1
+    for constraint in updated_topo.constraints:
+        for idx in (0, 1):
+            b = int(constraint[idx])
+            bead_bond_degree[b] = bead_bond_degree.get(b, 0) + 1
+
+    # Set of all beads that belong to any ring.
+    ring_beads = set()
+    for ring in updated_topo.ringbeads:
+        try:
+            for b in ring:
+                ring_beads.add(int(b))
+        except Exception:
+            continue
+
     for angle in updated_topo.angles:
-        if float(angle[4]) > float(angle_cutoff):
-            angle[3] = 1
-        if float(angle[5]) < float(k_cutoff):
-            angle[3] = 1
+        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
+
+        # Cap equilibrium angle at the upper cutoff.
+        if float(angle[5]) > float(CFG.angle_k_upper_cutoff):
+            angle[5] = float(CFG.angle_k_upper_cutoff)
+
+        # Linear fragment: 3 consecutive beads each with <= 2 bonds, none in a ring.
+        is_linear_fragment = (
+            bead_bond_degree.get(i, 0) <= 2
+            and bead_bond_degree.get(j, 0) <= 2
+            and bead_bond_degree.get(k, 0) <= 2
+            and i not in ring_beads
+            and j not in ring_beads
+            and k not in ring_beads
+        )
+
+        if is_linear_fragment:
+            angle[3] = 2
+        else:
+            # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
+            if float(angle[4]) > float(angle_cutoff):
+                angle[3] = 1
+            if float(angle[5]) < float(k_cutoff):
+                angle[3] = 1
         angle[5] *= CFG.fc_scale
 
     return updated_topo
@@ -384,7 +437,7 @@ if __name__ == "__main__":
         aa_xtc = aa_dir / "samples.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
         aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.aa_mapping, 
-            selection=CFG.aa_selection, stop=CFG.cg_traj_stop)
+            selection=CFG.aa_selection, stop=300)
         logger.info("Calculating internal coordinates from AA trajectory")
         internal_coords = calculate_internal_coordinates(aa_traj, topo)
         with open(pickle_file, "wb") as f:
