@@ -1,13 +1,14 @@
 import copy
 import pickle
 import logging
-from pathlib import Path
 import shutil
-from typing import Dict, Tuple, Optional
+import sys
 
 import numpy as np
 import AutoMartini as am
 
+from pathlib import Path
+from typing import Dict, Tuple, Optional
 from lpmath import (
     read_cg_trajectory,
     read_cog_trajectory,
@@ -286,7 +287,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         _, sigma_aa = _stats(aa_vals, "dihedral")
         _, sigma_cg = _stats(cg_vals, "dihedral")
-        scale = float((sigma_cg / sigma_aa) ** 1.25)
+        scale = float((sigma_cg / sigma_aa))
         print(scale)
 
 
@@ -294,20 +295,20 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             updated = list(term)
             funct = int(updated[4])
 
-            if funct == 9 and len(updated) >= 8:
+            if funct == 9:
                 mult = int(updated[7])
                 if mult == len(terms) or mult == 1: 
-                    scale = float(sigma_cg / sigma_aa) ** 0.7
+                    scale = scale ** 0.7
                 if len(terms) == 1 and mult == 1: 
-                    scale = float(sigma_cg / sigma_aa) ** 2
+                    scale = scale ** 2
                 k_new = float(updated[6]) * scale
                 k_new = max(k_new, float(CFG.dihedral_k_cutoff))
                 updated[6] = float(k_new)
                 n_dihedrals_updated += 1
 
-            elif funct == 11 and len(updated) >= 6:
-                kphi_new = float(updated[5]) * scale
-                kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
+            elif funct == 11:
+                kphi_new = float(updated[5]) * scale**2
+                # kphi_new = min(kphi_new, float(CFG.dihedral_k_cutoff))
                 updated[5] = float(kphi_new)
                 n_dihedrals_updated += 1
 
@@ -399,9 +400,10 @@ if __name__ == "__main__":
     out_refined_itp = itp_updated
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
-    plot_internal_coordinates_overlay(
-        aa_internal,
-        cg_internal,
-        topo,
-        output_file=wdir / "png" / "cg_vs_aa.png",
-    )
+    if sys.argv[-1] == "plot":
+        plot_internal_coordinates_overlay(
+            aa_internal,
+            cg_internal,
+            topo,
+            output_file=wdir / "png" / "cg_vs_aa.png",
+        )

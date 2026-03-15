@@ -2,11 +2,12 @@ import copy
 import logging
 import pickle
 import os
-from pathlib import Path
+import sys
 
 import AutoMartini as am
 import numpy as np
 
+from pathlib import Path
 from config import CFG
 from lpmath import (
     boltzmann_inversion_angle,
@@ -139,7 +140,7 @@ def boltzmann_invert_angles(topo, internal_coords):
             continue
         samples = internal_coords[(i, j, k, "angle")]
         theta0_calc, k_calc, density = boltzmann_inversion_angle(samples, 
-            temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
+            temperature=CFG.temperature, fc_scale=CFG.fc_scale)
         if float(k_calc) < CFG.angle_k_cutoff:
             k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
@@ -166,12 +167,12 @@ def boltzmann_invert_dihedrals(topo,
     length_lookup = _build_length_lookup(updated_topo)
 
     # Collect angles already marked type 2 (linear fragments set by update_angles).
-    type2_angle_set = set()
+    type1_angle_set = set()
     for a in updated_topo.angles:
-        if int(a[3]) == 2:
+        if int(a[3]) == 1:
             ai, aj, ak = int(a[0]), int(a[1]), int(a[2])
-            type2_angle_set.add((ai, aj, ak))
-            type2_angle_set.add((ak, aj, ai))
+            type1_angle_set.add((ai, aj, ak))
+            type1_angle_set.add((ak, aj, ai))
 
     def _eq_angle(i, j, k):
         if (i, j, k) in angle_lookup:
@@ -222,8 +223,8 @@ def boltzmann_invert_dihedrals(topo,
         # If either flanking angle is a linear-fragment angle (type 2),
         # the dihedral is ill-defined and must use type 11 (CBT).
         has_type2_angle = (
-            (i, j, k) in type2_angle_set
-            or (j, k, l) in type2_angle_set
+            (i, j, k) in type1_angle_set
+            or (j, k, l) in type1_angle_set
         )
 
         ill_defined = ill_defined_1 or ill_defined_2 or has_type2_angle
@@ -235,6 +236,10 @@ def boltzmann_invert_dihedrals(topo,
                 min_prob=CFG.type9_min_prob,
                 return_score=True,
             )
+            theta_1 = np.radians(a1)
+            theta_2 = np.radians(a2)
+            scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 1e-2)
+            # kphi /= scale
             new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue
@@ -341,7 +346,7 @@ def update_angles(
         )
 
         if is_linear_fragment:
-            angle[3] = 2
+            angle[3] = 1
         else:
             # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
             if float(angle[4]) > float(angle_cutoff):
@@ -471,10 +476,11 @@ if __name__ == "__main__":
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 
-    plot_internal_coordinates(
-        internal_coords,
-        topo,
-        output_file=wdir / "png" / "aa.png",
-        temperature=CFG.temperature,
-        cache_file=fit_cache_file,
-    )
+    if sys.argv[-1] == "plot":
+        plot_internal_coordinates(
+            internal_coords,
+            topo,
+            output_file=wdir / "png" / "aa.png",
+            temperature=CFG.temperature,
+            cache_file=fit_cache_file,
+        )
