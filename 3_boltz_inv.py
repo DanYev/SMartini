@@ -10,13 +10,13 @@ import numpy as np
 from pathlib import Path
 from config import CFG
 from lpmath import (
-    boltzmann_inversion_angle,
-    boltzmann_inversion_bond,
+    read_cog_trajectory,
     calculate_internal_coordinates,
+    boltzmann_inversion_bond,
     fit_type2_angle,
+    fit_type10_angle,
     fit_type9_dihedral,
     fit_type11_dihedral,
-    read_cog_trajectory,
 )
 from plots import plot_internal_coordinates
 
@@ -201,7 +201,7 @@ def boltzmann_invert_angles(topo, internal_coords):
             )
             angle_funct = 2
         else:
-            theta0_calc, k_calc, density = boltzmann_inversion_angle(
+            theta0_calc, k_calc, density = fit_type10_angle(
                 samples,
                 temperature=CFG.temperature,
                 fc_scale=CFG.fc_scale,

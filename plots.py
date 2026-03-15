@@ -5,11 +5,11 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 from lpmath import (
-    boltzmann_inversion_angle,
     boltzmann_inversion_bond,
-    boltzmann_inversion_improper,
     wrap_to_180,
     gmm_pdf_1d,
     circular_mean,
@@ -25,6 +25,8 @@ LINEAR_GRID_POINTS = 250
 DIHEDRAL_GRID_POINTS = 360
 AX_WIDTH_INCH = 3.0
 AX_HEIGHT_INCH = 2.5
+AA_HIST_COLOR = "tab:blue"
+CG_HIST_COLOR = "tab:orange"
 
 
 def _pair_key(i: int, j: int):
@@ -121,6 +123,25 @@ def _angle_U_harmonic(theta_deg, theta0_deg: float, k_kjmol_rad2: float):
     theta_deg = np.asarray(theta_deg, dtype=float)
     dtheta_rad = np.deg2rad(theta_deg - float(theta0_deg))
     return 0.5 * float(k_kjmol_rad2) * dtheta_rad**2
+
+
+def _angle_U_type2(theta_deg, theta0_deg: float, k_kjmol: float):
+    """GROMACS angle funct=2 (G96): 0.5 * k * (cos(theta)-cos(theta0))^2."""
+    theta_deg = np.asarray(theta_deg, dtype=float)
+    c = np.cos(np.deg2rad(theta_deg))
+    c0 = np.cos(np.deg2rad(float(theta0_deg)))
+    return 0.5 * float(k_kjmol) * (c - c0) ** 2
+
+
+def _angle_U_type10(theta_deg, theta0_deg: float, k_kjmol: float):
+    """GROMACS angle funct=10 (restricted bending)."""
+    theta_deg = np.asarray(theta_deg, dtype=float)
+    th_rad = np.deg2rad(theta_deg)
+    c = np.cos(th_rad)
+    c0 = np.cos(np.deg2rad(float(theta0_deg)))
+    s2 = np.sin(th_rad) ** 2
+    s2 = np.clip(s2, 1e-6, None)
+    return 0.5 * float(k_kjmol) * (c - c0) ** 2 / s2
 
 
 def _dihedral_U_type9(phi_deg, terms):
@@ -423,11 +444,8 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         ax = axes[idx]
         i, j, k, angle_type = key
 
-        vmin = float(np.min(angles))
-        vmax = float(np.max(angles))
-        if vmin == vmax:
-            vmin -= 1e-3
-            vmax += 1e-3
+        vmin = angles.min() if len(angles) > 0 else 0.0
+        vmax = angles.max() if len(angles) > 0 else 180.0
 
         ax.hist(
             angles,
@@ -438,6 +456,10 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
             density=True,
         )
 
+        angle_funct = None
+        param_theta0 = None
+        param_k = None
+
         # Check for cached fit density
         ik0, ik1 = (int(i), int(k))
         if ik0 > ik1:
@@ -446,16 +468,46 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         cached = cache_section.get(cache_key)
         if isinstance(cached, dict) and cached.get("density") is not None:
             density_arr = np.asarray(cached["density"], dtype=float)
-            x_grid = np.linspace(np.percentile(angles, 1), np.percentile(angles, 99), len(density_arr))
+            angle_entry = None
+            for angle in topo.angles:
+                if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k:
+                    angle_entry = angle
+                    break
+            if angle_entry is not None and len(angle_entry) >= 6:
+                try:
+                    angle_funct = int(angle_entry[3])
+                except Exception:
+                    angle_funct = 1
+                param_theta0 = float(angle_entry[4])
+                param_k = float(angle_entry[5])
+                if angle_funct in (2, 10):
+                    x_grid = np.linspace(0.0, 180.0, len(density_arr), endpoint=False)
+                else:
+                    x_grid = np.linspace(vmin, vmax, len(density_arr), endpoint=False)
+            else:
+                x_grid = np.linspace(vmin, vmax, len(density_arr), endpoint=False)
             ax.plot(x_grid, density_arr, color="red", linewidth=1.6)
 
-        # Overlay topology-implied density p(theta) ~ exp(-U(theta)/kT)
+        # Overlay topology-implied density p(theta) ~ sin(theta)*exp(-U(theta)/kT)
         for angle in topo.angles:
             if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
+                try:
+                    angle_funct = int(angle[3])
+                except Exception:
+                    angle_funct = 1
                 theta0 = float(angle[4])
                 k_param = float(angle[5])
+                param_theta0 = theta0
+                param_k = k_param
                 x_grid = np.linspace(vmin, vmax, LINEAR_GRID_POINTS)
-                U = _angle_U_harmonic(x_grid, theta0, k_param)
+
+                if angle_funct == 2:
+                    U = _angle_U_type2(x_grid, theta0, k_param)
+                elif angle_funct == 10:
+                    U = _angle_U_type10(x_grid, theta0, k_param)
+                else:
+                    U = _angle_U_harmonic(x_grid, theta0, k_param)
+
                 jac = np.clip(np.sin(np.deg2rad(x_grid)), 0.0, None)
                 p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=jac)
                 if p is not None:
@@ -470,22 +522,17 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         ax.set_xlim(vmin, vmax)
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
-        param_k = None
-        param_theta0 = None
-        for angle in topo.angles:
-            if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k and len(angle) >= 6:
-                param_theta0 = float(angle[4])
-                param_k = float(angle[5])
-                break
-
-        mean_angle = np.mean(angles)
-        std_angle = np.std(angles)
-        stats_text = f"mu={mean_angle:.1f} deg\nsigma={std_angle:.1f} deg\n"
-        if param_k is not None:
-            param_k_rounded = round(param_k / 10) * 10
-            stats_text += f"\nparam k={int(param_k_rounded)}"
+        stats_lines = []
+        if angle_funct is not None:
+            stats_lines.append(f"type={int(angle_funct)}")
         if param_theta0 is not None:
-            stats_text += f"\nparam theta0={param_theta0:.1f}"
+            stats_lines.append(f"theta0={param_theta0:.1f} deg")
+        if param_k is not None:
+            stats_lines.append(f"k={param_k:.1f}")
+        stats_lines.append(f"xmin={vmin:.1f}")
+        stats_lines.append(f"xmax={vmax:.1f}")
+
+        stats_text = "\n".join(stats_lines) if stats_lines else "(no params)"
 
         ax.text(
             0.98,
@@ -684,12 +731,12 @@ def _plot_bonds_overlay(bonds_aa, bonds_cg, topo, output_file):
             ax.set_xlim(hist_range)
 
         _add_stats_box(ax, aa_vals, cg_vals, value_type="bond")
-        ax.legend(fontsize=8)
 
     for idx in range(n_plots, len(axes)):
         axes[idx].axis("off")
 
-    plt.tight_layout()
+    _add_overlay_legend(fig, include_itp=True)
+    plt.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
     _save_or_show(output_file, "bonds")
 
 
@@ -697,6 +744,19 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
     logger.info("Plotting %s angles", len(set(angles_aa) | set(angles_cg)))
 
     angle_ref = {(int(a[0]), int(a[1]), int(a[2])): a[4] for a in topo.angles}
+    angle_params = {}
+    for a in topo.angles:
+        if len(a) >= 6:
+            key_ijk = (int(a[0]), int(a[1]), int(a[2]))
+            try:
+                angle_funct = int(a[3])
+            except Exception:
+                angle_funct = None
+            angle_params[key_ijk] = {
+                "type": angle_funct,
+                "theta0": float(a[4]),
+                "k": float(a[5]),
+            }
     keys = [(int(a[0]), int(a[1]), int(a[2]), "angle") for a in topo.angles]
     if not keys:
         keys = list(set(angles_aa.keys()) | set(angles_cg.keys()))
@@ -724,8 +784,10 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
         aa_vals = angles_aa.get(key)
         cg_vals = angles_cg.get(key)
 
-        bins = _common_bins(aa_vals, cg_vals, bins=HIST_BINS_LINEAR)
-        hist_range = _preferred_range(aa_vals, cg_vals)
+        vmin = min(aa_vals.min(), cg_vals.min()) if aa_vals is not None and cg_vals is not None else 0.0
+        vmax = max(aa_vals.max(), cg_vals.max()) if aa_vals is not None and cg_vals is not None else 180.0
+        hist_range = (vmin, vmax)
+        bins = np.linspace(vmin, vmax, HIST_BINS_LINEAR + 1)
 
         _plot_hist_pair(ax, aa_vals, cg_vals, bins=bins, hist_range=hist_range)
 
@@ -738,16 +800,32 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
         ax.grid(alpha=0.3)
         ax.set_yticks([])
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
-        if hist_range is not None:
-            ax.set_xlim(hist_range)
+        ax.set_xlim(hist_range)
 
-        _add_stats_box(ax, aa_vals, cg_vals, value_type="angle")
-        ax.legend(fontsize=8)
-
+        params = angle_params.get((i, j, k))
+        if params is not None:
+            lines = []
+            if params.get("type") is not None:
+                lines.append(f"type={int(params['type'])}")
+            lines.append(f"theta0={params['theta0']:.1f} deg")
+            lines.append(f"k={params['k']:.1f}")
+            lines.append("xmin=0.0")
+            lines.append("xmax=180.0")
+            ax.text(
+                0.98,
+                0.98,
+                "\n".join(lines),
+                transform=ax.transAxes,
+                fontsize=8,
+                verticalalignment="top",
+                horizontalalignment="right",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+            )
     for idx in range(n_plots, len(axes)):
         axes[idx].axis("off")
 
-    plt.tight_layout()
+    _add_overlay_legend(fig, include_itp=True)
+    plt.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
     _save_or_show(output_file, "angles")
 
 
@@ -807,12 +885,12 @@ def _plot_dihedrals_overlay(dihedrals_aa, dihedrals_cg, topo, output_file):
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
 
         _add_stats_box(ax, aa_vals, cg_vals, value_type="dihedral", dihedral_center=aa_shift)
-        ax.legend(fontsize=8)
 
     for idx in range(n_plots, len(axes)):
         axes[idx].axis("off")
 
-    plt.tight_layout()
+    _add_overlay_legend(fig, include_itp=False)
+    plt.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
     _save_or_show(output_file, "dihedrals")
 
 
@@ -833,6 +911,23 @@ def _common_bins(aa_vals, cg_vals, bins=HIST_BINS_LINEAR):
     return np.linspace(vmin, vmax, bins + 1)
 
 
+def _add_overlay_legend(fig, include_itp: bool = False):
+    handles = [
+        Patch(facecolor=AA_HIST_COLOR, edgecolor="black", alpha=0.55, label="AA"),
+        Patch(facecolor=CG_HIST_COLOR, edgecolor="black", alpha=0.55, label="CG"),
+    ]
+    if include_itp:
+        handles.append(Line2D([0], [0], color="red", linestyle="--", linewidth=1.5, label="ITP"))
+    fig.legend(
+        handles=handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.995),
+        ncol=len(handles),
+        frameon=False,
+        fontsize=9,
+    )
+
+
 def _plot_hist_pair(ax, aa_vals, cg_vals, bins=HIST_BINS_LINEAR, hist_range=None):
     if aa_vals is not None:
         ax.hist(
@@ -841,7 +936,7 @@ def _plot_hist_pair(ax, aa_vals, cg_vals, bins=HIST_BINS_LINEAR, hist_range=None
             range=hist_range,
             density=True,
             alpha=0.55,
-            color="tab:blue",
+            color=AA_HIST_COLOR,
             edgecolor="black",
             label="AA",
         )
@@ -852,7 +947,7 @@ def _plot_hist_pair(ax, aa_vals, cg_vals, bins=HIST_BINS_LINEAR, hist_range=None
             range=hist_range,
             density=True,
             alpha=0.55,
-            color="tab:orange",
+            color=CG_HIST_COLOR,
             edgecolor="black",
             label="CG",
         )

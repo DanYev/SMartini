@@ -35,7 +35,7 @@ class LigParConfig:
 
     # Fitting defaults
     temperature: float = 300.0
-    fc_scale: float = 0.8 # Scaling factor for force constants to roughly account for coupling of the potentials
+    fc_scale: float = 1.0 # Scaling factor for force constants to roughly account for coupling of the potentials
 
     # Type-9 dihedral (Gromacs) fitting parameters
     type9_max_n: int = 6

@@ -143,6 +143,40 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float) -> float
     return float(k_old * scale)
 
 
+def _angle_stats_jacobian(values: np.ndarray, bins: int = 180, min_prob: float = 1e-6) -> Tuple[float, float]:
+    """Estimate angle location/spread after correcting for the sin(theta) Jacobian.
+
+    For angle distributions on [0, 180], the observed density follows
+        p(theta) ~ sin(theta) * exp(-U(theta)/kT).
+    To compare AA/CG underlying potentials, we use q(theta) = p(theta)/sin(theta),
+    then report:
+      - mu: mode of q(theta)
+      - sigma: weighted std around that mode
+    """
+    if values is None or len(values) == 0:
+        return np.nan, np.nan
+
+    vals = np.asarray(values, dtype=float)
+    vals = np.clip(vals, 0.0, 180.0)
+
+    n_bins = int(max(24, bins))
+    edges = np.linspace(0.0, 180.0, n_bins + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    raw_density = np.histogram(vals, bins=edges, density=True)[0]
+    raw_density = np.clip(raw_density, min_prob, None)
+
+    jac = np.sin(np.deg2rad(centers))
+    jac = np.clip(jac, 1e-6, None)
+    corrected = np.clip(raw_density / jac, min_prob, None)
+
+    idx = int(np.argmax(corrected))
+    mu = float(centers[idx])
+
+    weights = corrected / np.sum(corrected)
+    sigma = float(np.sqrt(np.sum(weights * (centers - mu) ** 2)))
+    return mu, sigma
+
+
 def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
     """Update bonds and constraints by adjusting equilibrium values and force constants.
     
@@ -228,8 +262,12 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
             new_angles.append(angle)
             continue
 
-        mu_aa, sigma_aa = _stats(aa_vals, "angle")
-        mu_cg, sigma_cg = _stats(cg_vals, "angle")
+        mu_aa, sigma_aa = _angle_stats_jacobian(aa_vals)
+        mu_cg, sigma_cg = _angle_stats_jacobian(cg_vals)
+        if not np.isfinite(mu_aa) or not np.isfinite(sigma_aa):
+            mu_aa, sigma_aa = _stats(aa_vals, "angle")
+        if not np.isfinite(mu_cg) or not np.isfinite(sigma_cg):
+            mu_cg, sigma_cg = _stats(cg_vals, "angle")
         updated = list(angle)
 
         delta = mu_aa - mu_cg
