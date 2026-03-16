@@ -216,7 +216,9 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
         )
-        updated[4] = min(float(k_new), CFG.constraint_k_cutoff)
+        k_new = max(float(k_new), CFG.bond_lower_cutoff)
+        k_new = min(float(k_new), CFG.bond_upper_cutoff)
+        updated[4] = k_new
         
         new_bonds.append(updated)
         n_bonds_updated += 1
@@ -286,7 +288,9 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
         )
-        updated[5] = max(float(k_new), CFG.angle_k_cutoff)
+        k_new = min(float(k_new), CFG.angle_k_upper_cutoff)
+        k_new = max(float(k_new), CFG.angle_k_lower_cutoff)
+        updated[5] = k_new
 
         new_angles.append(updated)
         n_angles_updated += 1
@@ -342,7 +346,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
                     scale = scale ** 0.7
                 if len(terms) == 1 and mult == 1: 
                     scale = scale ** 2
-                k_new = float(updated[6]) * scale
+                k_new = float(updated[6]) * scale ** 1.3
                 k_new = min(k_new, float(CFG.dihedral_k_upper_cutoff))
                 updated[6] = float(k_new)
                 n_dihedrals_updated += 1
@@ -410,8 +414,7 @@ if __name__ == "__main__":
     wdir = CFG.wdir
     outdir = CFG.mol_dir
 
-    itp_updated = outdir / f"{molname}.itp"
-    in_itp = itp_updated 
+    in_itp = outdir / f"{molname}.itp"
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
@@ -438,7 +441,7 @@ if __name__ == "__main__":
     # Writes a new file and leaves the original ITP unchanged.
     tmp_itp = outdir / f"{molname}_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
-    out_refined_itp = itp_updated
+    out_refined_itp = in_itp
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
     if "plot" in sys.argv:

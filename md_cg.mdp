@@ -1,6 +1,6 @@
 integrator                  = md
 dt                          = 0.010
-nsteps                      = 10000000 ; 10000000 for 100000 ps = 100 ns  
+nsteps                      = 1000000 ; 1000000 for 10000 ps = 10 ns  
 nstxout                     = 0
 nstvout                     = 0
 nstfout                     = 0

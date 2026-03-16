@@ -209,7 +209,7 @@ def boltzmann_invert_angles(topo, internal_coords):
                 fc_scale=CFG.fc_scale,
             )
             # Use harmonic angle fitting for terms that will be represented as funct=1.
-            if float(theta0_calc) > float(CFG.angle_cutoff) or float(k_calc) < float(CFG.angle_k_cutoff):
+            if float(theta0_calc) > float(CFG.angle_cutoff) or float(k_calc) < float(CFG.angle_k_lower_cutoff):
                 (theta0_calc, k_calc), density = fit_type1_angle(
                     samples,
                     temperature=CFG.temperature,
@@ -219,9 +219,9 @@ def boltzmann_invert_angles(topo, internal_coords):
             else:
                 angle_funct = 10
 
-        if float(k_calc) < CFG.angle_k_cutoff:
-            k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
         comment = angle[6] if len(angle) >= 7 else ""
+        k_calc = min(float(k_calc), CFG.angle_k_upper_cutoff) 
+        k_calc = max(float(k_calc), CFG.angle_k_lower_cutoff)
         updated_topo.angles[idx] = [i, j, k, angle_funct, float(theta0_calc), float(k_calc), comment]
         
         # Store in fit cache for plotting
@@ -448,7 +448,6 @@ def update_bonds(
 
 def update_angles(
     topo,
-    k_cutoff=25.0,
     angle_cutoff=150.0
 ):
     """update/post-process angle terms."""
@@ -456,13 +455,6 @@ def update_angles(
 
     bead_bond_degree = _build_bead_bond_degree(updated_topo)
     ring_beads = _build_ring_bead_set(updated_topo)
-
-    for angle in updated_topo.angles:
-        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
-
-        # Cap equilibrium angle at the upper cutoff.
-        if float(angle[5]) > float(CFG.angle_k_upper_cutoff):
-            angle[5] = float(CFG.angle_k_upper_cutoff)
 
     return updated_topo
 
@@ -565,7 +557,7 @@ if __name__ == "__main__":
         topo = am.topology.read_itp(str(in_itp))
         topo, fit_cache = boltzmann_invert_ill_defined_dihedrals(topo, internal_coords)
         master_fit_cache["dihedrals"].update(fit_cache["dihedrals"])
-        out_itp = mol_dir / f"{molname}_updated.itp"
+        out_itp = mol_dir / f"{molname}.itp"
         topo.to_itp(out_file=out_itp)
         logger.info("Updated ITP file written to: %s", out_itp)
         exit(0)
@@ -580,7 +572,7 @@ if __name__ == "__main__":
     logger.info("Fitting angles...")
     topo, angle_cache = boltzmann_invert_angles(topo, internal_coords)
     master_fit_cache["angles"].update(angle_cache["angles"])
-    topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    topo = update_angles(topo, angle_cutoff=CFG.angle_cutoff)
     
     # DIHEDRALS
     logger.info("Fitting dihedrals...")

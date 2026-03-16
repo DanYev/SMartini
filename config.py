@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "FTA"
+    molname: str = "LIB"
     # specify_beads: tuple[list[int]] = ([4, 5, 8],)
     specify_beads: list[list[int]] = None
     max_combs_merged: int = 1000
@@ -45,9 +45,11 @@ class LigParConfig:
     type9_min_prob: float = 1e-6
 
     # Post-fit filtering / topology cleanup
-    constraint_k_cutoff: float = 20000.0
-    angle_k_cutoff: float = 10.0
-    angle_k_upper_cutoff: float = 1000.0
+    constraint_k_cutoff: float = 50000.0
+    bond_lower_cutoff: float = 4000.0
+    bond_upper_cutoff: float = 50000.0
+    angle_k_lower_cutoff: float = 50.0
+    angle_k_upper_cutoff: float = 2000.0
     dihedral_k_lower_cutoff: float = 0.0
     dihedral_k_upper_cutoff: float = 1000.0
     angle_cutoff: float = 150.0

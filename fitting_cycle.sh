@@ -18,7 +18,7 @@ echo "  SLURM_JOB_ID: $SLURM_JOB_ID" >&2
 echo "  SLURM_JOB_NAME: $SLURM_JOB_NAME" >&2
 echo "  HOSTNAME: $HOSTNAME" >&2
 
-python 3_boltz_inv.py
+python 3_boltz_inv.py plot
 python 4_cg_md.py nsteps 10000 # 10000 steps for 100 ps 100 samples
 python 5_cgmd_upd.py
 python 4_cg_md.py md nsteps 10000
