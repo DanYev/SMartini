@@ -161,7 +161,7 @@ def boltzmann_invert_bonds(
     for bond in topo.bonds:
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "bond")]
-        r0_calc, k_calc, density = boltzmann_inversion_bond(distances, temperature=CFG.temperature, max_components=CFG.type9_max_n)
+        r0_calc, k_calc, density = boltzmann_inversion_bond(distances, temperature=CFG.temperature)
         comment = bond[5] if len(bond) >= 6 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
         if density is not None:
@@ -174,7 +174,7 @@ def boltzmann_invert_bonds(
         i, j = int(bond[0]), int(bond[1])
         distances = internal_coords[(i, j, "constraint")]
         r0_calc, k_calc, density = boltzmann_inversion_bond(
-            distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale, max_components=CFG.type9_max_n)
+            distances, temperature=CFG.temperature, fc_scale=CFG.fc_scale)
         comment = bond[4] if len(bond) >= 5 else ""
         updated_topo.bonds.append([i, j, bond[2], float(r0_calc), float(k_calc), comment])
         if density is not None:
@@ -235,9 +235,89 @@ def boltzmann_invert_angles(topo, internal_coords):
     return updated_topo, fit_cache
 
 
+def boltzmann_invert_ill_defined_dihedrals(topo, internal_coords, ):
+
+    def get_eq_angle(i, j, k):
+        if (i, j, k) in angle_lookup:
+            return angle_lookup[(i, j, k)]
+        # If this angle isn't explicitly defined in the topology, use the
+        # geometric mean from the trajectory (if available).
+        adj = internal_coords.get((i, j, k, "adj_angle"))
+        if adj is not None and len(adj) > 0:
+            return float(np.mean(adj))
+        return _angle_from_triangle(length_lookup, i, j, k)
+        
+    updated_topo = copy.deepcopy(topo)
+    fit_cache = {"dihedrals": {}}
+
+    angle_lookup = _build_angle_lookup(updated_topo)
+    length_lookup = _build_length_lookup(updated_topo)
+
+    # Collect angles already marked as linear-fragment style (funct=2),
+    # while also accepting funct=1 for backward compatibility.
+    linear_angle_set = set()
+    for a in updated_topo.angles:
+        if int(a[3]) in (1, 2):
+            ai, aj, ak = int(a[0]), int(a[1]), int(a[2])
+            linear_angle_set.add((ai, aj, ak))
+            linear_angle_set.add((ak, aj, ai))
+
+    dihedrals_by_key = {}
+    for d in updated_topo.dihedrals:
+        key = (int(d[0]), int(d[1]), int(d[2]), int(d[3]))
+        dihedrals_by_key.setdefault(key, []).append(d)
+
+    new_dihedrals = []
+    for (i, j, k, l), existing_terms in dihedrals_by_key.items():
+        dih_type = existing_terms[0][4] 
+        if dih_type == 9:  
+            new_dihedrals.extend(existing_terms)
+            continue
+        data = internal_coords.get((i, j, k, l, "dihedral"))
+
+        if data is None:
+            raise KeyError(f"Missing dihedral samples for ({i},{j},{k},{l})")
+
+        comment = ""
+        if existing_terms and len(existing_terms[0]) >= 9:
+            comment = existing_terms[0][8]
+
+        # If the dihedral is ill-defined due to near-linear adjacent angles,
+        # only fit CBT (funct=11).
+        a1 = get_eq_angle(i, j, k)
+        a2 = get_eq_angle(j, k, l)
+        ill_defined = (a1 is None or a2 is None)
+        # If either flanking angle is a linear-fragment angle (type 2),
+        # the dihedral is ill-defined and must use type 11 (CBT).
+        has_linear_angle = (
+            (i, j, k) in linear_angle_set
+            or (j, k, l) in linear_angle_set
+        )
+        ill_defined = ill_defined or has_linear_angle
+
+        if ill_defined:
+            (kphi, a), density = fit_type11_dihedral(
+                data,
+                temperature=CFG.temperature,
+                bins=CFG.type9_bins,
+                min_prob=CFG.type9_min_prob,
+            )
+            theta_1 = np.radians(a1)
+            theta_2 = np.radians(a2)
+            # scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
+            kphi *= 0.1
+            new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
+            fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
+            continue
+
+    updated_topo.dihedrals = new_dihedrals
+    return updated_topo, fit_cache
+
+
 def boltzmann_invert_dihedrals(topo, 
     internal_coords, 
     angle_cutoff: float = 150.0, 
+    skip_ill_defined: bool = True,
     ):
 
     def get_eq_angle(i, j, k):
@@ -305,6 +385,8 @@ def boltzmann_invert_dihedrals(topo,
             theta_2 = np.radians(a2)
             # scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
             # kphi /= scale
+            if skip_ill_defined:
+                kphi = 0.0
             new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue
@@ -477,17 +559,31 @@ if __name__ == "__main__":
 
     master_fit_cache = {"bonds": {}, "angles": {}, "dihedrals": {}}
 
+    if "only_ill_defined" in sys.argv:
+        logger.info("Running only ill-defined dihedral fitting...")
+        in_itp = mol_dir / f"{molname}_updated.itp"
+        topo = am.topology.read_itp(str(in_itp))
+        topo, fit_cache = boltzmann_invert_ill_defined_dihedrals(topo, internal_coords)
+        master_fit_cache["dihedrals"].update(fit_cache["dihedrals"])
+        out_itp = mol_dir / f"{molname}_updated.itp"
+        topo.to_itp(out_file=out_itp)
+        logger.info("Updated ITP file written to: %s", out_itp)
+        exit(0)
+
     # BOONDS        
+    logger.info("Fitting bonds and constraints...")
     topo, bond_cache = boltzmann_invert_bonds(topo, internal_coords)
     master_fit_cache["bonds"].update(bond_cache["bonds"])
     topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
     
     # ANGLES
+    logger.info("Fitting angles...")
     topo, angle_cache = boltzmann_invert_angles(topo, internal_coords)
     master_fit_cache["angles"].update(angle_cache["angles"])
     topo = update_angles(topo, k_cutoff=CFG.angle_k_cutoff, angle_cutoff=CFG.angle_cutoff)
     
     # DIHEDRALS
+    logger.info("Fitting dihedrals...")
     topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
     topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)

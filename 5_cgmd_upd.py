@@ -387,10 +387,7 @@ def refine_topology_from_cg_vs_aa(
     n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
     # Update dihedrals
-    if not "nodih" in sys.argv:
-        n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
-    else:        
-        n_dihedrals_updated, n_dihedrals_removed = 0, 0
+    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
     logger.info(
         "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",

@@ -20,9 +20,10 @@ echo "  HOSTNAME: $HOSTNAME" >&2
 
 python 3_boltz_inv.py
 python 4_cg_md.py 
-python 5_cgmd_upd.py nodih
+python 5_cgmd_upd.py
 python 4_cg_md.py md
-python 5_cgmd_upd.py nodih
+python 5_cgmd_upd.py
+python 3_boltz_inv.py only_ill_defined
 python 4_cg_md.py md
 python 5_cgmd_upd.py 
 python 4_cg_md.py md
