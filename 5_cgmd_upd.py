@@ -410,7 +410,7 @@ if __name__ == "__main__":
     wdir = CFG.wdir
     outdir = CFG.mol_dir
 
-    itp_updated = outdir / f"{molname}_updated.itp"
+    itp_updated = outdir / f"{molname}.itp"
     in_itp = itp_updated 
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
@@ -436,7 +436,7 @@ if __name__ == "__main__":
 
     # Refine the CG topology based on CG-vs-AA distribution mismatch.
     # Writes a new file and leaves the original ITP unchanged.
-    tmp_itp = outdir / f"{molname}_updated_tmp.itp"
+    tmp_itp = outdir / f"{molname}_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = itp_updated
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)

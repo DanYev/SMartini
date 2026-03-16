@@ -345,7 +345,15 @@ class Cg_molecule:
 
 
     def symmetrize_rings_in_mapping(self, mapping):
-
+        """If a ring is present, symmetrize the mapping by generating alternative mappings where the atoms 
+        in the ring are shifted by one position in either direction.This is to avoid arbitrary breaking of 
+        symmetry in rings which can lead to poor CG models. 
+        Only applied if the entire ring is contained within the same bead, and only for rings larger 
+        than 5 atoms (since smaller rings have limited symmetry and it's less likely to find good alternative 
+        mappings). 
+        If specify_beads is set, filter symmetrized mappings to only those that contain all specified 
+        atoms in the same bead.
+        """
         def symmetrize_ring(mapping, ring, ring_beads):
             m = mapping.copy()
             for bead in ring_beads:

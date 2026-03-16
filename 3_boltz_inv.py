@@ -536,7 +536,7 @@ if __name__ == "__main__":
     mol_dir = CFG.mol_dir
     logger.info("Starting analysis for molecule: %s", molname)
 
-    in_itp = mol_dir / f"{molname}.itp"
+    in_itp = mol_dir / f"{molname}_initial.itp"
     logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
 
@@ -561,7 +561,7 @@ if __name__ == "__main__":
 
     if "only_ill_defined" in sys.argv:
         logger.info("Running only ill-defined dihedral fitting...")
-        in_itp = mol_dir / f"{molname}_updated.itp"
+        in_itp = mol_dir / f"{molname}.itp"
         topo = am.topology.read_itp(str(in_itp))
         topo, fit_cache = boltzmann_invert_ill_defined_dihedrals(topo, internal_coords)
         master_fit_cache["dihedrals"].update(fit_cache["dihedrals"])
@@ -595,7 +595,7 @@ if __name__ == "__main__":
     with open(fit_cache_file, "wb") as f:
         pickle.dump(master_fit_cache, f)
 
-    out_itp = mol_dir / f"{molname}_updated.itp"
+    out_itp = mol_dir / f"{molname}.itp"
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 

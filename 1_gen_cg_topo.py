@@ -88,7 +88,7 @@ if __name__ == "__main__":
         raw_molecule=raw_mol)
 
     # Write .itp file
-    itp_path = mol_dir / f"{molname}.itp"
+    itp_path = mol_dir / f"{molname}_initial.itp"
     cg_mol.to_itp(itp_path)  
     logging.info(f"Wrote: {itp_path}")
 
