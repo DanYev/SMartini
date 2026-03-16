@@ -32,7 +32,7 @@ def setup_martini(sysdir, sysname):
    
     # LIGANDS 
     pdb_file = outdir / f"{ligand}.pdb"
-    itp_file = outdir / f"{ligand}_updated.itp"
+    itp_file = outdir / f"{ligand}.itp"
     shutil.copy(itp_file, mdsys.topdir / f"ligand_{ligand}.itp") # copy .itp to mdsys.itpdir so it can be included in the system topology
     shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
     shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure
@@ -70,7 +70,6 @@ def md_npt(sysdir, sysname, runname, nsteps=None):
     
 def trjconv(sysdir, sysname, runname, **kwargs):
     kwargs.setdefault("b", 0) # in ps
-    kwargs.setdefault("dt", 2) # in ps
     kwargs.setdefault("e", 1e6) # in ps
     mdrun = GmxRun(sysdir, sysname, runname)
     mdrun.rundir = mdrun.root / "mdrun"
@@ -90,7 +89,7 @@ if __name__ == "__main__":
         nsteps = int(sys.argv[sys.argv.index("nsteps") + 1])
     setup_martini(sysdir, sysname)
     md_npt(sysdir, sysname, runname, nsteps=nsteps)
-    trjconv(sysdir, sysname, runname, b=0, dt=1, e=1e6)
+    trjconv(sysdir, sysname, runname, b=0, e=1e6)
 
 
     

@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
+    molname: str = "FTA"
     # specify_beads: tuple[list[int]] = ([4, 5, 8],)
     specify_beads: list[list[int]] = None
     max_combs_merged: int = 1000
