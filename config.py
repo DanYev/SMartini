@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
+    molname: str = "CLA"
     max_combs_merged: int = 1000
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
 

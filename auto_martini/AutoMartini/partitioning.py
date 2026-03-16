@@ -35,7 +35,7 @@ import multiprocessing as mp
 logger = logging.getLogger(__name__)
 
 PART_MAX_RING_LEN = 12
-PART_MAX_MAPPINGS_TO_KEEP = 1000
+PART_MAX_MAPPINGS_TO_KEEP = 500
 PART_MAX_BEAD_SIZE = 4
 PART_MAX_RING_BEAD_SIZE = 3
 PART_KEEP_RINGS_TOGETHER = True
@@ -443,7 +443,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     #         if count >= 10:
     #             break
     # mappings = tmp_mappings
-
     return mappings
 
 
@@ -455,12 +454,22 @@ def sort_mappings(mappings, molecule, fused_rings):
     3. Prefer keeping ring beads small (since rings are usually more rigid and less flexible)
     """
 
-    def num_nonring_beads(mapping):
+    def num_terminal_nonring_beads(mapping):
         count = 0
         for bead in mapping:
             is_in_ring = any(atom in flat_set(fused_rings) for atom in bead)
-            if not is_in_ring:
+            is_terminal = any(atom_is_terminal[a] for a in bead)
+            if not is_in_ring and is_terminal:
                 count += 1
+        return count
+
+    def num_tiny_ring_beads(mapping):
+        count = 0
+        for ring in fused_rings:
+            for bead in mapping:
+                all_in_ring = all(atom in ring for atom in bead)
+                if all_in_ring and len(bead) == 2:
+                    count += 1
         return count
 
     def num_whole_extended_ring_beads(mapping):
@@ -471,21 +480,22 @@ def sort_mappings(mappings, molecule, fused_rings):
                 if all_in_ring:
                     count += 1
         return count
-    
+
     def sort_key(mapping):
         num_beads = len(mapping)
-        num_nonring = num_nonring_beads(mapping)
+        num_terminal_nonring = num_terminal_nonring_beads(mapping)
         num_whole_ring = num_whole_extended_ring_beads(mapping)
-        return (num_beads, num_nonring, num_whole_ring)
+        num_tiny_ring = num_tiny_ring_beads(mapping)
+        return (num_beads, num_terminal_nonring, num_tiny_ring, num_whole_ring)
 
     molecule = Chem.RemoveHs(molecule)
     atoms = molecule.GetAtoms()
     atids = [a.GetIdx() for a in atoms]
     rings = molecule.GetRingInfo().AtomRings()
     rings = [ring for ring in rings if len(ring) > 5] 
+    atom_is_terminal = [a.GetDegree() == 1 for a in atoms]
     ha_terminal_neis = [[na.GetIdx() for na in a.GetNeighbors() if na.GetDegree() == 1] for a in atoms]
     fused_extended_rings = [list(flat_set([ha_terminal_neis[a] + [a] for a in ring])) for ring in fused_rings] # include the terminal neighbors
-    # sorting
     mappings = sorted(mappings, key=lambda m: sort_key(m), reverse=True) # maximize number of beads, etc     
     return mappings
 
