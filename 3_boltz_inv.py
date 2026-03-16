@@ -303,8 +303,8 @@ def boltzmann_invert_dihedrals(topo,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
-            scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
-            kphi /= scale
+            # scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
+            # kphi /= scale
             new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue
@@ -490,7 +490,7 @@ if __name__ == "__main__":
     # DIHEDRALS
     topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_cutoff, angle_cutoff=CFG.angle_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     topo.to_itp(out_file=out_itp)
     logger.info("Updated ITP file written to: %s", out_itp)
 
-    if sys.argv[-1] == "plot":
+    if "plot" in sys.argv:
         plot_internal_coordinates(
             internal_coords,
             topo,

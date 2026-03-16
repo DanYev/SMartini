@@ -343,13 +343,13 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
                 if len(terms) == 1 and mult == 1: 
                     scale = scale ** 2
                 k_new = float(updated[6]) * scale
-                k_new = max(k_new, float(CFG.dihedral_k_cutoff))
+                k_new = min(k_new, float(CFG.dihedral_k_upper_cutoff))
                 updated[6] = float(k_new)
                 n_dihedrals_updated += 1
 
             elif funct == 11:
-                kphi_new = float(updated[5]) * scale**2
-                kphi_new = max(kphi_new, float(CFG.dihedral_k_cutoff))
+                kphi_new = float(updated[5]) * scale
+                kphi_new = min(kphi_new, float(CFG.dihedral_k_upper_cutoff))
                 updated[5] = float(kphi_new)
                 n_dihedrals_updated += 1
 
@@ -387,7 +387,10 @@ def refine_topology_from_cg_vs_aa(
     n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
     
     # Update dihedrals
-    n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
+    if not "nodih" in sys.argv:
+        n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
+    else:        
+        n_dihedrals_updated, n_dihedrals_removed = 0, 0
 
     logger.info(
         "Refined topology: bonds %s, constraints %s, angles %s (removed %s), dihedrals %s (removed %s)",
@@ -441,7 +444,7 @@ if __name__ == "__main__":
     out_refined_itp = itp_updated
     refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
-    if sys.argv[-1] == "plot":
+    if "plot" in sys.argv:
         plot_internal_coordinates_overlay(
             aa_internal,
             cg_internal,

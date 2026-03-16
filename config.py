@@ -9,8 +9,8 @@ from typing import Optional
 @dataclass(frozen=True)
 class LigParConfig:
     # Identity / layout
-    molname: str = "CLA"
-    max_combs_merged: int = 100
+    molname: str = "ANP"
+    max_combs_merged: int = 1000
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
 
     systems_dir: Path = Path("systems")
@@ -46,7 +46,8 @@ class LigParConfig:
     constraint_k_cutoff: float = 50000.0
     angle_k_cutoff: float = 10.0
     angle_k_upper_cutoff: float = 1000.0
-    dihedral_k_cutoff: float = 0.0
+    dihedral_k_lower_cutoff: float = 0.0
+    dihedral_k_upper_cutoff: float = 1000.0
     angle_cutoff: float = 150.0
 
     # Refinement guardrails

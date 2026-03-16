@@ -432,12 +432,18 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     print(len(mappings))
     for mapping in mappings[:10]:
         print(mapping)
+
     # tmp_mappings = []
+    # count = 0
     # for mapping in mappings:
-    #     if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping:
+    #     if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping and not [6, 7, 9] in mapping:
+    #         count += 1
     #         print(len(mapping), mapping)
     #         tmp_mappings.append(mapping)
+    #         if count >= 10:
+    #             break
     # mappings = tmp_mappings
+
     return mappings
 
 
