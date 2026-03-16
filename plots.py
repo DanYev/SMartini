@@ -446,6 +446,8 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
 
         vmin = angles.min() if len(angles) > 0 else 0.0
         vmax = angles.max() if len(angles) > 0 else 180.0
+        vmin = 0.0
+        vmax = 180.0
 
         ax.hist(
             angles,
@@ -468,24 +470,7 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
         cached = cache_section.get(cache_key)
         if isinstance(cached, dict) and cached.get("density") is not None:
             density_arr = np.asarray(cached["density"], dtype=float)
-            angle_entry = None
-            for angle in topo.angles:
-                if int(angle[0]) == i and int(angle[1]) == j and int(angle[2]) == k:
-                    angle_entry = angle
-                    break
-            if angle_entry is not None and len(angle_entry) >= 6:
-                try:
-                    angle_funct = int(angle_entry[3])
-                except Exception:
-                    angle_funct = 1
-                param_theta0 = float(angle_entry[4])
-                param_k = float(angle_entry[5])
-                if angle_funct in (2, 10):
-                    x_grid = np.linspace(0.0, 180.0, len(density_arr), endpoint=False)
-                else:
-                    x_grid = np.linspace(vmin, vmax, len(density_arr), endpoint=False)
-            else:
-                x_grid = np.linspace(vmin, vmax, len(density_arr), endpoint=False)
+            x_grid = np.linspace(vmin, vmax, len(density_arr), endpoint=False)
             ax.plot(x_grid, density_arr, color="red", linewidth=1.6)
 
         # Overlay topology-implied density p(theta) ~ sin(theta)*exp(-U(theta)/kT)
@@ -509,7 +494,7 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
                     U = _angle_U_harmonic(x_grid, theta0, k_param)
 
                 jac = np.clip(np.sin(np.deg2rad(x_grid)), 0.0, None)
-                p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=jac)
+                p = _boltzmann_density_from_U(x_grid, U, temperature, prefactor=None)
                 if p is not None:
                     ax.plot(x_grid, p, color="black", linewidth=1.6)
                 break
@@ -529,8 +514,6 @@ def _plot_angles(angles_data, topo, output_file, temperature: float, cache=None)
             stats_lines.append(f"theta0={param_theta0:.1f} deg")
         if param_k is not None:
             stats_lines.append(f"k={param_k:.1f}")
-        stats_lines.append(f"xmin={vmin:.1f}")
-        stats_lines.append(f"xmax={vmax:.1f}")
 
         stats_text = "\n".join(stats_lines) if stats_lines else "(no params)"
 
@@ -809,8 +792,6 @@ def _plot_angles_overlay(angles_aa, angles_cg, topo, output_file):
                 lines.append(f"type={int(params['type'])}")
             lines.append(f"theta0={params['theta0']:.1f} deg")
             lines.append(f"k={params['k']:.1f}")
-            lines.append("xmin=0.0")
-            lines.append("xmax=180.0")
             ax.text(
                 0.98,
                 0.98,

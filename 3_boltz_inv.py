@@ -13,6 +13,8 @@ from lpmath import (
     read_cog_trajectory,
     calculate_internal_coordinates,
     boltzmann_inversion_bond,
+    fit_type1_angle,
+    fit_type1_angle,
     fit_type2_angle,
     fit_type10_angle,
     fit_type9_dihedral,
@@ -194,19 +196,28 @@ def boltzmann_invert_angles(topo, internal_coords):
         samples = internal_coords[(i, j, k, "angle")]
 
         if _is_linear_fragment(i, j, k, bead_bond_degree, ring_beads):
-            (theta0_calc, k_calc), density = fit_type2_angle(
+            (theta0_calc, k_calc), density = fit_type1_angle(
                 samples,
                 temperature=CFG.temperature,
                 fc_scale=CFG.fc_scale,
             )
-            angle_funct = 2
+            angle_funct = 1
         else:
             theta0_calc, k_calc, density = fit_type10_angle(
                 samples,
                 temperature=CFG.temperature,
                 fc_scale=CFG.fc_scale,
             )
-            angle_funct = 10
+            # Use harmonic angle fitting for terms that will be represented as funct=1.
+            if float(theta0_calc) > float(CFG.angle_cutoff) or float(k_calc) < float(CFG.angle_k_cutoff):
+                (theta0_calc, k_calc), density = fit_type1_angle(
+                    samples,
+                    temperature=CFG.temperature,
+                    fc_scale=CFG.fc_scale,
+                )
+                angle_funct = 1
+            else:
+                angle_funct = 10
 
         if float(k_calc) < CFG.angle_k_cutoff:
             k_calc /= CFG.fc_scale  # undo scaling for weak angles to avoid overfitting noise
@@ -371,19 +382,6 @@ def update_angles(
         if float(angle[5]) > float(CFG.angle_k_upper_cutoff):
             angle[5] = float(CFG.angle_k_upper_cutoff)
 
-        # Linear fragment: 3 consecutive beads each with <= 2 bonds, none in a ring.
-        is_linear_fragment = _is_linear_fragment(i, j, k, bead_bond_degree, ring_beads)
-
-        if is_linear_fragment:
-            angle[3] = 2
-        else:
-            # Change the type to 1 if theta > cutoff, to avoid numerical instability in CG MD.
-            if float(angle[4]) > float(angle_cutoff):
-                angle[3] = 1
-            if float(angle[5]) < float(k_cutoff):
-                angle[3] = 1
-        angle[5] *= CFG.fc_scale
-
     return updated_topo
 
 
@@ -471,7 +469,7 @@ if __name__ == "__main__":
         aa_xtc = aa_dir / "samples.xtc"
         logger.info("Reading AA trajectory from %s", aa_dir)
         aa_traj = read_cog_trajectory(aa_pdb, aa_xtc, topo.aa_mapping, 
-            selection=CFG.aa_selection, stop=300)
+            selection=CFG.aa_selection, stop=2000)
         logger.info("Calculating internal coordinates from AA trajectory")
         internal_coords = calculate_internal_coordinates(aa_traj, topo)
         with open(pickle_file, "wb") as f:

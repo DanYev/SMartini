@@ -330,7 +330,8 @@ def fit_type10_angle(
     angles = np.clip(angles, 0.0, 180.0)
 
     n_bins = int(max(24, bins))
-    theta_min, theta_max = angles.min(), angles.max()
+    # theta_min, theta_max = angles.min(), angles.max()
+    theta_min, theta_max = 0.0, 180.0
     theta_edges = np.linspace(theta_min, theta_max, n_bins + 1)
     theta_centers = 0.5 * (theta_edges[:-1] + theta_edges[1:])
     theta_rad = np.deg2rad(theta_centers)
@@ -382,7 +383,38 @@ def fit_type10_angle(
     return float(theta0), float(k_param), raw_density
 
 
-def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=1e-3):
+def fit_type1_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=1e-6):
+    """Fit GROMACS angle funct=1 parameters from sampled angles.
+
+    Type-1 form:
+        U(theta) = 0.5 * k * (theta - theta0)^2
+
+    Returns
+    -------
+    tuple
+        (theta0_deg, k_kjmol), fit_density
+        where fit_density is the histogram density on bin centers.
+    """
+    kB = 0.008314462618  # kJ/mol/K
+    kT = kB * float(temperature)
+
+    values = np.asarray(angles, dtype=float)
+    values = np.clip(values, 0.0, 180.0)
+
+    theta0 = float(np.mean(values))
+    residual_rad = np.deg2rad(values - theta0)
+    variance_rad = float(np.var(residual_rad))
+    k_param = float(fc_scale * kT / max(variance_rad, 1e-12))
+
+    n_bins = int(max(24, bins))
+    theta_edges = np.linspace(0.0, 180.0, n_bins + 1)
+    raw_density = np.histogram(values, bins=theta_edges, density=True)[0]
+    raw_density = np.clip(raw_density, min_prob, None)
+
+    return (theta0, k_param), raw_density
+
+
+def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=1e-6):
     """Fit GROMACS angle type-2 parameters from sampled angles.
 
     Type-2 form:
@@ -406,6 +438,7 @@ def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=
 
     n_bins = int(max(24, bins))
     theta_min, theta_max = angles.min(), angles.max()
+    # theta_min, theta_max = 0.0, 180.0
     theta_edges = np.linspace(theta_min, theta_max, n_bins + 1)
     theta_centers = 0.5 * (theta_edges[:-1] + theta_edges[1:])
     theta_rad = np.deg2rad(theta_centers)
@@ -415,13 +448,14 @@ def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=
 
     jac = np.sin(theta_rad)
     jac = np.clip(jac, 1e-6, None)
+    jac = np.power(jac, 0.0)
     fit_density = raw_density / jac
     fit_density = np.clip(fit_density, min_prob, None)
     pmf = -kT * np.log(fit_density)
 
     c = np.cos(theta_rad)
     A = np.column_stack([c * c, c, np.ones_like(c)])
-    w = np.power(raw_density, 0.30)
+    w = np.power(raw_density, 1.0)
     Aw = A * w[:, None]
     bw = pmf * w
 
