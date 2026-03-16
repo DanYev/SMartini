@@ -1,5 +1,6 @@
 import logging
 import shutil
+import sys
 import MDAnalysis as mda
 from pathlib import Path
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
@@ -36,19 +37,20 @@ def setup_martini(sysdir, sysname):
     shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
     shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure
 
-    mdsys.molecules[f"ligand_{ligand}"] = 1
-    mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
-    
-    # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
+    if not sys.argv[-1] == "md":
+        mdsys.molecules[f"ligand_{ligand}"] = 1
+        mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
+        
         # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
-    mdsys.make_box(d="1.0", bt="cubic")
-    solvent = mdsys.root / "water.gro"
-    mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.17") # all kwargs go to gmx solvate command
-    mdsys.add_bulk_ions(conc=0.0, pname="NA", nname="CL")
+            # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
+        mdsys.make_box(d="1.0", bt="cubic")
+        solvent = mdsys.root / "water.gro"
+        mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.17") # all kwargs go to gmx solvate command
+        mdsys.add_bulk_ions(conc=0.0, pname="NA", nname="CL")
 
-    # 1.4. Need index files to make selections with GROMACS. Very annoying but wcyd. Order:
-    # 1.System 2.Solute 3.Backbone 4.Solvent 5...chains. Can add custom groups using AtomList.write_to_ndx()
-    mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
+        # 1.4. Need index files to make selections with GROMACS. Very annoying but wcyd. Order:
+        # 1.System 2.Solute 3.Backbone 4.Solvent 5...chains. Can add custom groups using AtomList.write_to_ndx()
+        mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
 
     
 def md_npt(sysdir, sysname, runname, nsteps=None): 

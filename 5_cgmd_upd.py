@@ -168,12 +168,16 @@ def _angle_stats_jacobian(values: np.ndarray, bins: int = 180, min_prob: float =
     jac = np.sin(np.deg2rad(centers))
     jac = np.clip(jac, 1e-6, None)
     corrected = np.clip(raw_density / jac, min_prob, None)
+    corrected = raw_density
 
     idx = int(np.argmax(corrected))
     mu = float(centers[idx])
 
     weights = corrected / np.sum(corrected)
     sigma = float(np.sqrt(np.sum(weights * (centers - mu) ** 2)))
+    mu = np.average(values)
+    sigma = np.std(values)
+    print(mu, sigma)
     return mu, sigma
 
 
@@ -261,7 +265,8 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         if aa_vals is None or cg_vals is None:
             new_angles.append(angle)
             continue
-
+        
+        print(f"Updating angle ({i}, {j}, {k}): AA samples={len(aa_vals)}, CG samples={len(cg_vals)}")
         mu_aa, sigma_aa = _angle_stats_jacobian(aa_vals)
         mu_cg, sigma_cg = _angle_stats_jacobian(cg_vals)
         if not np.isfinite(mu_aa) or not np.isfinite(sigma_aa):
