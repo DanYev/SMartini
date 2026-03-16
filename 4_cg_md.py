@@ -37,7 +37,7 @@ def setup_martini(sysdir, sysname):
     shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
     shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure
 
-    if not sys.argv[-1] == "md":
+    if "md" not in sys.argv:
         mdsys.molecules[f"ligand_{ligand}"] = 1
         mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
         
@@ -85,8 +85,11 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 
 if __name__ == "__main__":
+    nsteps = -2
+    if "nsteps" in sys.argv:
+        nsteps = int(sys.argv[sys.argv.index("nsteps") + 1])
     setup_martini(sysdir, sysname)
-    md_npt(sysdir, sysname, runname, nsteps=-2)
+    md_npt(sysdir, sysname, runname, nsteps=nsteps)
     trjconv(sysdir, sysname, runname, b=0, dt=1, e=1e6)
 
 
