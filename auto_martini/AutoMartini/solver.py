@@ -366,7 +366,7 @@ class Cg_molecule:
 
         molecule = self.molecule
         rings = molecule.GetRingInfo().AtomRings()
-
+        # go thru each ring
         sym_mappings = [mapping]
         for ring in rings:
             new_mappings = []
@@ -376,6 +376,7 @@ class Cg_molecule:
                     symetrized = symmetrize_ring(mapping, ring, ring_beads)
                     new_mappings.extend(symetrized)
             sym_mappings = new_mappings if new_mappings else sym_mappings
+        # If specify_beads is set, filter sym_mappings to only those that contain all specified atoms in the same bead
         if self.specify_beads:
             mappings_with_ag = sym_mappings
             for ag in self.specify_beads:
@@ -470,7 +471,7 @@ class Cg_molecule:
             self.topology.build_virtual_sites()
         # Build angles
         self.topology.build_angles()
-        # Build dihedrals (unless simple model)
+        # Build dihedrals
         self.topology.build_dihedrals()
 
 

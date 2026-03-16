@@ -422,7 +422,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         merged_mappings = new_mappings
         merged_mappings = filter_mappings(merged_mappings, molecule, PART_MAX_BEAD_SIZE + 1, PART_MAX_RING_BEAD_SIZE)
         merged_mappings = sort_mappings(merged_mappings, molecule, fused_rings)
-        # merged_mappings = sorted(merged_mappings, key=lambda m: -len(m))  
     mappings = merged_mappings
     logger.info(f"Total combinations of mappings: {len(mappings)}")
 
