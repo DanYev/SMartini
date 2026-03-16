@@ -45,9 +45,10 @@ class Cg_molecule:
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
 
-    def __init__(self, molecule, mol_smi, molname, raw_molecule=None, 
-        min_beads=None, max_beads=None, use_vsites=True, forcepred=True, 
-        bartenderfname=None, bartender=None, logp_file_name="logP_smi_extended.dat", ):
+    def __init__(self, molecule, mol_smi, molname, 
+        specify_beads=None, min_beads=None, max_beads=None, 
+        use_vsites=True, forcepred=True, raw_molecule=None, 
+        bartenderfname=None, bartender=None, logp_file_name="logP_smi_extended.dat"):
         
         # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
 
@@ -56,6 +57,7 @@ class Cg_molecule:
         self.molecule = molecule
         self.smiles = mol_smi
         self.molname = molname
+        self.specify_beads = specify_beads
         self.min_beads = min_beads
         self.max_beads = max_beads
         self.raw_molecule = raw_molecule
@@ -206,8 +208,8 @@ class Cg_molecule:
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
             self.mapping = mapping
-            # sym_mapping = self.symmetrize_rings_in_mapping(mapping)
-            sym_mapping = mapping
+            sym_mapping = self.symmetrize_rings_in_mapping(mapping)
+            # sym_mapping = mapping
             self.aa_mapping = self.get_aa_mapping(sym_mapping)  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
             self.bead_coords = self.get_bead_coords(mapping=self.aa_mapping)  # Get bead coordinates based on AA mapping
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))
@@ -342,7 +344,7 @@ class Cg_molecule:
         return ha_list, bonds
 
 
-    def symmetrize_rings_in_mapping(self, mapping, specify_atoms=None):
+    def symmetrize_rings_in_mapping(self, mapping):
 
         def symmetrize_ring(mapping, ring, ring_beads):
             m = mapping.copy()
@@ -374,14 +376,14 @@ class Cg_molecule:
                     symetrized = symmetrize_ring(mapping, ring, ring_beads)
                     new_mappings.extend(symetrized)
             sym_mappings = new_mappings if new_mappings else sym_mappings
-        if specify_atoms:
+        if self.specify_beads:
             mappings_with_ag = sym_mappings
-            for ag in specify_atoms:
+            for ag in self.specify_beads:
                 mappings_with_ag = [m for m in mappings_with_ag if any(all(atom in bead for atom in ag) for bead in m)]
             if mappings_with_ag:
                 return mappings_with_ag[0] 
             else:
-                raise ValueError(f"None of the symmetrized mappings contain all specified atoms {specify_atoms}")
+                raise ValueError(f"None of the symmetrized mappings contain all specified atoms {self.specify_beads}")
         return sym_mappings[0]
 
 
