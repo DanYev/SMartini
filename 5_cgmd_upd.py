@@ -346,13 +346,13 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
                     scale = scale ** 0.7
                 if len(terms) == 1 and mult == 1: 
                     scale = scale ** 2
-                k_new = float(updated[6]) * scale ** 1.3
+                k_new = float(updated[6]) * scale ** 1.5
                 k_new = min(k_new, float(CFG.dihedral_k_upper_cutoff))
                 updated[6] = float(k_new)
                 n_dihedrals_updated += 1
 
             elif funct == 11:
-                kphi_new = float(updated[5]) * scale
+                kphi_new = float(updated[5]) * scale ** 2
                 kphi_new = min(kphi_new, float(CFG.dihedral_k_upper_cutoff))
                 updated[5] = float(kphi_new)
                 n_dihedrals_updated += 1

@@ -9,11 +9,12 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
+    molname: str = "FTA"
     # specify_beads: tuple[list[int]] = ([4, 5, 8],)
     specify_beads: list[list[int]] = None
     max_combs_merged: int = 1000
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
+    use_vsites: bool = True
 
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
@@ -37,7 +38,7 @@ class LigParConfig:
 
     # Fitting defaults
     temperature: float = 300.0
-    fc_scale: float = 1.0 # Scaling factor for force constants to roughly account for coupling of the potentials
+    fc_scale: float = 0.8  # Scaling factor for force constants to roughly account for coupling of the potentials
 
     # Type-9 dihedral (Gromacs) fitting parameters
     type9_max_n: int = 6
@@ -48,7 +49,7 @@ class LigParConfig:
     constraint_k_cutoff: float = 50000.0
     bond_lower_cutoff: float = 4000.0
     bond_upper_cutoff: float = 50000.0
-    angle_k_lower_cutoff: float = 5.0
+    angle_k_lower_cutoff: float = 3.0
     angle_k_upper_cutoff: float = 2000.0
     dihedral_k_lower_cutoff: float = 0.0
     dihedral_k_upper_cutoff: float = 1000.0
