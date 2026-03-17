@@ -386,6 +386,7 @@ class Topology:
                         il_bonded = False
                         ij_ring_diagonal = False
                         kl_ring_diagonal = False
+                        jk_ring_diagonal = False
                         for b in bondlist:
                             connectivity = b[:2]
                             if i in connectivity and j in connectivity:
@@ -394,6 +395,8 @@ class Topology:
                                     ij_ring_diagonal = True
                             if j in connectivity and k in connectivity:
                                 jk_bonded = True
+                                if _is_ring_diagonal(b):
+                                    jk_ring_diagonal = True
                             if k in connectivity and l in connectivity:
                                 kl_bonded = True
                                 if _is_ring_diagonal(b):
@@ -409,6 +412,16 @@ class Topology:
                         # (These constraints are added to stabilize rings and
                         # should not define torsional terms.)
                         if ij_ring_diagonal or kl_ring_diagonal:
+                            continue
+
+                        # Ring diagonal should only be involved in one dihedral for its own ring
+                        if jk_ring_diagonal:
+                            stop_iteration = True
+                            for ring in self.ringbeads:
+                                if {i, j, k, l} == set(ring):
+                                    stop_iteration = False
+                                    break
+                        if stop_iteration:
                             continue
                         
                         # # Skip if any shortcut bonds exist (not a proper dihedral chain)
