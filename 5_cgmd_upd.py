@@ -300,70 +300,127 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
     return n_angles_updated, 0
 
 
+
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
-    """Update dihedrals by rescaling force constants (no phase shifting).
+    """Update dihedrals using an IBI-style reweighting of the AA distribution.
 
     Strategy
     --------
-    - No shifting of phi0.
-    - Rescale force constants by (sigma_CG / sigma_AA)^2 (harmonic approximation).
-    - Clamp the scale factor to avoid extreme updates.
+    Given the AA dihedral density P_AA(phi) and the current CG potential
+    U_expected(phi) from the ITP, we look for a new potential U_fitting such
+    that the CG distribution reweighted by exp(-U_expected + U_fitting) matches
+    P_AA:
+
+        P_AA(phi) ~ exp( (-U_expected(phi) + U_fitting(phi)) / kT )
+
+    Solving for U_fitting:
+
+        U_fitting(phi) = U_expected(phi) - PMF_AA(phi) + const
+
+    where  PMF_AA(phi) = -kT * log P_AA(phi).
+
+    Steps for each dihedral quadruplet (i, j, k, l):
+      1. Evaluate U_expected on a phi grid from the current ITP terms.
+      2. Histogram the AA dihedral samples -> P_AA.
+      3. Compute PMF_AA = -kT * log P_AA.
+      4. Target potential: U_fitting = U_expected - PMF_AA  (shift min -> 0).
+      5. Fit U_fitting with the appropriate functional form and update topology.
 
     Applied terms
     ------------
-    - funct=9: scales k (field 6)
-    - funct=11: scales kphi (field 5)
+    - funct=9 : fit a Fourier cosine series preserving the existing multiplicities.
+    - funct=11: fit a cosine-power polynomial (CBT).
     """
-    n_dihedrals_updated = 0
+    kB = 0.008314462618  # kJ mol^-1 K^-1
+    kT = kB * CFG.temperature
 
+    n_dihedrals_updated = 0
     new_dihedrals = []
+
     dihedrals_by_key = {}
     for dihedral in topo.dihedrals:
         key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
         dihedrals_by_key.setdefault(key, []).append(dihedral)
 
-    for (i, j, k, l), terms in dihedrals_by_key.items():
-        key = (i, j, k, l, "dihedral")
-        aa_vals = aa_internal.get(key)
-        cg_vals = cg_internal.get(key)
+    n_bins  = CFG.type9_bins
+    phi_grid = np.linspace(-180.0, 180.0, n_bins, endpoint=False)
 
-        if aa_vals is None or cg_vals is None:
+    for (i, j, k, l), terms in dihedrals_by_key.items():
+        aa_vals = aa_internal.get((i, j, k, l, "dihedral"))
+
+        if aa_vals is None or len(aa_vals) < 5:
+            logger.debug("Dihedral (%s,%s,%s,%s): no AA data, skipping.", i, j, k, l)
             new_dihedrals.extend(terms)
             continue
 
-        _, sigma_aa = _stats(aa_vals, "dihedral")
-        _, sigma_cg = _stats(cg_vals, "dihedral")
-        scale = float((sigma_cg / sigma_aa))
-        print(scale)
+        funct = int(terms[0][4])
+        if funct not in (9, 11):
+            new_dihedrals.extend(terms)
+            continue
 
-        for term in terms:
-            updated = list(term)
-            funct = int(updated[4])
+        # --- 1. U_expected from current ITP ----------------------------------
+        if funct == 9:
+            U_expected = _eval_type9_potential(terms, phi_grid)
+        else:
+            U_expected = _eval_type11_potential(terms[0], phi_grid)
 
-            if funct == 9:
-                mult = int(updated[7])
-                if mult == len(terms) or mult == 1: 
-                    scale = scale ** 0.7
-                if len(terms) == 1 and mult == 1: 
-                    scale = scale ** 2
-                k_new = float(updated[6]) * scale ** 1.5
-                k_new = min(k_new, float(CFG.dihedral_k_upper_cutoff))
-                updated[6] = float(k_new)
-                n_dihedrals_updated += 1
+        # --- 2. P_AA histogram -----------------------------------------------
+        aa_hist, _ = np.histogram(
+            wrap_to_180(np.asarray(aa_vals, dtype=float)),
+            bins=n_bins,
+            range=(-180.0, 180.0),
+            density=True,
+        )
+        aa_density = np.clip(aa_hist, CFG.type9_min_prob, None)
 
-            elif funct == 11:
-                kphi_new = float(updated[5]) * scale ** 2
-                kphi_new = min(kphi_new, float(CFG.dihedral_k_upper_cutoff))
-                updated[5] = float(kphi_new)
-                n_dihedrals_updated += 1
+        # --- 3. PMF from AA distribution ------------------------------------
+        PMF_AA = -kT * np.log(aa_density)
 
-            new_dihedrals.append(updated)
+        # --- 4. Target: U_fitting = U_expected - PMF_AA, shifted to min=0 ---
+        U_fitting = U_expected - PMF_AA
+        U_fitting -= U_fitting.min()
+
+        # Weights proportional to sqrt(P_AA) so high-density regions dominate
+        weights = np.sqrt(aa_density)
+
+        logger.debug(
+            "Dihedral (%s,%s,%s,%s) funct=%s: U_fitting range [%.2f, %.2f] kJ/mol",
+            i, j, k, l, funct, float(U_fitting.min()), float(U_fitting.max()),
+        )
+
+        # --- 5. Fit and write new terms -------------------------------------
+        comment = ""
+        if funct == 9:
+            if len(terms[0]) >= 9:
+                comment = terms[0][8]
+            harmonics = sorted({int(t[7]) for t in terms})
+            fitted = _fit_type9_to_target(phi_grid, U_fitting, harmonics, weights)
+            for mult, k_term, phi0 in fitted:
+                k_term = float(np.clip(
+                    k_term * CFG.fc_scale,
+                    CFG.dihedral_k_lower_cutoff,
+                    CFG.dihedral_k_upper_cutoff,
+                ))
+                new_dihedrals.append([i, j, k, l, 9, float(phi0), k_term, int(mult), comment])
+            n_dihedrals_updated += 1
+
+        elif funct == 11:
+            if len(terms[0]) >= 12:
+                comment = terms[0][11]
+            k_phi, a = _fit_type11_to_target(phi_grid, U_fitting, weights)
+            k_phi = float(np.clip(
+                k_phi * CFG.fc_scale,
+                CFG.dihedral_k_lower_cutoff,
+                CFG.dihedral_k_upper_cutoff,
+            ))
+            new_dihedrals.append([i, j, k, l, 11, k_phi, a[0], a[1], a[2], a[3], a[4], comment])
+            n_dihedrals_updated += 1
 
     topo.dihedrals = new_dihedrals
     return n_dihedrals_updated, 0
 
 
-def refine_topology_from_cg_vs_aa(
+def update_topology_from_cg_vs_aa(
     topo,
     aa_internal: InternalCoords,
     cg_internal: InternalCoords,
@@ -442,7 +499,7 @@ if __name__ == "__main__":
     tmp_itp = outdir / f"{molname}_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = in_itp
-    refine_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    # update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
     if "plot" in sys.argv:
         plot_internal_coordinates_overlay(

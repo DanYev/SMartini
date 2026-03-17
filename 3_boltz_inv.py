@@ -395,7 +395,7 @@ def boltzmann_invert_dihedrals(topo,
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
-            bins=CFG.type9_bins,
+            nbins=CFG.type9_bins,
             min_prob=CFG.type9_min_prob,
             fc_scale=CFG.fc_scale,
         )

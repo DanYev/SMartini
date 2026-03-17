@@ -492,12 +492,125 @@ def boltzmann_inversion_improper(dihedrals, temperature=300.0, fc_scale=1.0):
 
     return phi0, k
 
+################################################################################
+### DIHEDRALS ###
+################################################################################   
+
+def _eval_type9_potential(terms, phi_deg: np.ndarray) -> np.ndarray:
+    """Evaluate the sum of type-9 dihedral energies on a phi grid (degrees).
+
+    GROMACS funct=9: U(phi) = sum_n  k_n * (1 + cos(n*phi - phi0_n))
+    term layout: [i, j, k, l, funct=9, phi0_deg, k, mult, ...]
+    """
+    phi_rad = np.deg2rad(phi_deg)
+    U = np.zeros_like(phi_deg, dtype=float)
+    for term in terms:
+        phi0_rad = np.deg2rad(float(term[5]))
+        k_term   = float(term[6])
+        mult     = int(term[7])
+        U += k_term * (1.0 + np.cos(mult * phi_rad - phi0_rad))
+    return U
+
+
+def _eval_type11_potential(term, phi_deg: np.ndarray) -> np.ndarray:
+    """Evaluate a type-11 (CBT) dihedral potential on a phi grid (degrees).
+
+    GROMACS funct=11:  U(phi) = k_phi * sum_{n=0}^{4} a_n * cos^n(phi)
+    (sin^3*sin^3 prefactor assumed = 1, consistent with fitting in lpmath)
+    term layout: [i, j, k, l, funct=11, k_phi, a0, a1, a2, a3, a4, ...]
+    """
+    cos_phi = np.cos(np.deg2rad(phi_deg))
+    kphi = float(term[5])
+    a    = [float(term[6 + n]) for n in range(5)]
+    U = kphi * sum(a[n] * cos_phi ** n for n in range(5))
+    return U
+
+# ---------------------------------------------------------------------------
+# Fitting helpers: fit a functional form to a target potential on a grid
+# ---------------------------------------------------------------------------
+
+def _fit_type9_to_target(
+    pmf: np.ndarray,
+    shift: float,
+    harmonics: list,
+    weights: np.ndarray = None,
+    phi_grid: np.ndarray = None,
+    nbins: int = 360,
+) -> list:
+    """Fit Gromacs type-9 Fourier terms to a target potential on a phi grid.
+
+    U(phi) = const + sum_n [ a_n*cos(n*phi) + b_n*sin(n*phi) ]
+    converted to (mult, k, phi0) via  k = hypot(a, b),  phi0 = atan2(b, a).
+
+    Returns list of (mult, k_term, phi0_deg) tuples.
+    """
+
+    def _k_phi_from_ab(a, b, n: int):
+        k = np.hypot(a, b)
+        if k < 1e-12:
+            return 0.0, 0.0
+        phi = np.rad2deg(np.arctan2(b, a))
+        # We fit in the centered coordinate x = wrap(phi - shift).
+        # Convert phase back to the absolute coordinate expected by type-9: cos(n*phi - phi0).
+        phi += n * shift
+        phi = wrap_to_180(phi)
+        return k, phi
+
+    if phi_grid is None:
+        phi_grid = np.linspace(-180.0, 180.0, nbins + 1)
+    phi_rad = np.deg2rad(phi_grid)
+
+    cols = [np.ones_like(phi_rad)]
+    for n in harmonics:
+        cols.append(np.cos(n * phi_rad))
+        cols.append(np.sin(n * phi_rad))
+
+    w = weights if weights is not None else np.ones_like(phi_rad)
+    A = np.column_stack(cols)
+    Aw = A * w[:, None]
+    bw = pmf * w
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    resid = Aw @ coeffs - bw
+
+    # Extract and output the fitted terms
+    terms = []
+    for idx, n in enumerate(harmonics):
+        a = coeffs[1 + 2 * idx]
+        b = coeffs[1 + 2 * idx + 1]
+        k, phi = _k_phi_from_ab(a, b, n)
+        terms.append((int(n), float(k), float(phi)))
+
+    return terms
+
+
+def _fit_type11_to_target(
+    phi_grid: np.ndarray,
+    U_target: np.ndarray,
+    weights: np.ndarray = None,
+):
+    """Fit a type-11 (CBT) potential to a target on a phi grid.
+
+    Returns (k_phi, [a0, a1, a2, a3, a4]).
+    """
+    cos_phi = np.cos(np.deg2rad(phi_grid))
+    cols = [cos_phi ** n for n in range(5)]
+    A  = np.column_stack(cols)
+    Aw = A * (weights[:, None] if weights is not None else 1.0)
+    bw = U_target * (weights if weights is not None else 1.0)
+    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
+    scale = float(np.max(np.abs(coeffs)))
+    if scale < 1e-12:
+        scale = 1.0
+    k_phi = scale
+    a = [float(c / scale) for c in coeffs[:5]]
+    return k_phi, a
+
 
 def fit_type9_dihedral(
     dihedrals,
     temperature=300.0,
     max_n=6,
-    bins=360,
+    nbins=360,
     min_prob=1e-2,
     fc_scale: float = 1.0,
 ):
@@ -526,7 +639,7 @@ def fit_type9_dihedral(
 
     # Always fit/evaluate on a fixed dihedral grid.
     # endpoint=False avoids duplicating -180 and +180 (same angle).
-    phi_centers = np.linspace(-180.0, 180.0, int(max(24, bins)), endpoint=False)
+    phi_centers = np.linspace(-180.0, 180.0, nbins, endpoint=False)
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
@@ -536,6 +649,8 @@ def fit_type9_dihedral(
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
     density = np.clip(gmm_density, min_prob, None)
+    # density = np.histogram(values, bins=np.linspace(-180.0, 180.0, nbins + 1), density=True)[0]
+    density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
 
     # Determine optimal n from the spacing between modes (circularly).
@@ -561,11 +676,6 @@ def fit_type9_dihedral(
     for n in range(1, optimal_n + 1):
         harmonics_to_fit.append(n)
 
-    cols = [np.ones_like(phi_rad)]
-    for n in harmonics_to_fit:
-        cols.append(np.cos(n * phi_rad))
-        cols.append(np.sin(n * phi_rad))
-
     # Weighted least squares with weights ~ sqrt(p) so high-probability regions dominate.
     # No masking/fallbacks: low-density regions naturally get near-zero weight.
     # w = np.sqrt(density)
@@ -574,34 +684,7 @@ def fit_type9_dihedral(
     else:
         w = np.pow(density, 0.2)
 
-    A = np.column_stack(cols)
-    Aw = A * w[:, None]
-    bw = pmf * w
-    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
-    resid = Aw @ coeffs - bw
-    score = float(np.mean(resid**2))
-
-    def _k_phi_from_ab(a, b, n: int):
-        k = np.hypot(a, b)
-        if k < 1e-12:
-            return 0.0, 0.0
-        phi = np.rad2deg(np.arctan2(b, a))
-        # We fit in the centered coordinate x = wrap(phi - shift).
-        # Convert phase back to the absolute coordinate expected by type-9: cos(n*phi - phi0).
-        phi += n * shift
-        phi = wrap_to_180(phi)
-        return k, phi
-
-    # Extract and output the fitted terms
-    terms = []
-    for idx, n in enumerate(harmonics_to_fit):
-        a = coeffs[1 + 2 * idx]
-        b = coeffs[1 + 2 * idx + 1]
-        k, phi = _k_phi_from_ab(a, b, n)
-        if not (n == 1 and len(harmonics_to_fit) > 1):
-            # if not n == len(harmonics_to_fit):
-            k *= fc_scale
-        terms.append((int(n), float(k), float(phi)))
+    terms = _fit_type9_to_target(pmf, shift, harmonics_to_fit, weights=w, phi_grid=phi_centers)
 
     return terms, density
 
