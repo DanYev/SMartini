@@ -627,8 +627,6 @@ def fit_type9_dihedral(
     list[tuple[int, float, float]]
         List of (multiplicity n, k_n, phi_n_deg) terms.
     """
-    if max_n <= 0:
-        return []
 
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
@@ -692,9 +690,8 @@ def fit_type9_dihedral(
 def fit_type11_dihedral(
     dihedrals,
     temperature=300.0,
-    nbins=180,
+    nbins=360,
     min_prob=1e-2,
-    cos_power_max: int = 4,
     fc_scale: float = 1.0,
 ):
     r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).
@@ -724,9 +721,6 @@ def fit_type11_dihedral(
     tuple[float, list[float]]
         (k_phi, [a0, a1, a2, a3, a4])
     """
-    if cos_power_max != 4:
-        raise ValueError("Only cos_power_max=4 is supported for funct=11")
-
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * float(temperature)
 
