@@ -378,15 +378,15 @@ def boltzmann_invert_dihedrals(topo,
             (kphi, a), density = fit_type11_dihedral(
                 data,
                 temperature=CFG.temperature,
-                bins=CFG.type9_bins,
+                nbins=CFG.type9_bins,
                 min_prob=CFG.type9_min_prob,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
             # scale = max(np.sin(theta_1) ** 3 * np.sin(theta_2) ** 3, 5e-2)
             # kphi /= scale
-            if skip_ill_defined:
-                kphi = 0.1
+            # if skip_ill_defined:
+            #     kphi = 0.1
             new_dihedrals.append([i, j, k, l, 11, kphi, a[0], a[1], a[2], a[3], a[4], comment])
             fit_cache["dihedrals"][(i, j, k, l, "dihedral")] = {"density": list(map(float, density))}
             continue

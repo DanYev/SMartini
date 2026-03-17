@@ -579,30 +579,30 @@ def _fit_type9_to_target(
         b = coeffs[1 + 2 * idx + 1]
         k, phi = _k_phi_from_ab(a, b, n)
         terms.append((int(n), float(k), float(phi)))
-
     return terms
 
 
 def _fit_type11_to_target(
-    phi_grid: np.ndarray,
-    U_target: np.ndarray,
+    pmf: np.ndarray,
     weights: np.ndarray = None,
+    phi_grid: np.ndarray = None,
+    nbins: int = 360,
 ):
     """Fit a type-11 (CBT) potential to a target on a phi grid.
 
     Returns (k_phi, [a0, a1, a2, a3, a4]).
     """
+    if phi_grid is None:
+        phi_grid = np.linspace(-180.0, 180.0, nbins + 1)
+    phi_rad = np.deg2rad(phi_grid)
     cos_phi = np.cos(np.deg2rad(phi_grid))
     cols = [cos_phi ** n for n in range(5)]
     A  = np.column_stack(cols)
     Aw = A * (weights[:, None] if weights is not None else 1.0)
-    bw = U_target * (weights if weights is not None else 1.0)
+    bw = pmf * (weights if weights is not None else 1.0)
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
-    scale = float(np.max(np.abs(coeffs)))
-    if scale < 1e-12:
-        scale = 1.0
-    k_phi = scale
-    a = [float(c / scale) for c in coeffs[:5]]
+    k_phi = float(np.max(np.abs(coeffs)))
+    a = [float(c / k_phi) for c in coeffs[:5]]
     return k_phi, a
 
 
@@ -692,7 +692,7 @@ def fit_type9_dihedral(
 def fit_type11_dihedral(
     dihedrals,
     temperature=300.0,
-    bins=180,
+    nbins=180,
     min_prob=1e-2,
     cos_power_max: int = 4,
     fc_scale: float = 1.0,
@@ -732,8 +732,7 @@ def fit_type11_dihedral(
 
     dihs = np.asarray(dihedrals, dtype=float)
     dihs = wrap_to_180(dihs)
-    n_bins = int(max(24, bins))
-    phi_edges = np.linspace(-180.0, 180.0, n_bins + 1)
+    phi_edges = np.linspace(-180.0, 180.0, nbins + 1)
     phi_centers = 0.5 * (phi_edges[:-1] + phi_edges[1:])
     phi_rad = np.deg2rad(phi_centers)
 
@@ -741,31 +740,6 @@ def fit_type11_dihedral(
     density = np.histogram(dihs, bins=phi_edges, density=True)[0]
     density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
-
-    # Build weighted least squares system: PMF(phi) ~ sum_n c_n * cos^n(phi)
-    cols = []
-    cos_phi = np.cos(phi_rad)
-    cos_pow = np.ones_like(cos_phi)
-    for n in range(0, 5):
-        if n == 0:
-            cos_pow = np.ones_like(cos_phi)
-        elif n == 1:
-            cos_pow = cos_phi
-        else:
-            cos_pow = cos_pow * cos_phi
-        cols.append(cos_pow)
-
     w = np.pow(density, 0.30)
-    A = np.column_stack(cols)
-    Aw = A * w[:, None]
-    bw = pmf * w
-    coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
-    resid = Aw @ coeffs - bw
-
-    scale = float(np.max(np.abs(coeffs)))
-    k_phi = scale
-    a = (coeffs / scale).tolist()
-    # Ensure length exactly 5
-    a = [float(x) for x in a[:5]]
-    result = (float(k_phi), a)
+    result = _fit_type11_to_target(pmf, weights=w, phi_grid=phi_centers)
     return result, density
