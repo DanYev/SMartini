@@ -611,7 +611,7 @@ def fit_type9_dihedral(
     temperature=300.0,
     max_n=6,
     nbins=360,
-    min_prob=1e-2,
+    min_prob=1e-6,
     fc_scale: float = 1.0,
 ):
     r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
@@ -646,8 +646,8 @@ def fit_type9_dihedral(
     
     # Fit free energy from GMM density
     gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    density = np.clip(gmm_density, min_prob, None)
-    # density = np.histogram(values, bins=np.linspace(-180.0, 180.0, nbins + 1), density=True)[0]
+    # density = np.clip(gmm_density, min_prob, None)
+    density = np.histogram(values, bins=np.linspace(-180.0, 180.0, nbins + 1), density=True)[0]
     density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
 

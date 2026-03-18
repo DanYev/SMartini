@@ -578,7 +578,7 @@ if __name__ == "__main__":
     logger.info("Fitting dihedrals...")
     topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
+    # topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"

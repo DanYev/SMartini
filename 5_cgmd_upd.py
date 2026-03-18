@@ -5,6 +5,7 @@ import shutil
 import sys
 
 import numpy as np
+import matplotlib.pyplot as plt
 import AutoMartini as am
 
 from pathlib import Path
@@ -13,6 +14,10 @@ from lpmath import (
     read_cg_trajectory,
     read_cog_trajectory,
     calculate_internal_coordinates,
+    _eval_type9_potential,
+    _eval_type11_potential,
+    _fit_type9_to_target,
+    _fit_type11_to_target,
     circular_mean,
     wrap_to_180,
 )
@@ -34,91 +39,6 @@ def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
     mu = float(np.mean(values))
     sigma = float(np.std(values))
     return mu, sigma
-
-
-def _dihedral_mode_deg(values: np.ndarray, center_deg: float, bins: int = 72) -> float:
-    """Estimate dihedral 'location' robustly as a mode near a reference center.
-
-    We histogram wrapped residuals (value - center) in [-180, 180] and take the
-    most populated bin center; then map back by adding center.
-    """
-    if values is None or len(values) == 0:
-        return float(wrap_to_180(center_deg))
-
-    residual = wrap_to_180(values - center_deg)
-    hist, edges = np.histogram(residual, bins=bins, range=(-180, 180))
-    if np.all(hist == 0):
-        return float(wrap_to_180(circular_mean(values)))
-
-    idx = int(np.argmax(hist))
-    bin_center = float(0.5 * (edges[idx] + edges[idx + 1]))
-    return float(wrap_to_180(center_deg + bin_center))
-
-
-def _circular_distance_deg(a: float, b: float) -> float:
-    return float(abs(wrap_to_180(a - b)))
-
-
-def _bimodal_dihedral_stats(
-    values: np.ndarray,
-    bins: int = 72,
-    min_separation_deg: float = 30.0,
-    min_cluster_size: int = 5,
-):
-    """Estimate up to two dihedral modes and their sigmas using a histogram.
-
-    Returns a list of (center_deg, sigma_deg) sorted by population.
-    """
-    if values is None or len(values) == 0:
-        return []
-
-    wrapped = wrap_to_180(np.asarray(values, dtype=float))
-    hist, edges = np.histogram(wrapped, bins=bins, range=(-180, 180))
-    if np.all(hist == 0):
-        return []
-
-    bin_centers = 0.5 * (edges[:-1] + edges[1:])
-    order = np.argsort(hist)[::-1]
-
-    picked_centers = []
-    for idx in order:
-        if hist[idx] == 0:
-            break
-        candidate = float(bin_centers[idx])
-        if not picked_centers:
-            picked_centers.append(candidate)
-            if len(picked_centers) == 2:
-                break
-            continue
-        if _circular_distance_deg(candidate, picked_centers[0]) >= min_separation_deg:
-            picked_centers.append(candidate)
-            break
-
-    if not picked_centers:
-        return []
-
-    # Assign samples to nearest picked center
-    centers = picked_centers
-    clusters = {c: [] for c in centers}
-    for val in wrapped:
-        nearest = min(centers, key=lambda c: _circular_distance_deg(val, c))
-        clusters[nearest].append(val)
-
-    stats = []
-    for center in centers:
-        cluster_vals = np.asarray(clusters[center], dtype=float)
-        if len(cluster_vals) < min_cluster_size:
-            continue
-        residual = wrap_to_180(cluster_vals - center)
-        sigma = float(np.std(residual))
-        stats.append((float(center), sigma, len(cluster_vals)))
-
-    if not stats:
-        return []
-
-    stats.sort(key=lambda x: x[2], reverse=True)
-    return [(c, s) for c, s, _ in stats]
-
 
 def _pair_mode_centers(aa_centers, cg_centers):
     if len(aa_centers) != 2 or len(cg_centers) != 2:
@@ -177,7 +97,6 @@ def _angle_stats_jacobian(values: np.ndarray, bins: int = 180, min_prob: float =
     sigma = float(np.sqrt(np.sum(weights * (centers - mu) ** 2)))
     mu = np.average(values)
     sigma = np.std(values)
-    print(mu, sigma)
     return mu, sigma
 
 
@@ -268,7 +187,6 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
             new_angles.append(angle)
             continue
         
-        print(f"Updating angle ({i}, {j}, {k}): AA samples={len(aa_vals)}, CG samples={len(cg_vals)}")
         mu_aa, sigma_aa = _angle_stats_jacobian(aa_vals)
         mu_cg, sigma_cg = _angle_stats_jacobian(cg_vals)
         if not np.isfinite(mu_aa) or not np.isfinite(sigma_aa):
@@ -300,39 +218,181 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
     return n_angles_updated, 0
 
 
-
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
-    """Update dihedrals using an IBI-style reweighting of the AA distribution.
+    """Update dihedrals by fitting delta PMF and adding it to current terms.
 
-    Strategy
-    --------
-    Given the AA dihedral density P_AA(phi) and the current CG potential
-    U_expected(phi) from the ITP, we look for a new potential U_fitting such
-    that the CG distribution reweighted by exp(-U_expected + U_fitting) matches
-    P_AA:
-
-        P_AA(phi) ~ exp( (-U_expected(phi) + U_fitting(phi)) / kT )
-
-    Solving for U_fitting:
-
-        U_fitting(phi) = U_expected(phi) - PMF_AA(phi) + const
-
-    where  PMF_AA(phi) = -kT * log P_AA(phi).
-
-    Steps for each dihedral quadruplet (i, j, k, l):
-      1. Evaluate U_expected on a phi grid from the current ITP terms.
-      2. Histogram the AA dihedral samples -> P_AA.
-      3. Compute PMF_AA = -kT * log P_AA.
-      4. Target potential: U_fitting = U_expected - PMF_AA  (shift min -> 0).
-      5. Fit U_fitting with the appropriate functional form and update topology.
-
-    Applied terms
-    ------------
-    - funct=9 : fit a Fourier cosine series preserving the existing multiplicities.
-    - funct=11: fit a cosine-power polynomial (CBT).
+    For each torsion, we compute:
+        pmf = -kT * log(rho_AA / rho_expected)
+    then fit that delta with either type-9 or type-11 form, and combine the
+    fitted delta terms with the existing topology terms.
     """
     kB = 0.008314462618  # kJ mol^-1 K^-1
     kT = kB * CFG.temperature
+    nbins = int(CFG.type9_bins)
+    png_dir = Path(__file__).resolve().parent / "png"
+    png_dir.mkdir(parents=True, exist_ok=True)
+
+    def _save_pmf_plot(phi_grid, pmf, u_initial, u_updated, title: str, filename: str):
+        fig, ax = plt.subplots(figsize=(6.0, 4.0))
+        pmf_plot = np.asarray(pmf, dtype=float) - float(np.min(pmf))
+        u0_plot = np.asarray(u_initial, dtype=float) - float(np.min(u_initial))
+        u1_plot = np.asarray(u_updated, dtype=float) - float(np.min(u_updated))
+
+        ax.plot(phi_grid, pmf_plot, lw=1.8, label="PMF")
+        ax.plot(phi_grid, u0_plot, lw=1.5, ls="--", label="Initial potential")
+        ax.plot(phi_grid, u1_plot, lw=1.5, ls="-.", label="Updated potential")
+        ax.set_xlabel("Dihedral (deg)")
+        ax.set_ylabel("PMF (kJ/mol)")
+        ax.set_title(title)
+        ax.legend(frameon=False)
+        ax.grid(alpha=0.25)
+        fig.tight_layout()
+        fig.savefig(png_dir / filename, dpi=180)
+        plt.close(fig)
+
+    def _update_type9_terms(i, j, k, l, aa_vals, cg_vals, terms):
+        aa_vals = np.asarray(aa_vals, dtype=float)
+        cg_vals = np.asarray(cg_vals, dtype=float)
+        shift = float(circular_mean(aa_vals))
+        aa_vals= wrap_to_180(aa_vals - shift)
+        cg_vals = wrap_to_180(cg_vals - shift)
+
+        # Fit in centered coordinate x = wrap(phi - shift), same as lpmath.
+        phi_centers = np.linspace(-180.0, 180.0, nbins, endpoint=False)
+        phi_absolute = wrap_to_180(phi_centers + shift)
+
+        U_expected = _eval_type9_potential(terms, phi_absolute)
+        density_from_potential = np.exp(-U_expected / kT)
+        density_from_potential = np.clip(density_from_potential, CFG.type9_min_prob, None)
+        density_from_potential /= np.sum(density_from_potential)
+
+        bins = np.linspace(-180.0, 180.0, nbins + 1)
+        aa_density, _ = np.histogram(
+            aa_vals,
+            bins=bins,
+            density=True,
+        )
+        aa_density = np.clip(aa_density, CFG.type9_min_prob, None)
+        aa_density /= np.sum(aa_density)
+
+        cg_density, _ = np.histogram(
+            cg_vals,
+            bins=bins,
+            density=True,
+        )
+        cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
+        cg_density /= np.sum(cg_density)
+
+        pmf = -kT * (np.log(aa_density) - np.log(cg_density) + np.log(density_from_potential))
+
+        harmonics = sorted({int(t[7]) for t in terms})
+        weights = np.sqrt(aa_density * density_from_potential)
+        if len(harmonics) == 1:
+            weights = np.pow(weights, 1.0)
+        else:
+            weights = np.pow(weights, 0.2)
+
+        fitted_terms = _fit_type9_to_target(
+            pmf,
+            shift=shift,
+            harmonics=harmonics,
+            weights=weights,
+            phi_grid=phi_centers,
+        )
+        updated_terms = []
+        comment = ""
+        if terms and len(terms[0]) >= 9:
+            comment = terms[0][8]
+        for mult, k_term, phi0 in fitted_terms:
+            updated_terms.append(
+                [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
+            )
+
+        U_updated = _eval_type9_potential(updated_terms, phi_absolute)
+        _save_pmf_plot(
+            phi_centers,
+            pmf,
+            u_initial=U_expected,
+            u_updated=U_updated,
+            title=f"PMF type9 ({i},{j},{k},{l})",
+            filename=f"{i}{j}{k}{l}.png",
+        )
+        return updated_terms
+
+    def _update_type11_terms(terms, aa_vals, cg_vals):
+        aa_vals = np.asarray(aa_vals, dtype=float)
+        cg_vals = np.asarray(cg_vals, dtype=float)
+        phi_grid = np.linspace(-180.0, 180.0, nbins, endpoint=False)
+
+        U_expected = _eval_type11_potential(terms[0], phi_grid)
+        density_from_potential = np.exp(-U_expected / kT)
+        density_from_potential = np.clip(density_from_potential, CFG.type9_min_prob, None)
+        density_from_potential /= np.sum(density_from_potential)
+
+        aa_hist, _ = np.histogram(
+            wrap_to_180(aa_vals),
+            bins=nbins,
+            range=(-180.0, 180.0),
+            density=True,
+        )
+        aa_density = np.clip(aa_hist, CFG.type9_min_prob, None)
+        aa_density /= np.sum(aa_density)
+
+        cg_density, _ = np.histogram(
+            wrap_to_180(cg_vals),
+            bins=nbins,
+            range=(-180.0, 180.0),
+            density=True,
+        )
+        cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
+        cg_density /= np.sum(cg_density)
+
+        # pmf = -kT * (np.log(aa_density) - np.log(density_from_potential))
+        pmf = -kT * (np.log(aa_density) - np.log(cg_density) + np.log(density_from_potential))
+        # pmf = -kT * (np.log(aa_density))
+        pmf -= np.min(pmf)
+        weights = np.pow(aa_density, 0.30)
+        i, j, k, l = (int(terms[0][0]), int(terms[0][1]), int(terms[0][2]), int(terms[0][3]))
+        k_phi_new, a_new = _fit_type11_to_target(
+            pmf,
+            weights=weights,
+            phi_grid=phi_grid,
+        )
+        base = list(terms[0])
+        base[5] = k_phi_new
+        for n in range(5):
+            base[6 + n] = float(a_new[n])
+
+        U_updated = _eval_type11_potential(base, phi_grid)
+        _save_pmf_plot(
+            phi_grid,
+            pmf,
+            u_initial=U_expected,
+            u_updated=U_updated,
+            title=f"PMF type11 ({i},{j},{k},{l})",
+            filename=f"pmf_type11_{i}_{j}_{k}_{l}.png",
+        )
+        return [base]
+
+        base = list(terms[0])
+        k_phi_0 = float(base[5])
+        a0 = np.asarray([float(base[6 + n]) for n in range(5)], dtype=float)
+        c0 = k_phi_0 * a0
+        c_delta = k_phi_delta * np.asarray(a_delta, dtype=float)
+        c_new = c0 + c_delta
+
+        k_phi_new = float(np.max(np.abs(c_new)))
+        if k_phi_new < 1e-12:
+            k_phi_new = float(CFG.dihedral_k_lower_cutoff)
+            a_new = np.zeros(5, dtype=float)
+        else:
+            a_new = c_new / k_phi_new
+
+        k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower_cutoff, CFG.dihedral_k_upper_cutoff))
+        base[5] = k_phi_new
+        for n in range(5):
+            base[6 + n] = float(a_new[n])
+        return [base]
 
     n_dihedrals_updated = 0
     new_dihedrals = []
@@ -342,79 +402,21 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         key = (int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]))
         dihedrals_by_key.setdefault(key, []).append(dihedral)
 
-    n_bins  = CFG.type9_bins
-    phi_grid = np.linspace(-180.0, 180.0, n_bins, endpoint=False)
-
     for (i, j, k, l), terms in dihedrals_by_key.items():
         aa_vals = aa_internal.get((i, j, k, l, "dihedral"))
-
-        if aa_vals is None or len(aa_vals) < 5:
-            logger.debug("Dihedral (%s,%s,%s,%s): no AA data, skipping.", i, j, k, l)
-            new_dihedrals.extend(terms)
-            continue
+        cg_vals = cg_internal.get((i, j, k, l, "dihedral"))
 
         funct = int(terms[0][4])
-        if funct not in (9, 11):
-            new_dihedrals.extend(terms)
-            continue
-
-        # --- 1. U_expected from current ITP ----------------------------------
         if funct == 9:
-            U_expected = _eval_type9_potential(terms, phi_grid)
-        else:
-            U_expected = _eval_type11_potential(terms[0], phi_grid)
-
-        # --- 2. P_AA histogram -----------------------------------------------
-        aa_hist, _ = np.histogram(
-            wrap_to_180(np.asarray(aa_vals, dtype=float)),
-            bins=n_bins,
-            range=(-180.0, 180.0),
-            density=True,
-        )
-        aa_density = np.clip(aa_hist, CFG.type9_min_prob, None)
-
-        # --- 3. PMF from AA distribution ------------------------------------
-        PMF_AA = -kT * np.log(aa_density)
-
-        # --- 4. Target: U_fitting = U_expected - PMF_AA, shifted to min=0 ---
-        U_fitting = U_expected - PMF_AA
-        U_fitting -= U_fitting.min()
-
-        # Weights proportional to sqrt(P_AA) so high-density regions dominate
-        weights = np.sqrt(aa_density)
-
-        logger.debug(
-            "Dihedral (%s,%s,%s,%s) funct=%s: U_fitting range [%.2f, %.2f] kJ/mol",
-            i, j, k, l, funct, float(U_fitting.min()), float(U_fitting.max()),
-        )
-
-        # --- 5. Fit and write new terms -------------------------------------
-        comment = ""
-        if funct == 9:
-            if len(terms[0]) >= 9:
-                comment = terms[0][8]
-            harmonics = sorted({int(t[7]) for t in terms})
-            fitted = _fit_type9_to_target(phi_grid, U_fitting, harmonics, weights)
-            for mult, k_term, phi0 in fitted:
-                k_term = float(np.clip(
-                    k_term * CFG.fc_scale,
-                    CFG.dihedral_k_lower_cutoff,
-                    CFG.dihedral_k_upper_cutoff,
-                ))
-                new_dihedrals.append([i, j, k, l, 9, float(phi0), k_term, int(mult), comment])
+            updated_terms = _update_type9_terms(i, j, k, l, aa_vals, cg_vals, terms)
+            new_dihedrals.extend(updated_terms)
             n_dihedrals_updated += 1
-
         elif funct == 11:
-            if len(terms[0]) >= 12:
-                comment = terms[0][11]
-            k_phi, a = _fit_type11_to_target(phi_grid, U_fitting, weights)
-            k_phi = float(np.clip(
-                k_phi * CFG.fc_scale,
-                CFG.dihedral_k_lower_cutoff,
-                CFG.dihedral_k_upper_cutoff,
-            ))
-            new_dihedrals.append([i, j, k, l, 11, k_phi, a[0], a[1], a[2], a[3], a[4], comment])
+            updated_terms = _update_type11_terms(terms, aa_vals, cg_vals)
+            new_dihedrals.extend(updated_terms)
             n_dihedrals_updated += 1
+        else:
+            new_dihedrals.extend(terms)
 
     topo.dihedrals = new_dihedrals
     return n_dihedrals_updated, 0
@@ -472,8 +474,11 @@ if __name__ == "__main__":
     outdir = CFG.mol_dir
 
     in_itp = outdir / f"{molname}.itp"
-    logger.info("Reading topology from %s", in_itp)
     topo = am.topology.read_itp(str(in_itp))
+    logger.info("Reading topology from %s", in_itp)
+    # DEBUG
+    ref_itp = outdir / f"{molname}_ref.itp"
+    topo = am.topology.read_itp(str(ref_itp))
 
     unique_dihedrals = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])) for d in topo.dihedrals}
     logger.info(
@@ -499,7 +504,7 @@ if __name__ == "__main__":
     tmp_itp = outdir / f"{molname}_tmp.itp"
     shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = in_itp
-    # update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
     if "plot" in sys.argv:
         plot_internal_coordinates_overlay(
