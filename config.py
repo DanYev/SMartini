@@ -56,6 +56,7 @@ class LigParConfig:
     angle_cutoff: float = 155.0
 
     # Refinement guardrails
+    alpha: float = 0.3
     refine_max_k_scale: float = 25.0
     refine_dihedral_shift_scale: float = 1.0
 

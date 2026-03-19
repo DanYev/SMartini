@@ -328,8 +328,9 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        pmf_aa = -kT * np.log(aa_density)
-        pmf_cg = +kT * np.log(cg_density)
+        alpha = CFG.alpha
+        pmf_aa = -alpha * kT * np.log(aa_density)
+        pmf_cg = +alpha * kT * np.log(cg_density)
         pmf_potential = -kT * np.log(density_from_potential)
 
         harmonics = sorted({int(t[7]) for t in terms})
@@ -442,9 +443,8 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        # pmf = -kT * (np.log(aa_density) - np.log(density_from_potential))
-        pmf = -kT * (np.log(aa_density) - np.log(cg_density) + np.log(density_from_potential))
-        # pmf = -kT * (np.log(aa_density))
+        alpha = CFG.alpha
+        pmf = -kT * (alpha * (np.log(aa_density) - np.log(cg_density)) + np.log(density_from_potential))
         pmf -= np.min(pmf)
         weights = np.pow(aa_density, 0.30)
         i, j, k, l = (int(terms[0][0]), int(terms[0][1]), int(terms[0][2]), int(terms[0][3]))
@@ -571,9 +571,9 @@ if __name__ == "__main__":
     in_itp = outdir / f"{molname}.itp"
     topo = am.topology.read_itp(str(in_itp))
     logger.info("Reading topology from %s", in_itp)
-    # DEBUG
-    ref_itp = outdir / f"{molname}_ref.itp"
-    topo = am.topology.read_itp(str(ref_itp))
+    # # DEBUG
+    # ref_itp = outdir / f"{molname}_ref.itp"
+    # topo = am.topology.read_itp(str(ref_itp))
 
     unique_dihedrals = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])) for d in topo.dihedrals}
     logger.info(

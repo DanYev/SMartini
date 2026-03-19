@@ -601,8 +601,12 @@ def _fit_type11_to_target(
     Aw = A * (weights[:, None] if weights is not None else 1.0)
     bw = pmf * (weights if weights is not None else 1.0)
     coeffs, _, _, _ = np.linalg.lstsq(Aw, bw, rcond=None)
-    k_phi = float(np.max(np.abs(coeffs)))
-    a = [float(c / k_phi) for c in coeffs[:5]]
+    coeffs5 = coeffs[:5]
+    k_phi = float(np.linalg.norm(coeffs5))
+    if k_phi > 0.0:
+        a = [float(c / k_phi) for c in coeffs5]
+    else:
+        a = [0.0] * 5
     return k_phi, a
 
 
