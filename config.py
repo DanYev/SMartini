@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "FTA"
+    molname: str = "LIB"
     # specify_beads: tuple[list[int]] = ([4, 5, 8],)
     specify_beads: list[list[int]] = None
     max_combs_merged: int = 1000
@@ -38,7 +38,7 @@ class LigParConfig:
 
     # Fitting defaults
     temperature: float = 300.0
-    fc_scale: float = 1.0  # Scaling factor for force constants to roughly account for coupling of the potentials
+    fc_scale: float = 0.5  # Scaling factor for force constants to roughly account for coupling of the potentials
 
     # Type-9 dihedral (Gromacs) fitting parameters
     type9_max_n: int = 6
@@ -56,7 +56,8 @@ class LigParConfig:
     angle_cutoff: float = 155.0
 
     # Refinement guardrails
-    alpha: float = 0.3
+    alpha_max: float = 0.25
+    alpha_min: float = 0.01
     refine_max_k_scale: float = 25.0
     refine_dihedral_shift_scale: float = 1.0
 

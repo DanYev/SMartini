@@ -501,7 +501,7 @@ def update_dihedrals(
 
         group = tuple(sorted(key))
         n_perm = int(perm_group_size.get(group, 1))
-        scale = 1.0 / float(n_perm) * CFG.fc_scale
+        scale = CFG.fc_scale / float(n_perm)
 
         # Apply scaling to "other" terms when supported.
         # - funct=11: scale kphi (index 5)
@@ -578,7 +578,7 @@ if __name__ == "__main__":
     logger.info("Fitting dihedrals...")
     topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
-    # topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"

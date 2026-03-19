@@ -315,9 +315,9 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         phi_abs_from_potential = wrap_to_180(phi_centers + shift_potential)
         U_expected_from_potential = _eval_type9_potential(terms, phi_abs_from_potential)
-        density_from_potential = np.exp(-U_expected_from_potential / kT)
-        density_from_potential = np.clip(density_from_potential, CFG.type9_min_prob, None)
-        density_from_potential /= np.sum(density_from_potential)
+        pot_density = np.exp(-U_expected_from_potential / kT)
+        pot_density = np.clip(pot_density, CFG.type9_min_prob, None)
+        pot_density /= np.sum(pot_density)
 
         bins = np.linspace(-180.0, 180.0, nbins + 1)
         aa_density, _ = np.histogram(aa_centered, bins=bins, density=True)
@@ -328,16 +328,20 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        alpha = CFG.alpha
+        overlap = np.sum(np.sqrt(aa_density * cg_density)) # / np.sum(aa_density) / np.sum(cg_density)
+        alpha = 2 * overlap
+        alpha = min(alpha, CFG.alpha_max)
+        alpha = max(alpha, CFG.alpha_min)
+        print(alpha)
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = +alpha * kT * np.log(cg_density)
-        pmf_potential = -kT * np.log(density_from_potential)
+        pmf_potential = -kT * np.log(pot_density)
 
         harmonics = sorted({int(t[7]) for t in terms})
         density_power = 1.0 if len(harmonics) == 1 else 0.2
+        density = np.sqrt(aa_density * cg_density)
         weights_aa = np.pow(aa_density, density_power)
         weights_cg = np.pow(cg_density, density_power)
-        weights_pot = np.pow(density_from_potential, density_power)
 
         comment = ""
         if terms and len(terms[0]) >= 9:
@@ -349,7 +353,6 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         component_specs = (
             (pmf_aa, shift_aa, weights_aa),
             (pmf_cg, shift_cg, weights_cg),
-            (pmf_potential, shift_potential, weights_pot),
         )
         for pmf_component, shift_component, weights_component in component_specs:
             component_fit = _fit_type9_to_target(
@@ -359,22 +362,10 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
                 weights=weights_component,
                 phi_grid=phi_centers,
             )
-            if not component_fit:
-                continue
-            component_terms = []
+            component_terms = terms.copy()
             for mult, k_term_single, phi0_single in component_fit:
                 component_terms.append(
-                    [
-                        i,
-                        j,
-                        k,
-                        l,
-                        9,
-                        float(phi0_single),
-                        float(k_term_single),
-                        int(mult),
-                        comment,
-                    ]
+                    [i, j, k, l, 9, float(phi0_single), float(k_term_single), int(mult), comment]
                 )
             summed_fitted_potential += _eval_type9_potential(component_terms, phi_absolute)
 
@@ -421,9 +412,9 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         phi_grid = np.linspace(-180.0, 180.0, nbins, endpoint=False)
 
         U_expected = _eval_type11_potential(terms[0], phi_grid)
-        density_from_potential = np.exp(-U_expected / kT)
-        density_from_potential = np.clip(density_from_potential, CFG.type9_min_prob, None)
-        density_from_potential /= np.sum(density_from_potential)
+        pot_density = np.exp(-U_expected / kT)
+        pot_density = np.clip(pot_density, CFG.type9_min_prob, None)
+        pot_density /= np.sum(pot_density)
 
         aa_hist, _ = np.histogram(
             wrap_to_180(aa_vals),
@@ -443,8 +434,8 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        alpha = CFG.alpha
-        pmf = -kT * (alpha * (np.log(aa_density) - np.log(cg_density)) + np.log(density_from_potential))
+        alpha = CFG.alpha_max
+        pmf = -kT * (alpha * (np.log(aa_density) - np.log(cg_density)) + np.log(pot_density))
         pmf -= np.min(pmf)
         weights = np.pow(aa_density, 0.30)
         i, j, k, l = (int(terms[0][0]), int(terms[0][1]), int(terms[0][2]), int(terms[0][3]))
