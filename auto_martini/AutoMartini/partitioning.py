@@ -398,7 +398,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     # alist = [0, 1, 2, 3, 4, 6]
     # new_fragments = [fragments[i] for i in alist]
     # fragments = new_fragments
-    # print(fragments)
 
     # Map each fragment to beads, and collect all the combinations of mappings for each fragment
     all_mappings = []
@@ -465,7 +464,7 @@ def sort_mappings(mappings, molecule, fused_rings):
 
     def num_tiny_ring_beads(mapping):
         count = 0
-        for ring in fused_rings:
+        for ring in fused_extended_rings:
             for bead in mapping:
                 all_in_ring = all(atom in ring for atom in bead)
                 if all_in_ring and len(bead) == 2:
@@ -484,9 +483,9 @@ def sort_mappings(mappings, molecule, fused_rings):
     def sort_key(mapping):
         num_beads = len(mapping)
         num_terminal_nonring = num_terminal_nonring_beads(mapping)
-        num_whole_ring = num_whole_extended_ring_beads(mapping)
         num_tiny_ring = num_tiny_ring_beads(mapping)
-        return (num_beads, num_terminal_nonring, num_tiny_ring, num_whole_ring)
+        num_whole_ring = num_whole_extended_ring_beads(mapping)
+        return (num_beads, num_terminal_nonring, num_tiny_ring, )
 
     molecule = Chem.RemoveHs(molecule)
     atoms = molecule.GetAtoms()

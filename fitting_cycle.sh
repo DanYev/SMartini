@@ -19,13 +19,12 @@ echo "  SLURM_JOB_NAME: $SLURM_JOB_NAME" >&2
 echo "  HOSTNAME: $HOSTNAME" >&2
 
 nsteps=200000
-# python 3_boltz_inv.py 
-# python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples
-# python 5_cgmd_upd.py
-# python 4_cg_md.py md nsteps $nsteps
-# python 5_cgmd_upd.py
+python 3_boltz_inv.py 
+python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples
+python 5_cgmd_upd.py
 python 4_cg_md.py md nsteps $nsteps
 python 5_cgmd_upd.py plot
+exit 0
 python 4_cg_md.py md nsteps $nsteps
 python 5_cgmd_upd.py plot
 
