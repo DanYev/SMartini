@@ -251,24 +251,6 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         plt.close(fig)
 
     def _update_type9_terms(i, j, k, l, aa_vals, cg_vals, terms):
-        def _weighted_circular_mean_deg(angles_deg: np.ndarray, weights: np.ndarray) -> float:
-            weights = np.asarray(weights, dtype=float)
-            angles_rad = np.deg2rad(np.asarray(angles_deg, dtype=float))
-            wsum = float(np.sum(weights))
-            if wsum <= 0:
-                return 0.0
-            sin_mean = float(np.sum(weights * np.sin(angles_rad)) / wsum)
-            cos_mean = float(np.sum(weights * np.cos(angles_rad)) / wsum)
-            return float(wrap_to_180(np.rad2deg(np.arctan2(sin_mean, cos_mean))))
-
-        def _periodic_interp_deg(x_query: np.ndarray, x_grid: np.ndarray, y_grid: np.ndarray) -> np.ndarray:
-            x = np.asarray(x_grid, dtype=float)
-            y = np.asarray(y_grid, dtype=float)
-            xq = np.asarray(x_query, dtype=float)
-            x_ext = np.concatenate([x - 360.0, x, x + 360.0])
-            y_ext = np.concatenate([y, y, y])
-            return np.interp(xq, x_ext, y_ext)
-
         aa_vals = np.asarray(aa_vals, dtype=float)
         cg_vals = np.asarray(cg_vals, dtype=float)
         shift_aa = float(circular_mean(aa_vals))
@@ -276,45 +258,12 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         # Canonical absolute grid for potential summation/extraction.
         phi_centers = np.linspace(-180.0, 180.0, nbins, endpoint=False)
-        phi_absolute = phi_centers.copy()
-
-        # Shift for potential-derived component from its own implied density.
-        U_expected_abs = _eval_type9_potential(terms, phi_absolute)
-        density_abs = np.exp(-U_expected_abs / kT)
-        density_abs = np.clip(density_abs, CFG.type9_min_prob, None)
-        density_abs /= np.sum(density_abs)
-        shift_potential = _weighted_circular_mean_deg(phi_absolute, density_abs)
-
-        # PMF used for plotting only: keep everything on the absolute grid
-        # so phase is directly comparable to U_expected_abs.
-        bins_abs = np.linspace(-180.0, 180.0, nbins + 1)
-        aa_density_abs, _ = np.histogram(
-            wrap_to_180(aa_vals),
-            bins=bins_abs,
-            density=True,
-        )
-        aa_density_abs = np.clip(aa_density_abs, CFG.type9_min_prob, None)
-        aa_density_abs /= np.sum(aa_density_abs)
-
-        cg_density_abs, _ = np.histogram(
-            wrap_to_180(cg_vals),
-            bins=bins_abs,
-            density=True,
-        )
-        cg_density_abs = np.clip(cg_density_abs, CFG.type9_min_prob, None)
-        cg_density_abs /= np.sum(cg_density_abs)
-
-        pmf_plot_abs = -kT * (
-            np.log(aa_density_abs)
-            - np.log(cg_density_abs)
-            + np.log(density_abs)
-        )
 
         aa_centered = wrap_to_180(aa_vals - shift_aa)
-        cg_centered = wrap_to_180(cg_vals - shift_cg)
+        cg_centered = wrap_to_180(cg_vals - shift_aa)
 
-        phi_abs_from_potential = wrap_to_180(phi_centers + shift_potential)
-        U_expected_from_potential = _eval_type9_potential(terms, phi_abs_from_potential)
+        phi_from_potential = wrap_to_180(phi_centers + shift_aa)
+        U_expected_from_potential = _eval_type9_potential(terms, phi_from_potential)
         pot_density = np.exp(-U_expected_from_potential / kT)
         pot_density = np.clip(pot_density, CFG.type9_min_prob, None)
         pot_density /= np.sum(pot_density)
@@ -328,20 +277,21 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        overlap = np.sum(np.sqrt(aa_density * cg_density)) # / np.sum(aa_density) / np.sum(cg_density)
-        alpha = 2 * overlap
+        overlap = np.sum(np.sqrt(aa_density * cg_density))
+        alpha = 0.5 * overlap
         alpha = min(alpha, CFG.alpha_max)
         alpha = max(alpha, CFG.alpha_min)
-        print(alpha)
+        alpha = 0.1
         pmf_aa = -alpha * kT * np.log(aa_density)
-        pmf_cg = +alpha * kT * np.log(cg_density)
-        pmf_potential = -kT * np.log(pot_density)
+        pmf_cg = -alpha * kT * np.log(cg_density)
+        pmf_pot = -kT * np.log(pot_density)
+        pmf = pmf_aa - pmf_cg + pmf_pot
 
         harmonics = sorted({int(t[7]) for t in terms})
         density_power = 1.0 if len(harmonics) == 1 else 0.2
         density = np.sqrt(aa_density * cg_density)
         weights_aa = np.pow(aa_density, density_power)
-        weights_cg = np.pow(cg_density, density_power)
+        weights_cg = np.pow(aa_density, density_power)
 
         comment = ""
         if terms and len(terms[0]) >= 9:
@@ -351,8 +301,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         # potentials, then extract a final consolidated set of type-9 terms.
         summed_fitted_potential = np.zeros_like(phi_centers, dtype=float)
         component_specs = (
-            (pmf_aa, shift_aa, weights_aa),
-            (pmf_cg, shift_cg, weights_cg),
+            (pmf, shift_aa, weights_aa),
         )
         for pmf_component, shift_component, weights_component in component_specs:
             component_fit = _fit_type9_to_target(
@@ -362,49 +311,12 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
                 weights=weights_component,
                 phi_grid=phi_centers,
             )
-            component_terms = terms.copy()
+            component_terms = []
             for mult, k_term_single, phi0_single in component_fit:
                 component_terms.append(
                     [i, j, k, l, 9, float(phi0_single), float(k_term_single), int(mult), comment]
                 )
-            summed_fitted_potential += _eval_type9_potential(component_terms, phi_absolute)
-
-        summed_fitted_potential -= float(np.min(summed_fitted_potential))
-        density_summed = np.exp(-summed_fitted_potential / kT)
-        density_summed = np.clip(density_summed, CFG.type9_min_prob, None)
-        density_summed /= np.sum(density_summed)
-        shift_summed = _weighted_circular_mean_deg(phi_absolute, density_summed)
-
-        phi_abs_summed = wrap_to_180(phi_centers + shift_summed)
-        summed_on_shifted_grid = _periodic_interp_deg(
-            phi_abs_summed,
-            phi_absolute,
-            summed_fitted_potential,
-        )
-
-        fitted_terms = _fit_type9_to_target(
-            summed_on_shifted_grid,
-            shift=shift_summed,
-            harmonics=harmonics,
-            weights=np.pow(density_summed, density_power),
-            phi_grid=phi_centers,
-        )
-        updated_terms = []
-        for mult, k_term, phi0 in fitted_terms:
-            updated_terms.append(
-                [i, j, k, l, 9, float(phi0), float(k_term), int(mult), comment]
-            )
-
-        U_updated = _eval_type9_potential(updated_terms, phi_absolute)
-        _save_pmf_plot(
-            phi_centers,
-            pmf_plot_abs,
-            u_initial=U_expected_abs,
-            u_updated=U_updated,
-            title=f"PMF type9 ({i},{j},{k},{l})",
-            filename=f"{i}{j}{k}{l}.png",
-        )
-        return updated_terms
+        return component_terms
 
     def _update_type11_terms(terms, aa_vals, cg_vals):
         aa_vals = np.asarray(aa_vals, dtype=float)
@@ -437,7 +349,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         alpha = CFG.alpha_max
         pmf = -kT * (alpha * (np.log(aa_density) - np.log(cg_density)) + np.log(pot_density))
         pmf -= np.min(pmf)
-        weights = np.pow(aa_density, 0.30)
+        weights = np.pow(aa_density, 0.20)
         i, j, k, l = (int(terms[0][0]), int(terms[0][1]), int(terms[0][2]), int(terms[0][3]))
         k_phi_new, a_new = _fit_type11_to_target(
             pmf,
@@ -587,8 +499,8 @@ if __name__ == "__main__":
 
     # Refine the CG topology based on CG-vs-AA distribution mismatch.
     # Writes a new file and leaves the original ITP unchanged.
-    tmp_itp = outdir / f"{molname}_tmp.itp"
-    shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
+    # tmp_itp = outdir / f"{molname}_tmp.itp"
+    # shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = in_itp
     update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 

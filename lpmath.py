@@ -738,6 +738,6 @@ def fit_type11_dihedral(
     density = np.histogram(dihs, bins=phi_edges, density=True)[0]
     density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
-    w = np.pow(density, 0.30)
+    w = np.pow(density, 0.20)
     result = _fit_type11_to_target(pmf, weights=w, phi_grid=phi_centers)
     return result, density
