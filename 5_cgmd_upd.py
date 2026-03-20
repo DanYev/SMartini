@@ -502,7 +502,7 @@ if __name__ == "__main__":
     # tmp_itp = outdir / f"{molname}_tmp.itp"
     # shutil.copy2(in_itp, tmp_itp)  # Start from existing ITP to preserve formatting and any unmapped terms
     out_refined_itp = in_itp
-    update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
+    # update_topology_from_cg_vs_aa(topo, aa_internal, cg_internal, out_refined_itp)
 
     if "plot" in sys.argv:
         plot_internal_coordinates_overlay(

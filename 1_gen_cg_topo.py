@@ -83,6 +83,7 @@ if __name__ == "__main__":
     cg_mol = am.solver.Cg_molecule(mol, smiles, molname, 
         specify_beads=CFG.specify_beads,
         use_vsites=CFG.use_vsites,
+        symmetrize_rings=CFG.symmetrize_rings,
         min_beads=n_beads, 
         max_beads=n_beads, 
         raw_molecule=raw_mol)
