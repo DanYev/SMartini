@@ -174,6 +174,18 @@ class Cg_molecule:
                 # continue
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
 
+            # Symmetrize and filter
+            self.mapping = mapping
+            if self.symmetrize_rings:
+                sym_mapping = self.symmetrize_rings_in_mapping(mapping)
+            else:
+                sym_mapping = mapping
+            if self.specify_beads:
+                bead_present = [any(set(bead) == set(ag) for bead in sym_mapping) for ag in self.specify_beads]
+                if not all(bead_present):
+                    logger.info("Skipping mapping because it does not contain all specified atoms in the same bead")
+                    continue
+
             # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
             # for connectivity purposes
             for ring in self.ring_atoms:
@@ -208,11 +220,6 @@ class Cg_molecule:
 
             # Extract position of coarse-grained beads
             logger.info("Extracting coordinates for CG beads")
-            self.mapping = mapping
-            if self.symmerize_rings:
-                sym_mapping = self.symmetrize_rings_in_mapping(mapping)
-            else:
-                sym_mapping = mapping
             self.aa_mapping = self.get_aa_mapping(sym_mapping)  # Update mapping to include hydrogens in the same bead as their heavy atom neighbors
             self.bead_coords = self.get_bead_coords(mapping=self.aa_mapping)  # Get bead coordinates based on AA mapping
             logger.info("Partitioned atoms into %d beads", len(self.bead_coords))

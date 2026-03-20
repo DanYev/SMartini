@@ -31,6 +31,7 @@ from .common import *
 from .utils import timeit, memprofit
 from . import optimization_cy as opcy
 import multiprocessing as mp
+from config import CFG
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ PART_MAX_RING_LEN = 12
 PART_MAX_MAPPINGS_TO_KEEP = 500
 PART_MAX_BEAD_SIZE = 4
 PART_MAX_RING_BEAD_SIZE = 3
-PART_KEEP_RINGS_TOGETHER = True
+PART_KEEP_RINGS_TOGETHER = False
     
 #############################################################################
 ### HELPER FUNCTIONS ###
