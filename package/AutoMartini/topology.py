@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from sys import exit
 
-from AutoMartini._version import __version__
+from ._version import __version__
 
 from .common import *
 

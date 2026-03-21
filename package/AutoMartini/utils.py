@@ -16,6 +16,7 @@ Date: YYYY-MM-DD
 import logging
 import os
 import subprocess as sp
+import shutil
 import time
 import tracemalloc
 import warnings
@@ -197,6 +198,12 @@ def gmx(command, gmx_callable="gmx_mpi", **kwargs):
     """Execute a GROMACS command."""
     clinput = kwargs.pop("clinput", None)
     cltext = kwargs.pop("cltext", True)
+
+    if shutil.which(gmx_callable) is None and gmx_callable == "gmx_mpi":
+        if shutil.which("gmx") is not None:
+            gmx_callable = "gmx"
+            logger.info("gmx_mpi not found; falling back to gmx")
+
     cmd = gmx_callable + " " + command + " " + _kwargs_to_str(**kwargs)
     try:
         sp.run(cmd.split(), input=clinput, text=cltext, check=True)

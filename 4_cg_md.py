@@ -2,7 +2,8 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from auto_martini.AutoMartini.utils import change_directory, clean_dir, get_ntomp, gmx
+import MDAnalysis as mda
+from package.AutoMartini.utils import change_directory, clean_dir, get_ntomp, gmx
 
 from config import CFG
 
@@ -22,6 +23,7 @@ NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
 
 def setup(sysdir, sysname):
     root = Path(sysdir).resolve() / sysname
+    data_dir = Path(__file__).resolve().parent / "cgmd_data"
     topdir = root / "topol"
     mdpdir = root / "mdp"
     solupdb = root / "solute.pdb"
@@ -35,12 +37,53 @@ def setup(sysdir, sysname):
     topdir.mkdir(parents=True, exist_ok=True)
     mdpdir.mkdir(parents=True, exist_ok=True)
 
-    src_md = Path(__file__).resolve().parent / "md_cg.mdp"
-    shutil.copy(src_md, mdpdir / "md_cg.mdp")
+    if not data_dir.exists():
+        raise FileNotFoundError(f"Missing cgmd_data directory: {data_dir}")
 
-    if not (mdpdir / "em_cg.mdp").exists() or not (mdpdir / "ions.mdp").exists():
+    # Remove stale Martini includes from previous setups
+    for stale_ff in topdir.glob("martini*.itp"):
+        stale_ff.unlink()
+
+    # Copy force-field data in deterministic order
+    preferred_ff_order = [
+        "martini_v3.0.0.itp",
+        "martini_v3.0.0_ions_v1.itp",
+        "martini_v3.0.0_solvents_v1.itp",
+        "martini_v3.0.0_phospholipids_v1.itp",
+        "martini_v3.0.0_nucleobases_v1.itp",
+        "martini_v3.0.0_sugars_v2.itp",
+        "martini_v3.0.0_small_molecules_v2.itp",
+    ]
+    copied_ff_files = []
+    for ff_name in preferred_ff_order:
+        ff_src = data_dir / ff_name
+        if ff_src.exists():
+            ff_dst = topdir / ff_name
+            shutil.copy(ff_src, ff_dst)
+            copied_ff_files.append(ff_dst)
+
+    solvent_src = data_dir / "water.gro"
+    if solvent_src.exists():
+        shutil.copy(solvent_src, root / "water.gro")
+
+    # Copy mdp templates from cgmd_data naming to runtime naming
+    mdp_map = {
+        "mdp_em.mdp": "em_cg.mdp",
+        "mdp_md.mdp": "md_cg.mdp",
+    }
+    for src_name, dst_name in mdp_map.items():
+        src = data_dir / src_name
+        if src.exists():
+            shutil.copy(src, mdpdir / dst_name)
+
+    # Keep ions.mdp if already present in runtime folder; otherwise optional from data dir
+    ions_src = data_dir / "ions.mdp"
+    if ions_src.exists():
+        shutil.copy(ions_src, mdpdir / "ions.mdp")
+
+    if not (mdpdir / "em_cg.mdp").exists() or not (mdpdir / "md_cg.mdp").exists():
         raise FileNotFoundError(
-            f"Missing required mdp templates in {mdpdir}: need em_cg.mdp and ions.mdp"
+            f"Missing required mdp templates in {mdpdir}: need em_cg.mdp and md_cg.mdp"
         )
 
     pdb_file = outdir / f"{ligand}.pdb"
@@ -50,22 +93,22 @@ def setup(sysdir, sysname):
     shutil.copy(pdb_file, solupdb)
     shutil.copy(pdb_file, inpdb)
 
-    if "md" not in sys.argv:
-        martini_itps = sorted(topdir.glob("martini*.itp"))
-        if not martini_itps:
-            raise FileNotFoundError(
-                f"No Martini force-field .itp files found in {topdir}."
-            )
+    if not copied_ff_files:
+        raise FileNotFoundError(
+            f"No Martini force-field .itp files found in {data_dir}."
+        )
 
-        with open(systop, "w", encoding="utf-8") as f:
-            for ff in martini_itps:
-                f.write(f'#include "topol/{ff.name}"\n')
-            f.write(f'\n#include "topol/{ligand_itp.name}"\n\n')
-            f.write("[ system ]\n")
-            f.write(f"Martini system for {sysname} in water\n\n")
-            f.write("[ molecules ]\n")
-            f.write("; name\t\tnumber\n")
-            f.write(f"{ligand}\t\t1\n")
+    with open(systop, "w", encoding="utf-8") as f:
+        for ff in copied_ff_files:
+            f.write(f'#include "topol/{ff.name}"\n')
+        f.write(f'\n#include "topol/{ligand_itp.name}"\n\n')
+        f.write("[ system ]\n")
+        f.write(f"Martini system for {sysname} in water\n\n")
+        f.write("[ molecules ]\n")
+        f.write("; name\t\tnumber\n")
+        f.write(f"{ligand}\t\t1\n")
+
+    if "md" not in sys.argv:
 
         solvent = root / "water.gro"
         if not solvent.exists():
@@ -74,8 +117,9 @@ def setup(sysdir, sysname):
         with change_directory(root):
             gmx("editconf", f=solupdb, o=solupdb, d="1.0", bt="cubic")
             gmx("solvate", cp=solupdb, cs=solvent, p=systop, o=syspdb, radius="0.17")
-            gmx("grompp", f=mdpdir / "ions.mdp", c=syspdb, p=systop, o="ions.tpr")
-            gmx("genion", clinput="W\n", s="ions.tpr", p=systop, o=syspdb, conc=0.0, pname="NA", nname="CL")
+            if (mdpdir / "ions.mdp").exists():
+                gmx("grompp", f=mdpdir / "ions.mdp", c=syspdb, p=systop, o="ions.tpr")
+                gmx("genion", clinput="W\n", s="ions.tpr", p=systop, o=syspdb, conc=0.0, pname="NA", nname="CL")
             gmx("editconf", f=syspdb, o=sysgro)
 
         u_system = mda.Universe(str(syspdb))

@@ -1,7 +1,7 @@
 import logging
 import MDAnalysis as mda
 import rdkit
-import AutoMartini as am
+import package.AutoMartini as am
 
 from pathlib import Path
 from openff.toolkit import Molecule
