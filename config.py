@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "ANP"
+    molname: str = "DMBI"
     specify_beads: list[list[int]] = None
     # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
     # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
@@ -17,7 +17,7 @@ class LigParConfig:
     max_combs_merged: int = 1000
     n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
     use_vsites: bool = False
-    symmetrize_rings: bool = True
+    symmetrize_rings: bool = False
 
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")

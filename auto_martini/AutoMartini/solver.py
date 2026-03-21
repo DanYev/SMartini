@@ -364,23 +364,28 @@ class Cg_molecule:
         If specify_beads is set, filter symmetrized mappings to only those that contain all specified 
         atoms in the same bead.
         """
-        def symmetrize_ring(mapping, ring, ring_beads):
-            m = mapping.copy()
-            for bead in ring_beads:
-                if bead in m:
-                    m.remove(bead)
-            mapping_1 = m.copy()
+        def symmetrize_ring(mapping, ring, ring_bead_indices):
+            mapping_dict = {idx: bead.copy() for idx, bead in enumerate(mapping)}
+
+            shifted_even = []
             for i in range(0, len(ring), 2):
-                bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]] 
-                mapping_1.append(bead)
-            mapping_1 = sort_nested(mapping_1)
-            mapping_2 = m.copy()
+                bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]]
+                shifted_even.append(bead)
+
+            shifted_odd = []
             for i in range(1, len(ring) + 1, 2):
-                bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]] 
-                mapping_2.append(bead)
-            mapping_2 = sort_nested(mapping_2)
-            mappings = [mapping_1, mapping_2]
-            return mappings
+                bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]]
+                shifted_odd.append(bead)
+
+            def apply_shift(base_mapping_dict, replacement_beads):
+                updated = {idx: bead.copy() for idx, bead in base_mapping_dict.items()}
+                for bead_idx, bead in zip(ring_bead_indices, replacement_beads):
+                    updated[bead_idx] = bead
+                return [updated[idx] for idx in range(len(updated))]
+
+            mapping_1 = apply_shift(mapping_dict, shifted_even)
+            mapping_2 = apply_shift(mapping_dict, shifted_odd)
+            return [mapping_1, mapping_2]
 
         molecule = self.molecule
         rings = molecule.GetRingInfo().AtomRings()
@@ -389,9 +394,12 @@ class Cg_molecule:
         for ring in rings:
             new_mappings = []
             for mapping in sym_mappings:
-                ring_beads = [bead for bead in mapping if all(atom in ring for atom in bead)]
+                ring_bead_indices = [
+                    bead_idx for bead_idx, bead in enumerate(mapping) if all(atom in ring for atom in bead)
+                ]
+                ring_beads = [mapping[bead_idx] for bead_idx in ring_bead_indices]
                 if flat_set(ring_beads) == set(ring) and len(ring) > 5:
-                    symetrized = symmetrize_ring(mapping, ring, ring_beads)
+                    symetrized = symmetrize_ring(mapping, ring, ring_bead_indices)
                     new_mappings.extend(symetrized)
             sym_mappings = new_mappings if new_mappings else sym_mappings
         # If specify_beads is set, filter sym_mappings to only those that contain all specified atoms in the same bead
