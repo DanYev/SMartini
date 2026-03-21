@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+try:
+    from openmm import unit
+except ImportError:
+    unit = None
+
 
 @dataclass()
 class LigParConfig:
@@ -59,6 +64,35 @@ class LigParConfig:
     # Refinement guardrails
     alpha_max: float = 0.25
     alpha_min: float = 0.01
+
+    # ============================================================================
+    # Partitioning settings (AutoMartini module)
+    # ============================================================================
+    max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
+    max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
+    max_bead_size: int = 4
+    max_ring_bead_size: int = 3
+    keep_rings_together: bool = False
+
+    # ============================================================================
+    # AA MD settings (All-Atom Molecular Dynamics)
+    # ============================================================================
+    aa_temperature_kelvin: float = 300.0  # Temperature in Kelvin for equilibration
+    aa_gamma: float = 1.0  # Friction coefficient (1/picosecond)
+    aa_pressure_bar: float = 1.0  # Pressure in bar
+    aa_timestep_fs: float = 2.0  # Timestep in femtoseconds
+    aa_total_steps: int = int(1e6)  # Total MD steps (1e6 = 2 ns with 2 fs timestep)
+    aa_trj_nout: int = 1000  # Trajectory output frequency (frames every N steps)
+    aa_log_nout: int = 10000  # Log output frequency (every N steps)
+    aa_chk_nout: int = 100000  # Checkpoint output frequency (every N steps)
+    aa_trjext: str = 'xtc'  # Trajectory format ('xtc' or 'trr')
+
+    # ============================================================================
+    # CG MD settings (Coarse-Grained Molecular Dynamics)
+    # ============================================================================
+    cg_dt: float = 0.020  # Timestep in picoseconds
+    cg_total_time_ns: float = 1000.0  # Total simulation time in nanoseconds
+
 
 CFG = LigParConfig()
 

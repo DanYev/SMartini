@@ -35,11 +35,6 @@ from config import CFG
 
 logger = logging.getLogger(__name__)
 
-PART_MAX_RING_LEN = 12
-PART_MAX_MAPPINGS_TO_KEEP = 500
-PART_MAX_BEAD_SIZE = 4
-PART_MAX_RING_BEAD_SIZE = 3
-PART_KEEP_RINGS_TOGETHER = False
     
 #############################################################################
 ### HELPER FUNCTIONS ###
@@ -101,7 +96,7 @@ def split_into_fragments(molecule):
     def fuse_rings(molecule):
         # Get ring atoms (systems of joined rings)
         rings = molecule.GetRingInfo().AtomRings()
-        rings = [set(ring) for ring in rings if len(ring) < PART_MAX_RING_LEN] # Large rings are usually not aromatic and can be broken up into smaller fragments
+        rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
         n_rings = len(rings)
         fused_rings = []
         overlaps = []
@@ -415,18 +410,18 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
-        for m1 in merged_mappings[:PART_MAX_MAPPINGS_TO_KEEP]: # only keep top mappings at each step to avoid combinatorial explosion
+        for m1 in merged_mappings[:CFG.max_mappings_to_keep]: # only keep top mappings at each step to avoid combinatorial explosion
             for m2 in mappings_to_add:
                 merged_mappings = merge_fragments(m1, m2, overlaps)
                 new_mappings.extend(merged_mappings)
         merged_mappings = new_mappings
-        merged_mappings = filter_mappings(merged_mappings, molecule, PART_MAX_BEAD_SIZE + 1, PART_MAX_RING_BEAD_SIZE)
+        merged_mappings = filter_mappings(merged_mappings, molecule, CFG.max_bead_size + 1, CFG.max_ring_bead_size)
         merged_mappings = sort_mappings(merged_mappings, molecule, fused_rings)
     mappings = merged_mappings
     logger.info(f"Total combinations of mappings: {len(mappings)}")
 
     logger.info("Filtering and sorting the mappings...")
-    mappings = filter_mappings(mappings, molecule, fused_rings, PART_MAX_BEAD_SIZE, PART_MAX_RING_BEAD_SIZE)
+    mappings = filter_mappings(mappings, molecule, fused_rings, CFG.max_bead_size, CFG.max_ring_bead_size)
     mappings = sort_mappings(mappings, molecule, fused_rings)
     print(len(mappings))
     for mapping in mappings[:10]:
@@ -503,9 +498,9 @@ def filter_mappings(
     mappings, 
     molecule, 
     fused_rings,
-    max_bead_size=PART_MAX_BEAD_SIZE, 
-    max_ring_bead_size=PART_MAX_RING_BEAD_SIZE,
-    keep_rings_together=PART_KEEP_RINGS_TOGETHER,
+    max_bead_size=CFG.max_bead_size, 
+    max_ring_bead_size=CFG.max_ring_bead_size,
+    keep_rings_together=CFG.keep_rings_together,
     ):
     """Find acceptable mappings of atoms to beads for given trial combination"""
 

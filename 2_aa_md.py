@@ -15,30 +15,13 @@ from config import CFG
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# Global settings
-# Production parameters
-TEMPERATURE = 300 * unit.kelvin  # for equilibration
-GAMMA = 1 / unit.picosecond
-PRESSURE = 1 * unit.bar
-# Either steps or time
-TSTEP = 2 * unit.femtoseconds
-TOTAL_STEPS = int(1e6)  # 1e6 = 2 ns with 2 fs timestep. 1000 frames with 1000 step reporting. Adjust as needed for longer simulations.
-# Reporting: save every NOUT steps
-TRJ_NOUT = 1000 # normally you want ~10000 here
-LOG_NOUT = 10000 # 100000 or more
-CHK_NOUT = 100000 
-TRJEXT = 'xtc' # 'xtc' if don't need velocities or 'trr' if do
-# Analysis and trjconv
-SELECTION = CFG.aa_selection 
-#########
-
+# Use configuration from config.py
 ligand_name = CFG.molname
 sysdir = CFG.systems_dir
 wdir = CFG.wdir
 aa_dir = CFG.aa_dir
 system_pdb = aa_dir / "system.pdb"
 system_xml = aa_dir / "system.xml"
-runname = "."
 
 
 def process_ligand(ligand_name):
@@ -81,8 +64,8 @@ def process_ligand(ligand_name):
         ewaldErrorTolerance=1e-5
     )
     _save_system_to_xml(system, system_xml)
-    logger.info(f'Saving reference PDB with selection: {SELECTION}')
-    mda.Universe(system_pdb).select_atoms(SELECTION).write(str(aa_dir / "md.pdb"))
+    logger.info(f'Saving reference PDB with selection: {CFG.aa_selection}')
+    mda.Universe(system_pdb).select_atoms(CFG.aa_selection).write(str(aa_dir / "md.pdb"))
 
 
 def md_npt(): 
@@ -100,7 +83,7 @@ def md_npt():
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(system_xml)
     # Create simulation object
-    integrator = mm.LangevinMiddleIntegrator(0, GAMMA, 1*unit.femtosecond)  
+    integrator = mm.LangevinMiddleIntegrator(0, CFG.aa_gamma / unit.picosecond, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator) 
         # platform=platform, platformProperties=platform_properties)
     simulation.context.setPositions(pdb.positions)
@@ -112,27 +95,27 @@ def md_npt():
     n_cycles = 10
     steps_per_cycle = 1000
     for i in range(n_cycles):
-        current_temp = (i + 1) * TEMPERATURE / n_cycles
+        current_temp = (i + 1) * CFG.aa_temperature_kelvin * unit.kelvin / n_cycles
         simulation.integrator.setTemperature(current_temp)
         simulation.step(steps_per_cycle)
     # Eqilibration
     logger.info("Equilibrating...")
-    barostat = mm.MonteCarloBarostat(PRESSURE, TEMPERATURE)
+    barostat = mm.MonteCarloBarostat(CFG.aa_pressure_bar * unit.bar, CFG.aa_temperature_kelvin * unit.kelvin)
     system.addForce(barostat)
-    simulation.integrator.setTemperature(TEMPERATURE)
+    simulation.integrator.setTemperature(CFG.aa_temperature_kelvin * unit.kelvin)
     simulation.context.reinitialize(preserveState=True)
     simulation.step(10000)
     # MD
     logger.info("Production...")
     # state = simulation.context.getState(getPositions=True, getVelocities=True)
-    simulation.integrator.setStepSize(TSTEP)
+    simulation.integrator.setStepSize(CFG.aa_timestep_fs * unit.femtoseconds)
     simulation.context.reinitialize(preserveState=True)
     # simulation.context.setPositions(state.getPositions())
     # simulation.context.setVelocities(state.getVelocities())
     # simulation.context.setPeriodicBoxVectors(*state.getPeriodicBoxVectors())
     reporters = _get_reporters(append=False, prefix='md')
     simulation.reporters = reporters
-    simulation.step(int(TOTAL_STEPS))
+    simulation.step(int(CFG.aa_total_steps))
     logger.info("Done!")
 
 
@@ -140,14 +123,14 @@ def trjconv():
     # INPUT
     top = aa_dir / "md.pdb"
     # top = mdrun.root / "system.pdb"
-    traj = aa_dir / f"md.{TRJEXT}"
-    ext_trajs = sorted([f for f in aa_dir.glob(f"md_*.{TRJEXT}")])
+    traj = aa_dir / f"md.{CFG.aa_trjext}"
+    ext_trajs = sorted([f for f in aa_dir.glob(f"md_*.{CFG.aa_trjext}")])
     trajs = [traj] + ext_trajs
     logger.info(f'Input trajectory files: {trajs}')
     out_top = aa_dir / "topology.pdb"
-    out_traj = aa_dir / f"samples.{TRJEXT}"
+    out_traj = aa_dir / f"samples.{CFG.aa_trjext}"
     # CONVERT
-    convert_trajectories(top, trajs, out_top, out_traj, selection=SELECTION, start=0, stop=None, step=1, fit=True)
+    convert_trajectories(top, trajs, out_top, out_traj, selection=CFG.aa_selection, start=0, stop=None, step=1, fit=True)
     logger.info("Done!")
 
 
@@ -169,16 +152,16 @@ def _get_reporters(append=False, prefix="md"):
     # Log reporter (file)
     log_reporter = app.StateDataReporter(
         str(aa_dir / f"{prefix}.log"), 
-        LOG_NOUT, step=True, time=True, potentialEnergy=True, kineticEnergy=True,
+        CFG.aa_log_nout, step=True, time=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
     # Error reporter (stderr)
     err_reporter = app.StateDataReporter(
-        sys.stderr, LOG_NOUT, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
+        sys.stderr, CFG.aa_log_nout, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
     # Custom trajectory reporter with velocities using MmReporter
-    logger.info(f'Setting up trajectory reporter with selection: {SELECTION}')
-    traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{TRJEXT}"), 
-        reportInterval=TRJ_NOUT, selection=SELECTION)
+    logger.info(f'Setting up trajectory reporter with selection: {CFG.aa_selection}')
+    traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{CFG.aa_trjext}"), 
+        reportInterval=CFG.aa_trj_nout, selection=CFG.aa_selection)
     return log_reporter, err_reporter, traj_reporter
 
 

@@ -11,17 +11,15 @@ from config import CFG
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Global settings
-INPDB = 'KDA.pdb'
-DT = 0.020  # Time step in picoseconds
-total_time = 1000  # Total simulation time in nanoseconds
-NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
-
+# Use configuration from config.py
 ligand = CFG.molname
 sysdir = CFG.wdir
 outdir = CFG.mol_dir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
+
+# Compute NSTEPS from config
+NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
 
 
 def setup_martini(sysdir, sysname):
