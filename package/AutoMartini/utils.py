@@ -178,18 +178,6 @@ def clean_dir(directory=".", pattern="#*"):
             file_path.unlink()
 
 
-@contextmanager
-def change_directory(newdir):
-    """Temporarily change the current working directory."""
-    prevdir = Path.cwd()
-    os.chdir(newdir)
-    logger.info("Changed working directory to: %s", newdir)
-    try:
-        yield
-    finally:
-        os.chdir(prevdir)
-
-
 def _kwargs_to_str(hyphen="-", **kwargs):
     return " ".join([f"{hyphen}{key} {value}" for key, value in kwargs.items()])
 
