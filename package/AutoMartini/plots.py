@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from lpmath import (
+from .lpmath import (
     boltzmann_inversion_bond,
     wrap_to_180,
     gmm_pdf_1d,

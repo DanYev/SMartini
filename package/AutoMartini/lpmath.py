@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-import AutoMartini.ligpar_cy as ligpar_cy
+from . import ligpar_cy
 from MDAnalysis import Universe
 from typing import Dict, Tuple
 
