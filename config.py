@@ -5,69 +5,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-try:
-    from openmm import unit
-except ImportError:
-    unit = None
-
 
 @dataclass()
 class LigParConfig:
-    # Identity / layout
+    # ============================================================================
+    # Identity, coarse graining and partitioning settings
+    # ============================================================================
     molname: str = "DMBI"
     specify_beads: list[list[int]] = None
     # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
     # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
     # specify_beads: tuple[list[int]] = ([9, 15], ) # FOR THC
-    max_combs_merged: int = 1000
-    n_beads: Optional[int] = None  # if None, will be determined by AutoMartini
+    n_beads: Optional[int] = None 
     use_vsites: bool = False
     symmetrize_rings: bool = False
-
-    systems_dir: Path = Path("systems")
-    ligands_dir: Path = Path("ligands")
-
-    wdir: Path = systems_dir / molname
-    mol_dir: Path = wdir / "molecule"
-
-    # Common subfolders
-    aa_sysname: str = "aa_md"
-    cg_sysname: str = "cg_md"
-    cg_runname: str = "mdrun"
-    aa_dir: Path = wdir / aa_sysname
-    cg_dir: Path = wdir / cg_sysname
-
-    # Selections
-    aa_selection: str = "resname UNK"
-    cg_selection: str = "all"
-
-    # Sampling defaults
-    cg_traj_stop: int = 2000
-
-    # Fitting defaults
-    temperature: float = 300.0
-    fc_scale: float = 0.5  # Scaling factor for force constants to roughly account for coupling of the potentials
-    type9_max_n: int = 6
-    type9_bins: int = 120
-    type9_min_prob: float = 1e-12
-
-    # Post-fit filtering / topology cleanup
-    constraint_k_cutoff: float = 50000.0
-    bond_lower_cutoff: float = 4000.0
-    bond_upper_cutoff: float = 50000.0
-    angle_k_lower_cutoff: float = 3.0
-    angle_k_upper_cutoff: float = 2000.0
-    dihedral_k_lower_cutoff: float = 0.0
-    dihedral_k_upper_cutoff: float = 1000.0
-    angle_cutoff: float = 155.0
-
-    # Refinement guardrails
-    alpha_max: float = 0.25
-    alpha_min: float = 0.01
-
-    # ============================================================================
-    # Partitioning settings (AutoMartini module)
-    # ============================================================================
+    max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
     max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
     max_bead_size: int = 4
@@ -75,9 +27,22 @@ class LigParConfig:
     keep_rings_together: bool = False
 
     # ============================================================================
+    # Working folders
+    # ============================================================================
+    systems_dir: Path = Path("systems")
+    ligands_dir: Path = Path("ligands")
+    wdir: Path = systems_dir / molname
+    mol_dir: Path = wdir / "molecule"
+    aa_sysname: str = "aa_md"
+    cg_sysname: str = "cg_md"
+    cg_runname: str = "mdrun"
+    aa_dir: Path = wdir / aa_sysname
+    cg_dir: Path = wdir / cg_sysname
+
+    # ============================================================================
     # AA MD settings (All-Atom Molecular Dynamics)
     # ============================================================================
-    aa_temperature_kelvin: float = 300.0  # Temperature in Kelvin for equilibration
+    aa_selection: str = "resname UNK"
     aa_gamma: float = 1.0  # Friction coefficient (1/picosecond)
     aa_pressure_bar: float = 1.0  # Pressure in bar
     aa_timestep_fs: float = 2.0  # Timestep in femtoseconds
@@ -92,6 +57,29 @@ class LigParConfig:
     # ============================================================================
     cg_dt: float = 0.020  # Timestep in picoseconds
     cg_total_time_ns: float = 1000.0  # Total simulation time in nanoseconds
+    cg_traj_stop: int = 2000  # Trajectory sampling cutoff
+    cg_selection: str = "all"
+
+    # ============================================================================
+    # Refinement settings (Fitting, filtering, and optimization)
+    # ============================================================================
+    # Fitting /filtering defaults 
+    temperature: float = 300.0
+    bond_k_lower: float = 4000.0
+    bond_k_upper: float = 50000.0
+    angle_k_lower: float = 3.0
+    angle_k_upper: float = 2000.0
+    dihedral_k_lower: float = 0.0
+    dihedral_k_upper: float = 1000.0
+    ill_defined_angle_cutoff: float = 155.0
+    type9_max_n: int = 6
+    nbins: int = 120
+    min_prob: float = 1e-12
+    fc_scale: float = 0.5  # Scaling factor for force constants to roughly account for coupling of the potentials
+
+    # Refinement guardrails
+    alpha_max: float = 0.25
+    alpha_min: float = 0.01
 
 
 CFG = LigParConfig()

@@ -32,9 +32,7 @@ def process_ligand(ligand_name):
     aa_dir.mkdir(parents=True, exist_ok=True)
     input_file = wdir / f"{ligand_name}.sdf"
     logger.info("Reading ligand file: %s", input_file)
-    # smiles = "CCC1=C(C2=Cc3c(c(c4n3[Mg@]56[N]2=C1C=C7N5C8=C([C@H](C(=O)C8=C7C)C(=O)OC)C9=[N]6C(=C4)[C@H]([C@@H]9CCC(=O)OC/C=C(\C)/CCC[C@H](C)CCC[C@H](C)CCCC(C)C)C)C)C=C)C"
     ligand = Molecule.from_file(str(input_file))
-    # ligand = Molecule.from_smiles(smiles)
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
     forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
     # Ligand FF
@@ -69,23 +67,14 @@ def process_ligand(ligand_name):
 
 
 def md_npt(): 
-    # # Log platform info
-    # platform = mm.Platform.getPlatformByName("CUDA")
-    # platform_properties = {
-    #     "CudaDeviceIndex": "0", # IF multiple GPUs
-    #     "CudaPrecision": "mixed"
-    # }
     # Prep
-    logger.info("Preparing the system...")
     logger.info("Loading the PDB file...")
     pdb = app.PDBFile(str(system_pdb))
-    # Create system object
     logger.info("Loading the XML file...")
     system = _load_system_from_xml(system_xml)
     # Create simulation object
     integrator = mm.LangevinMiddleIntegrator(0, CFG.aa_gamma / unit.picosecond, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator) 
-        # platform=platform, platformProperties=platform_properties)
     simulation.context.setPositions(pdb.positions)
     # Minimization
     logger.info("Minimizing energy...")
@@ -95,14 +84,14 @@ def md_npt():
     n_cycles = 10
     steps_per_cycle = 1000
     for i in range(n_cycles):
-        current_temp = (i + 1) * CFG.aa_temperature_kelvin * unit.kelvin / n_cycles
+        current_temp = (i + 1) * CFG.temperature * unit.kelvin / n_cycles
         simulation.integrator.setTemperature(current_temp)
         simulation.step(steps_per_cycle)
     # Eqilibration
     logger.info("Equilibrating...")
-    barostat = mm.MonteCarloBarostat(CFG.aa_pressure_bar * unit.bar, CFG.aa_temperature_kelvin * unit.kelvin)
+    barostat = mm.MonteCarloBarostat(CFG.aa_pressure_bar * unit.bar, CFG.temperature * unit.kelvin)
     system.addForce(barostat)
-    simulation.integrator.setTemperature(CFG.aa_temperature_kelvin * unit.kelvin)
+    simulation.integrator.setTemperature(CFG.temperature * unit.kelvin)
     simulation.context.reinitialize(preserveState=True)
     simulation.step(10000)
     # MD
