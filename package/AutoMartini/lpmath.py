@@ -693,7 +693,7 @@ def fit_type11_dihedral(
     dihedrals,
     temperature=300.0,
     nbins=360,
-    min_prob=1e-2,
+    min_prob=1e-6,
     fc_scale: float = 1.0,
 ):
     r"""Fit GROMACS dihedral funct=11 (combined bending-torsion, CBT).

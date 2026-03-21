@@ -73,7 +73,7 @@ class LigParConfig:
     ill_defined_angle_cutoff: float = 155.0
     type9_max_n: int = 6
     nbins: int = 120
-    min_prob: float = 1e-12
+    min_prob: float = 1e-6
     fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
     alpha_max: float = 0.25
