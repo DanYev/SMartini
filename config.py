@@ -65,7 +65,7 @@ class LigParConfig:
     # ============================================================================
     # Fitting /filtering defaults 
     temperature: float = 300.0
-    bond_k_lower: float = 4000.0
+    bond_k_lower: float = 2000.0
     bond_k_upper: float = 50000.0
     angle_k_lower: float = 3.0
     angle_k_upper: float = 2000.0
@@ -75,8 +75,7 @@ class LigParConfig:
     type9_max_n: int = 6
     nbins: int = 120
     min_prob: float = 1e-12
-    fc_scale: float = 0.5  # Scaling factor for force constants to roughly account for coupling of the potentials
-
+    fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
     alpha_max: float = 0.25
     alpha_min: float = 0.01

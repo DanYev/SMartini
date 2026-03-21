@@ -209,7 +209,7 @@ def boltzmann_invert_angles(topo, internal_coords):
                 fc_scale=CFG.fc_scale,
             )
             # Use harmonic angle fitting for terms that will be represented as funct=1.
-            if float(theta0_calc) > float(CFG.angle_cutoff) or float(k_calc) < float(CFG.angle_k_lower_cutoff):
+            if float(theta0_calc) > float(CFG.ill_defined_angle_cutoff) or float(k_calc) < float(CFG.angle_k_lower):
                 (theta0_calc, k_calc), density = fit_type1_angle(
                     samples,
                     temperature=CFG.temperature,
@@ -220,8 +220,8 @@ def boltzmann_invert_angles(topo, internal_coords):
                 angle_funct = 10
 
         comment = angle[6] if len(angle) >= 7 else ""
-        k_calc = min(float(k_calc), CFG.angle_k_upper_cutoff) 
-        k_calc = max(float(k_calc), CFG.angle_k_lower_cutoff)
+        k_calc = min(float(k_calc), CFG.angle_k_upper) 
+        k_calc = max(float(k_calc), CFG.angle_k_lower)
         updated_topo.angles[idx] = [i, j, k, angle_funct, float(theta0_calc), float(k_calc), comment]
         
         # Store in fit cache for plotting
@@ -299,8 +299,8 @@ def boltzmann_invert_ill_defined_dihedrals(topo, internal_coords, ):
             (kphi, a), density = fit_type11_dihedral(
                 data,
                 temperature=CFG.temperature,
-                bins=CFG.type9_bins,
-                min_prob=CFG.type9_min_prob,
+                bins=CFG.nbins,
+                min_prob=CFG.min_prob,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
@@ -378,8 +378,8 @@ def boltzmann_invert_dihedrals(topo,
             (kphi, a), density = fit_type11_dihedral(
                 data,
                 temperature=CFG.temperature,
-                nbins=CFG.type9_bins,
-                min_prob=CFG.type9_min_prob,
+                nbins=CFG.nbins,
+                min_prob=CFG.min_prob,
             )
             theta_1 = np.radians(a1)
             theta_2 = np.radians(a2)
@@ -395,8 +395,8 @@ def boltzmann_invert_dihedrals(topo,
             data,
             temperature=CFG.temperature,
             max_n=CFG.type9_max_n,
-            nbins=CFG.type9_bins,
-            min_prob=CFG.type9_min_prob,
+            nbins=CFG.nbins,
+            min_prob=CFG.min_prob,
             fc_scale=CFG.fc_scale,
         )
 
@@ -566,19 +566,19 @@ if __name__ == "__main__":
     logger.info("Fitting bonds and constraints...")
     topo, bond_cache = boltzmann_invert_bonds(topo, internal_coords)
     master_fit_cache["bonds"].update(bond_cache["bonds"])
-    topo = update_bonds(topo, k_cutoff=CFG.constraint_k_cutoff)
+    topo = update_bonds(topo, k_cutoff=CFG.bond_k_upper)
     
     # ANGLES
     logger.info("Fitting angles...")
     topo, angle_cache = boltzmann_invert_angles(topo, internal_coords)
     master_fit_cache["angles"].update(angle_cache["angles"])
-    topo = update_angles(topo, angle_cutoff=CFG.angle_cutoff)
+    topo = update_angles(topo, angle_cutoff=CFG.ill_defined_angle_cutoff)
     
     # DIHEDRALS
     logger.info("Fitting dihedrals...")
-    topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.angle_cutoff)
+    topo, dih_cache = boltzmann_invert_dihedrals(topo, internal_coords, angle_cutoff=CFG.ill_defined_angle_cutoff)
     master_fit_cache["dihedrals"].update(dih_cache["dihedrals"])
-    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower_cutoff, angle_cutoff=CFG.angle_cutoff)
+    topo = update_dihedrals(topo, k_cutoff=CFG.dihedral_k_lower, angle_cutoff=CFG.ill_defined_angle_cutoff)
 
     # Save the fit cache
     fit_cache_file = wdir / "fit_cache.pkl"

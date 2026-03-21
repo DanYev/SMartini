@@ -135,8 +135,8 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
         )
-        k_new = max(float(k_new), CFG.bond_lower_cutoff)
-        k_new = min(float(k_new), CFG.bond_upper_cutoff)
+        k_new = max(float(k_new), CFG.bond_k_lower)
+        k_new = min(float(k_new), CFG.bond_k_upper)
         updated[4] = k_new
         
         new_bonds.append(updated)
@@ -206,8 +206,8 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
             sigma_target=sigma_aa,
             sigma_current=sigma_cg,
         )
-        k_new = min(float(k_new), CFG.angle_k_upper_cutoff)
-        k_new = max(float(k_new), CFG.angle_k_lower_cutoff)
+        k_new = min(float(k_new), CFG.angle_k_upper)
+        k_new = max(float(k_new), CFG.angle_k_lower)
         updated[5] = k_new
 
         new_angles.append(updated)
@@ -228,7 +228,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
     """
     kB = 0.008314462618  # kJ mol^-1 K^-1
     kT = kB * CFG.temperature
-    nbins = int(CFG.type9_bins)
+    nbins = int(CFG.nbins)
     png_dir = Path(__file__).resolve().parent / "png"
     png_dir.mkdir(parents=True, exist_ok=True)
 
@@ -265,16 +265,16 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         phi_from_potential = wrap_to_180(phi_centers + shift_aa)
         U_expected_from_potential = _eval_type9_potential(terms, phi_from_potential)
         pot_density = np.exp(-U_expected_from_potential / kT)
-        pot_density = np.clip(pot_density, CFG.type9_min_prob, None)
+        pot_density = np.clip(pot_density, CFG.min_prob, None)
         pot_density /= np.sum(pot_density)
 
         bins = np.linspace(-180.0, 180.0, nbins + 1)
         aa_density, _ = np.histogram(aa_centered, bins=bins, density=True)
-        aa_density = np.clip(aa_density, CFG.type9_min_prob, None)
+        aa_density = np.clip(aa_density, CFG.min_prob, None)
         aa_density /= np.sum(aa_density)
 
         cg_density, _ = np.histogram(cg_centered, bins=bins, density=True)
-        cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
+        cg_density = np.clip(cg_density, CFG.min_prob, None)
         cg_density /= np.sum(cg_density)
 
         overlap = np.sum(aa_density * cg_density)
@@ -334,7 +334,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         U_expected = _eval_type11_potential(terms[0], phi_grid)
         pot_density = np.exp(-U_expected / kT)
-        pot_density = np.clip(pot_density, CFG.type9_min_prob, None)
+        pot_density = np.clip(pot_density, CFG.min_prob, None)
         pot_density /= np.sum(pot_density)
 
         aa_hist, _ = np.histogram(
@@ -343,7 +343,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             range=(-180.0, 180.0),
             density=True,
         )
-        aa_density = np.clip(aa_hist, CFG.type9_min_prob, None)
+        aa_density = np.clip(aa_hist, CFG.min_prob, None)
         aa_density /= np.sum(aa_density)
 
         cg_density, _ = np.histogram(
@@ -352,7 +352,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             range=(-180.0, 180.0),
             density=True,
         )
-        cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
+        cg_density = np.clip(cg_density, CFG.min_prob, None)
         cg_density /= np.sum(cg_density)
 
         alpha = CFG.alpha_max
@@ -390,12 +390,12 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
 
         k_phi_new = float(np.max(np.abs(c_new)))
         if k_phi_new < 1e-12:
-            k_phi_new = float(CFG.dihedral_k_lower_cutoff)
+            k_phi_new = float(CFG.dihedral_k_lower)
             a_new = np.zeros(5, dtype=float)
         else:
             a_new = c_new / k_phi_new
 
-        k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower_cutoff, CFG.dihedral_k_upper_cutoff))
+        k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower, CFG.dihedral_k_upper))
         base[5] = k_phi_new
         for n in range(5):
             base[6 + n] = float(a_new[n])
