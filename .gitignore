@@ -3,7 +3,7 @@ output/
 slurm*
 systems/
 tmp/
-Automartini_M3/
+png/
 *.log
 *.tmp
 *.itp
