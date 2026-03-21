@@ -1,10 +1,8 @@
 import logging
 import shutil
 import sys
-import MDAnalysis as mda
 from pathlib import Path
-from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
-from reforge.utils import clean_dir
+from auto_martini.AutoMartini.utils import change_directory, clean_dir, get_ntomp, gmx
 
 from config import CFG
 
@@ -22,69 +20,121 @@ runname = CFG.cg_runname
 NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
 
 
-def setup_martini(sysdir, sysname):
-    ### FOR CG PROTEIN+/RNA SYSTEMS ###
-    mdsys = GmxSystem(sysdir, sysname)
-    mdsys.prepare_files(pour_martini=True)
-    shutil.copy("md_cg.mdp", mdsys.mdpdir / "md_cg.mdp")
-   
-    # LIGANDS 
+def setup(sysdir, sysname):
+    root = Path(sysdir).resolve() / sysname
+    topdir = root / "topol"
+    mdpdir = root / "mdp"
+    solupdb = root / "solute.pdb"
+    inpdb = root / "inpdb.pdb"
+    syspdb = root / "system.pdb"
+    sysgro = root / "system.gro"
+    systop = root / "system.top"
+    sysndx = root / "system.ndx"
+
+    root.mkdir(parents=True, exist_ok=True)
+    topdir.mkdir(parents=True, exist_ok=True)
+    mdpdir.mkdir(parents=True, exist_ok=True)
+
+    src_md = Path(__file__).resolve().parent / "md_cg.mdp"
+    shutil.copy(src_md, mdpdir / "md_cg.mdp")
+
+    if not (mdpdir / "em_cg.mdp").exists() or not (mdpdir / "ions.mdp").exists():
+        raise FileNotFoundError(
+            f"Missing required mdp templates in {mdpdir}: need em_cg.mdp and ions.mdp"
+        )
+
     pdb_file = outdir / f"{ligand}.pdb"
     itp_file = outdir / f"{ligand}.itp"
-    shutil.copy(itp_file, mdsys.topdir / f"ligand_{ligand}.itp") # copy .itp to mdsys.itpdir so it can be included in the system topology
-    shutil.copy(pdb_file, mdsys.solupdb) # copy .pdb to mdsys.root so it can be included in the system structure
-    shutil.copy(pdb_file, mdsys.inpdb) # copy .pdb to mdsys.root so it can be included in the system structure
+    ligand_itp = topdir / f"ligand_{ligand}.itp"
+    shutil.copy(itp_file, ligand_itp)
+    shutil.copy(pdb_file, solupdb)
+    shutil.copy(pdb_file, inpdb)
 
     if "md" not in sys.argv:
-        mdsys.molecules[f"ligand_{ligand}"] = 1
-        mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
-        
-        # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
-            # 1.3. Coarse graining is *hopefully* done. Need to add solvent and ions
-        mdsys.make_box(d="1.0", bt="cubic")
-        solvent = mdsys.root / "water.gro"
-        mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.17") # all kwargs go to gmx solvate command
-        mdsys.add_bulk_ions(conc=0.0, pname="NA", nname="CL")
+        martini_itps = sorted(topdir.glob("martini*.itp"))
+        if not martini_itps:
+            raise FileNotFoundError(
+                f"No Martini force-field .itp files found in {topdir}."
+            )
 
-        # 1.4. Need index files to make selections with GROMACS. Very annoying but wcyd. Order:
-        # 1.System 2.Solute 3.Backbone 4.Solvent 5...chains. Can add custom groups using AtomList.write_to_ndx()
-        mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
+        with open(systop, "w", encoding="utf-8") as f:
+            for ff in martini_itps:
+                f.write(f'#include "topol/{ff.name}"\n')
+            f.write(f'\n#include "topol/{ligand_itp.name}"\n\n')
+            f.write("[ system ]\n")
+            f.write(f"Martini system for {sysname} in water\n\n")
+            f.write("[ molecules ]\n")
+            f.write("; name\t\tnumber\n")
+            f.write(f"{ligand}\t\t1\n")
+
+        solvent = root / "water.gro"
+        if not solvent.exists():
+            raise FileNotFoundError(f"Missing solvent structure file: {solvent}")
+
+        with change_directory(root):
+            gmx("editconf", f=solupdb, o=solupdb, d="1.0", bt="cubic")
+            gmx("solvate", cp=solupdb, cs=solvent, p=systop, o=syspdb, radius="0.17")
+            gmx("grompp", f=mdpdir / "ions.mdp", c=syspdb, p=systop, o="ions.tpr")
+            gmx("genion", clinput="W\n", s="ions.tpr", p=systop, o=syspdb, conc=0.0, pname="NA", nname="CL")
+            gmx("editconf", f=syspdb, o=sysgro)
+
+        u_system = mda.Universe(str(syspdb))
+        u_solute = mda.Universe(str(solupdb))
+        n_system = len(u_system.atoms)
+        n_solute = len(u_solute.atoms)
+        system_idx = list(range(1, n_system + 1))
+        solute_idx = list(range(1, n_solute + 1))
+        backbone_idx = solute_idx.copy()
+        solvent_idx = list(range(n_solute + 1, n_system + 1))
+
+        def _write_group(handle, name, indices, wrap=15):
+            handle.write(f"[ {name} ]\n")
+            for i in range(0, len(indices), wrap):
+                handle.write(" ".join(str(x) for x in indices[i:i + wrap]) + "\n")
+            handle.write("\n")
+
+        with open(sysndx, "w", encoding="utf-8") as ndx:
+            _write_group(ndx, "System", system_idx)
+            _write_group(ndx, "Solute", solute_idx)
+            _write_group(ndx, "Backbone", backbone_idx)
+            if solvent_idx:
+                _write_group(ndx, "Solvent", solvent_idx)
 
     
-def md_npt(sysdir, sysname, runname, nsteps=None): 
-    mdrun = GmxRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / "mdrun"
-    mdrun.rundir.mkdir(parents=True, exist_ok=True)
+def md_npt(sysdir, sysname, runname, nsteps=NSTEPS): 
+    root = Path(sysdir).resolve() / sysname
+    rundir = root / "mdrun"
+    mdpdir = root / "mdp"
+    sysgro = root / "system.gro"
+    systop = root / "system.top"
+    sysndx = root / "system.ndx"
     ntomp = get_ntomp()
-    mdrun.empp(f=mdrun.mdpdir / "em_cg.mdp")
-    mdrun.mdrun(deffnm="em", ntomp=ntomp)
-    # mdrun.eqpp(f=mdrun.mdpdir / "eq_cg.mdp", c="em.gro", r="em.gro", maxwarn="1") 
-    # mdrun.mdrun(deffnm="eq", ntomp=ntomp)
-    mdrun.mdpp(f=mdrun.mdpdir / "md_cg.mdp", c="em.gro", r="em.gro", maxwarn="1")    
-    if nsteps is None:
-        nsteps = NSTEPS
-    mdrun.mdrun(deffnm="md", ntomp=ntomp, nsteps=nsteps, ) # bonded="gpu")
+    rundir.mkdir(parents=True, exist_ok=True)
+    with change_directory(rundir):
+        gmx("grompp", f=mdpdir / "em_cg.mdp", c=sysgro, r=sysgro, p=systop, n=sysndx, o="em.tpr")
+        gmx("mdrun", deffnm="em", ntomp=ntomp)
+        gmx("grompp", f=mdpdir / "md_cg.mdp", c="em.gro", r="em.gro", p=systop, n=sysndx, o="md.tpr", maxwarn="1")
+        gmx("mdrun", deffnm="md", ntomp=ntomp, nsteps=nsteps)  # bonded="gpu"
     
     
-def trjconv(sysdir, sysname, runname, **kwargs):
-    kwargs.setdefault("b", 0) # in ps
-    kwargs.setdefault("e", 1e6) # in ps
-    mdrun = GmxRun(sysdir, sysname, runname)
-    mdrun.rundir = mdrun.root / "mdrun"
-    k = 1 # k=1 to remove solvent, k=2 for backbone analysis, k=4 to include ions
-    mdrun.convert_tpr(clinput=f"{k}\n", s="md.tpr", n=mdrun.sysndx, o="topology.tpr")
-    mdrun.trjconv(clinput="1\n 1\n", s="md.tpr", f="md.xtc", o="samples.xtc", n=mdrun.sysndx, fit="rot+trans")
-    mdrun.trjconv(clinput="1\n 1\n", s="md.tpr", f="md.xtc", o="topology.pdb", n=mdrun.sysndx, fit="rot+trans", e=0)
-    clean_dir(mdrun.rundir)
+def trjconv(sysdir, sysname, runname):
+    root = Path(sysdir).resolve() / sysname
+    rundir = root / "mdrun"
+    sysndx = root / "system.ndx"
+    with change_directory(rundir):
+        gmx("convert-tpr", clinput=f"1\n", s="md.tpr", n=sysndx, o="topology.tpr")
+        gmx("trjconv", clinput="1\n 1\n", s="md.tpr", f="md.xtc", o="samples.xtc", n=sysndx, fit="rot+trans")
+        gmx("trjconv", clinput="1\n 1\n", s="md.tpr", f="md.xtc", o="topology.pdb", n=sysndx, fit="rot+trans", e=0)
+    clean_dir(rundir)
 
 
 if __name__ == "__main__":
     nsteps = -2
     if "nsteps" in sys.argv:
         nsteps = int(sys.argv[sys.argv.index("nsteps") + 1])
-    setup_martini(sysdir, sysname)
+    setup(sysdir, sysname)
     md_npt(sysdir, sysname, runname, nsteps=nsteps)
-    trjconv(sysdir, sysname, runname, b=0, e=1e6)
+    trjconv(sysdir, sysname, runname)
 
 
     

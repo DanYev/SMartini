@@ -19,12 +19,12 @@ class LigParConfig:
     n_beads: Optional[int] = None 
     use_vsites: bool = False
     symmetrize_rings: bool = False
+    keep_rings_together: bool = False
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
     max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
     max_bead_size: int = 4
     max_ring_bead_size: int = 3
-    keep_rings_together: bool = False
 
     # ============================================================================
     # Working folders
