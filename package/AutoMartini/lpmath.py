@@ -1,10 +1,8 @@
 import logging
-from typing import Dict, Tuple
-
 import numpy as np
+import AutoMartini.ligpar_cy as ligpar_cy
 from MDAnalysis import Universe
-
-import ligpar_cy
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 

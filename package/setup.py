@@ -47,17 +47,26 @@ def build(setup_kwargs: dict) -> None:
     # Build with OpenMP if the compiler supports it (Linux gcc/clang).
     # If OpenMP isn't available, compilation may fail; in that case remove
     # "-fopenmp" or adjust for your compiler toolchain.
-    ext = Extension(
-        name="AutoMartini.optimization_cy",
-        sources=["AutoMartini/optimization_cy.pyx"],
-        include_dirs=[numpy.get_include()],
-        extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
-        extra_link_args=["-fopenmp"],
-    )
+    ext = [
+        Extension(
+            name="AutoMartini.optimization_cy",
+            sources=["AutoMartini/optimization_cy.pyx"],
+            include_dirs=[numpy.get_include()],
+            extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
+            extra_link_args=["-fopenmp"],
+        ),
+        Extension(
+            name="AutoMartini.ligpar_cy",
+            sources=["AutoMartini/ligpar_cy.pyx"],
+            include_dirs=[numpy.get_include()],
+            extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
+            extra_link_args=["-fopenmp"],
+        ),
+    ]
 
     setup_kwargs.update(
         ext_modules=cythonize(
-            [ext],
+            ext,
             compiler_directives={"language_level": "3"},
         ),
     )
@@ -72,7 +81,14 @@ def _make_extensions():
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
-        )
+        ),
+        Extension(
+            name="AutoMartini.ligpar_cy",
+            sources=["AutoMartini/ligpar_cy.pyx"],
+            include_dirs=[numpy.get_include()],
+            extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
+            extra_link_args=["-fopenmp"],
+        ),
     ]
 
 

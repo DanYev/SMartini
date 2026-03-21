@@ -4,12 +4,12 @@ import pickle
 import os
 import sys
 
-import package.AutoMartini as am
+import AutoMartini as am
 import numpy as np
 
 from pathlib import Path
 from config import CFG
-from package.AutoMartini.lpmath import (
+from AutoMartini.lpmath import (
     read_cog_trajectory,
     calculate_internal_coordinates,
     boltzmann_inversion_bond,
@@ -20,7 +20,7 @@ from package.AutoMartini.lpmath import (
     fit_type9_dihedral,
     fit_type11_dihedral,
 )
-from package.AutoMartini.plots import plot_internal_coordinates
+from AutoMartini.plots import plot_internal_coordinates
 
 logger = logging.getLogger("AutoMartini")
 logger.setLevel(logging.INFO)
