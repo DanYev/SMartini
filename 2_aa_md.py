@@ -1,14 +1,11 @@
 import logging
 import sys
 import MDAnalysis as mda
-import numpy as np
 import openmm as mm
-from pathlib import Path
 from openmm import app, unit
 from openff.toolkit import ForceField, Molecule, Topology 
 from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
-from reforge.mdsystem.mmmd import MmReporter, convert_trajectories
 
 from config import CFG
 
@@ -24,8 +21,9 @@ system_pdb = aa_dir / "system.pdb"
 system_xml = aa_dir / "system.xml"
 
 
-def process_ligand(ligand_name):
+def process_ligand():
     # INPUTS
+    ligand_name = CFG.molname
     logger.info("Working directory: %s", wdir)
     logger.info("Processing ligand: %s", ligand_name)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
@@ -76,6 +74,7 @@ def md_npt():
     integrator = mm.LangevinMiddleIntegrator(0, CFG.aa_gamma / unit.picosecond, 1*unit.femtosecond)  
     simulation = app.Simulation(pdb.topology, system, integrator) 
     simulation.context.setPositions(pdb.positions)
+    reporters = _get_reporters(append=False, prefix='md')
     # Minimization
     logger.info("Minimizing energy...")
     simulation.minimizeEnergy(maxIterations=1000)
@@ -99,27 +98,29 @@ def md_npt():
     # state = simulation.context.getState(getPositions=True, getVelocities=True)
     simulation.integrator.setStepSize(CFG.aa_timestep_fs * unit.femtoseconds)
     simulation.context.reinitialize(preserveState=True)
-    # simulation.context.setPositions(state.getPositions())
-    # simulation.context.setVelocities(state.getVelocities())
-    # simulation.context.setPeriodicBoxVectors(*state.getPeriodicBoxVectors())
-    reporters = _get_reporters(append=False, prefix='md')
     simulation.reporters = reporters
     simulation.step(int(CFG.aa_total_steps))
     logger.info("Done!")
 
 
-def trjconv():
-    # INPUT
+def trjconv(start=0, stop=None, step=1, fit=True):
     top = aa_dir / "md.pdb"
-    # top = mdrun.root / "system.pdb"
-    traj = aa_dir / f"md.{CFG.aa_trjext}"
-    ext_trajs = sorted([f for f in aa_dir.glob(f"md_*.{CFG.aa_trjext}")])
-    trajs = [traj] + ext_trajs
-    logger.info(f'Input trajectory files: {trajs}')
+    traj = aa_dir / "md.xtc"
     out_top = aa_dir / "topology.pdb"
-    out_traj = aa_dir / f"samples.{CFG.aa_trjext}"
-    # CONVERT
-    convert_trajectories(top, trajs, out_top, out_traj, selection=CFG.aa_selection, start=0, stop=None, step=1, fit=True)
+    out_traj = aa_dir / "samples.xtc"
+    universe = mda.Universe(str(top), str(traj))
+    atom_group = universe.select_atoms(CFG.aa_selection)
+
+    if fit:
+        ref_universe = mda.Universe(str(top))
+        ref_atoms = ref_universe.select_atoms(CFG.aa_selection)
+        from MDAnalysis.transformations import fit_rot_trans
+        universe.trajectory.add_transformations(fit_rot_trans(atom_group, ref_atoms))
+
+    atom_group.write(str(out_top))
+    with mda.Writer(str(out_traj), n_atoms=atom_group.n_atoms) as writer:
+        for _ in universe.trajectory[start:stop:step]:
+            writer.write(atom_group)
     logger.info("Done!")
 
 
@@ -137,7 +138,7 @@ def _load_system_from_xml(filename):
 
 
 def _get_reporters(append=False, prefix="md"):
-    """Get reporters for MD simulation using custom MmReporter for velocities"""
+    """Get reporters for MD simulation using OpenMM reporters."""
     # Log reporter (file)
     log_reporter = app.StateDataReporter(
         str(aa_dir / f"{prefix}.log"), 
@@ -147,14 +148,29 @@ def _get_reporters(append=False, prefix="md"):
     err_reporter = app.StateDataReporter(
         sys.stderr, CFG.aa_log_nout, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
         temperature=True, speed=True, append=append)
-    # Custom trajectory reporter with velocities using MmReporter
-    logger.info(f'Setting up trajectory reporter with selection: {CFG.aa_selection}')
-    traj_reporter = MmReporter(str(aa_dir / f"{prefix}.{CFG.aa_trjext}"), 
-        reportInterval=CFG.aa_trj_nout, selection=CFG.aa_selection)
+
+    # Position-only trajectory reporter (XTC) with atom subset
+    if CFG.aa_selection == "all":
+        atom_subset = None
+        logger.info("Setting up XTC reporter for all atoms")
+    else:
+        universe = mda.Universe(str(system_pdb))
+        atom_subset = universe.select_atoms(CFG.aa_selection).indices.tolist()
+        logger.info(
+            "Setting up XTC reporter with selection '%s' (%d atoms)",
+            CFG.aa_selection,
+            len(atom_subset),
+        )
+    traj_reporter = app.XTCReporter(
+        str(aa_dir / f"{prefix}.xtc"),
+        CFG.aa_trj_nout,
+        append=append,
+        atomSubset=atom_subset,
+    )
     return log_reporter, err_reporter, traj_reporter
 
 
 if __name__ == "__main__":
-    process_ligand(ligand_name)
+    process_ligand()
     md_npt()
     trjconv()

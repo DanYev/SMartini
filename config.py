@@ -50,7 +50,6 @@ class LigParConfig:
     aa_trj_nout: int = 1000  # Trajectory output frequency (frames every N steps)
     aa_log_nout: int = 10000  # Log output frequency (every N steps)
     aa_chk_nout: int = 100000  # Checkpoint output frequency (every N steps)
-    aa_trjext: str = 'xtc'  # Trajectory format ('xtc' or 'trr')
 
     # ============================================================================
     # CG MD settings (Coarse-Grained Molecular Dynamics)
