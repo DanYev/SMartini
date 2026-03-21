@@ -9,7 +9,7 @@ from typing import Optional
 @dataclass()
 class LigParConfig:
     # Identity / layout
-    molname: str = "THC"
+    molname: str = "ANP"
     specify_beads: list[list[int]] = None
     # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
     # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
