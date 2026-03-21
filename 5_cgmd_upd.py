@@ -277,18 +277,27 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_density = np.clip(cg_density, CFG.type9_min_prob, None)
         cg_density /= np.sum(cg_density)
 
-        overlap = np.sum(np.sqrt(aa_density * cg_density))
-        alpha = 0.5 * overlap
+        overlap = np.sum(aa_density * cg_density)
+        aa_mean = np.average(aa_centered)
+        aa_std = np.std(aa_centered)
+        cg_mean = np.average(cg_centered)
+        cg_std = np.std(cg_centered)
+        delta_shift = float(np.abs(aa_mean - cg_mean))
+        inv_rel_shift = np.sqrt(aa_std * cg_std) / (delta_shift + 1e-6)
+        print(f"Dihedral ({i},{j},{k},{l}): AA-CG density overlap = {overlap:.4f}, inv rel shift = {inv_rel_shift:.4f}")
+        alpha = overlap
         alpha = min(alpha, CFG.alpha_max)
         alpha = max(alpha, CFG.alpha_min)
-        alpha = 0.1
+        if len(terms) > 1:
+            alpha = min(alpha, 0.02)  # Be more conservative when multiple terms already exist to avoid overfitting
+        print(alpha)
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = -alpha * kT * np.log(cg_density)
         pmf_pot = -kT * np.log(pot_density)
         pmf = pmf_aa - pmf_cg + pmf_pot
 
         harmonics = sorted({int(t[7]) for t in terms})
-        density_power = 1.0 if len(harmonics) == 1 else 0.2
+        density_power = 1.0 if len(harmonics) == 1 else 0.0
         density = np.sqrt(aa_density * cg_density)
         weights_aa = np.pow(aa_density, density_power)
         weights_cg = np.pow(aa_density, density_power)
