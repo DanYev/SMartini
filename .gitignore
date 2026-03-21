@@ -6,7 +6,6 @@ tmp/
 png/
 *.log
 *.tmp
-*.itp
 *.png
 *.txt
 *.npy
