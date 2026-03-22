@@ -371,7 +371,7 @@ def boltzmann_invert_dihedrals(topo,
             (i, j, k) in linear_angle_set
             or (j, k, l) in linear_angle_set
         )
-        ill_defined = ill_defined or has_linear_angle
+        ill_defined = ill_defined or (has_linear_angle and CFG.use_type11_for_linear)
 
         if ill_defined:
             (kphi, a), density = fit_type11_dihedral(

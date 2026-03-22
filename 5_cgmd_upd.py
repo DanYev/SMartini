@@ -128,7 +128,8 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
         updated = list(bond)
 
         delta = mu_aa - mu_cg
-        updated[3] = float(updated[3]) + delta
+        alpha = CFG.alpha_max
+        updated[3] = float(updated[3]) + alpha * delta
 
         k_new = _k_rescale(
             float(updated[4]),
@@ -196,8 +197,9 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
         updated = list(angle)
 
         delta = mu_aa - mu_cg
+        alpha = CFG.alpha_max
         theta0_old = float(updated[4])
-        theta0_new = float(theta0_old + delta)
+        theta0_new = float(theta0_old + alpha * delta)
         theta0_new = float(np.clip(theta0_new, 0.0, 180.0))
         updated[4] = theta0_new
 
@@ -289,7 +291,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         alpha = min(alpha, CFG.alpha_max)
         alpha = max(alpha, CFG.alpha_min)
         if len(terms) > 1:
-            alpha = min(alpha, 0.04)  # Be more conservative when multiple terms already exist to avoid overfitting
+            alpha = min(alpha, 0.01)  # Be more conservative when multiple terms already exist to avoid overfitting
         print(alpha)
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = -alpha * kT * np.log(cg_density)
@@ -450,13 +452,8 @@ def update_topology_from_cg_vs_aa(
     """
     updated = copy.deepcopy(topo)
 
-    # Update bonds and constraints
     n_bonds_updated, n_constraints_updated = update_bonds(updated, aa_internal, cg_internal)
-    
-    # Update angles
     n_angles_updated, n_angles_removed = update_angles(updated, aa_internal, cg_internal)
-    
-    # Update dihedrals
     n_dihedrals_updated, n_dihedrals_removed = update_dihedrals(updated, aa_internal, cg_internal)
 
     logger.info(
