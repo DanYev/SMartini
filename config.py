@@ -11,13 +11,13 @@ class LigParConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "DMBI"
-    specify_beads: list[list[int]] = None
+    molname: str = "ANP"
+    specify_beads: Optional[list[list[int]]] = None
     # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
     # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
     # specify_beads: tuple[list[int]] = ([9, 15], ) # FOR THC
     n_beads: Optional[int] = None 
-    use_vsites: bool = False
+    use_vsites: bool = True
     symmetrize_rings: bool = False
     keep_rings_together: bool = False
     max_combs_merged: int = 1000
@@ -73,7 +73,7 @@ class LigParConfig:
     ill_defined_angle_cutoff: float = 155.0
     type9_max_n: int = 6
     nbins: int = 120
-    min_prob: float = 1e-6
+    min_prob: float = 1e-12
     fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
     alpha_max: float = 0.25
