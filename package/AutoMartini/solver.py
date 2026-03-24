@@ -36,7 +36,25 @@ logger = logging.getLogger(__name__)
 
 
 class Cg_molecule:
-    """Main class to coarse-grain molecule"""
+    """Coarse-grain a single small molecule to a Martini 3 bead representation.
+
+    Workflow
+    --------
+    1. Embed the AA molecule and optimize its geometry (MMFF).
+    2. Build heavy-atom and all-atom graph representations.
+    3. Enumerate candidate bead mappings via fragment-based partitioning.
+    4. For each candidate mapping (best first):
+       a. Optionally symmetrize ring mappings.
+       b. Assign Martini 3 bead types from per-bead SMILES and logP.
+       c. Compute bead coordinates as atom-group centres of geometry.
+       d. Build the full topology (bonds, angles, dihedrals, virtual sites).
+       e. Accept the first mapping that passes all validation checks.
+    5. Expose topology and coordinates for ITP/GRO/PDB output.
+
+    The mapping search is halted at the first valid solution; all remaining
+    candidates are discarded.  The quality of the result therefore depends
+    heavily on the sorting/filtering in `partitioning.generate_mappings`.
+    """
 
     # Initialize feature factory for feature extraction
     _fdefName = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
@@ -45,12 +63,43 @@ class Cg_molecule:
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
 
-    def __init__(self, molecule, mol_smi, molname, 
-        specify_beads=None, min_beads=None, max_beads=None, 
-        use_vsites=True, symmetrize_rings=False, forcepred=True, raw_molecule=None, 
+    def __init__(self, molecule, mol_smi, molname,
+        specify_beads=None, min_beads=None, max_beads=None,
+        use_vsites=True, symmetrize_rings=False, forcepred=True, raw_molecule=None,
         bartenderfname=None, bartender=None, logp_file_name="logP_smi_extended.dat"):
-        
-        # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens), 
+        """Initialise and immediately run the full coarse-graining workflow.
+
+        Parameters
+        ----------
+        molecule : rdkit.Chem.Mol
+            Pre-built RDKit molecule (with or without hydrogens).
+        mol_smi : str
+            SMILES string of the molecule; used for logP prediction.
+        molname : str
+            Short identifier written into all output files.
+        specify_beads : list[list[int]], optional
+            Constrain the search so that each inner list of atom indices must
+            end up in the same bead.
+        min_beads, max_beads : int, optional
+            Hard bounds on the number of CG beads; ``None`` means unconstrained.
+        use_vsites : bool, optional
+            Build virtual-site entries for ring centres when applicable.
+        symmetrize_rings : bool, optional
+            Generate rotationally shifted variants of ring mappings to avoid
+            arbitrary symmetry-breaking in the bead assignment.
+        forcepred : bool, optional
+            Use ML-based logP prediction; if False falls back to Wildman-Crippen.
+        raw_molecule : rdkit.Chem.Mol, optional
+            Original molecule before any modifications (used for coordinate
+            extraction).  Defaults to ``molecule`` when not supplied.
+        bartenderfname : str, optional
+            Path for Bartender topology output; Bartender output is skipped if None.
+        bartender : bool, optional
+            Enable Bartender output generation.
+        logp_file_name : str, optional
+            Filename of the logP reference table bundled with the package.
+        """
+        # NOTE _ha refers to heavy atoms, _aa refers to all atoms (including hydrogens),
 
         # Store all arguments as instance attributes
         # AutoM3 new arguments : mol_smi, simple_model, bartenderfname, bartender, logp_file
@@ -132,7 +181,20 @@ class Cg_molecule:
         self.process()
 
     def process(self):
-        # Find coarse-grained bead positions 
+        """Run the mapping search and populate topology on the first valid result.
+
+        The search iterates over candidate mappings produced by
+        `partitioning.generate_mappings` (sorted best-first) and halts as soon
+        as one passes all downstream checks:
+        - bead-type assignment succeeds (SMILES extraction + logP lookup),
+        - topology build produces a consistent bonded term list.
+
+        Side-effects
+        ------------
+        On success sets ``self.mapping``, ``self.topology``, ``self.bead_coords``,
+        ``self.bead_names``, and ``self.aa_mapping``.
+        """
+        # Find coarse-grained bead positions
         # -- keep all possibilities in case something goes wrong later in the code.
         import pickle
         # mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
@@ -252,14 +314,19 @@ class Cg_molecule:
 
 
     def extract_features(self):
-        """Extract features of molecule (H-bond donors/acceptors, etc.)"""
+        """Extract RDKit chemical features (H-bond donors/acceptors) for bead-type assignment."""
         logger.debug("Entering extract_features()")
         features = Cg_molecule._factory.GetFeaturesForMol(self.molecule)
         return features
 
 
     def build_aa_graph(self):
-        """Build all-atom graph data structure with heavy atoms, coords, rings, H-bonds, etc."""
+        """Build the all-atom graph used throughout the solver.
+
+        Collects atom names, 3D coordinates, fused ring systems, aromaticity
+        flags, H-bond donor/acceptor lists, and heavy-atom bond list into one
+        dict so the rest of the class has a single source of truth.
+        """
         logger.debug("Entering build_aa_graph()")
         
         # Get list of heavy atoms and their names
@@ -340,7 +407,12 @@ class Cg_molecule:
 
 
     def build_ha_graph(self):
-        """Extract molecule info needed for partitioning."""
+        """Build the heavy-atom-only graph used by the partitioning module.
+
+        Returns (ha_list, bonds) where bonds are undirected [i, j] pairs over
+        heavy atoms only.  Hydrogens are excluded because CG mapping operates
+        on heavy atoms; hydrogens are re-attached later in `get_aa_mapping`.
+        """
         molecule = self.molecule
         atoms = molecule.GetAtoms()
         ha_list = [a for a in atoms if a.GetAtomicNum() > 1]
@@ -355,14 +427,16 @@ class Cg_molecule:
 
 
     def symmetrize_rings_in_mapping(self, mapping):
-        """If a ring is present, symmetrize the mapping by generating alternative mappings where the atoms 
-        in the ring are shifted by one position in either direction.This is to avoid arbitrary breaking of 
-        symmetry in rings which can lead to poor CG models. 
-        Only applied if the entire ring is contained within the same bead, and only for rings larger 
-        than 5 atoms (since smaller rings have limited symmetry and it's less likely to find good alternative 
-        mappings). 
-        If specify_beads is set, filter symmetrized mappings to only those that contain all specified 
-        atoms in the same bead.
+        """Generate ring-symmetrized variants of a mapping and return the first.
+
+        Why this is needed
+        ------------------
+        When all atoms of a ring fall into sequential beads, the choice of
+        which atom "starts" a bead is arbitrary and can break physical symmetry.
+        This method produces even/odd-shifted alternatives for each qualifying
+        ring (size > 5, fully contained in beads) and returns the first variant.
+        If ``specify_beads`` is active, only variants that satisfy the atom-group
+        constraints are considered.
         """
         def symmetrize_ring(mapping, ring, ring_bead_indices):
             mapping_dict = {idx: bead.copy() for idx, bead in enumerate(mapping)}
@@ -415,7 +489,12 @@ class Cg_molecule:
 
 
     def get_aa_mapping(self, mapping):
-        """Update HA partitioning to include hydrogens in the same bead as their heavy atom neighbors"""
+        """Extend a heavy-atom mapping to include hydrogens.
+
+        Each hydrogen is assigned to the bead containing its bonded heavy atom.
+        This all-atom mapping is used for computing bead centres of geometry
+        from the full-resolution conformer.
+        """
         aa_mapping = []
         for bead in mapping:
             bead = bead.copy()
@@ -432,6 +511,18 @@ class Cg_molecule:
 
 
     def get_bead_coords(self, mapping):
+        """Compute bead coordinates as the centre of geometry of each atom group.
+
+        Parameters
+        ----------
+        mapping : list[list[int]]
+            All-atom mapping (including hydrogens) produced by `get_aa_mapping`.
+
+        Returns
+        -------
+        list[numpy.ndarray]
+            One (3,) position vector per bead, in Ångström.
+        """
         # Extract atom coordinates
         aa_coords = []
         mol = self.raw_molecule
@@ -450,9 +541,14 @@ class Cg_molecule:
         return bead_coords
 
 
-    def check_additivity(self, beadtypes): #AutoM3 change : added mol_smi argument
-        """Check additivity assumption between sum of free energies of CG beads
-        and free energy of whole molecule"""
+    def check_additivity(self, beadtypes):
+        """Validate the logP additivity assumption for the current mapping.
+
+        A valid CG mapping should have the sum of per-bead transfer free
+        energies (delta_f) approximately equal to the whole-molecule value.
+        Returns ``True`` when the relative error is within threshold or when
+        rings are present (ring additivity is less strictly enforced).
+        """
         logger.info("Checking LogP additivity...")
         # If there's only one bead, don't check.
         sum_frag = 0.0
@@ -485,7 +581,13 @@ class Cg_molecule:
 
 
     def build_topology(self, beads):
-        """Build topology data using Topology instance methods."""
+        """Populate the topology with bonded terms for the accepted mapping.
+
+        Called once a valid mapping is found.  The build order matters:
+        exclusions must precede virtual sites (so VS atoms inherit default
+        exclusion rules), and virtual sites must precede angles/dihedrals
+        (so VS beads are not included in bonded terms).
+        """
         # Build bonds and constraints
         self.topology.build_bonds(ha_neighbors=self.ha_neighbors)
         # Build exclusions 
@@ -502,9 +604,12 @@ class Cg_molecule:
 
 
     def update_topology(self, beads, bead_types, attempt):
-        """Update topology with formatted output strings after successful mapping."""
+        """Finalise topology after a successful mapping attempt.
 
-
+        Stores convenience references on the topology, runs a lightweight
+        sanity check on the bond/angle count, and optionally generates
+        Bartender input.
+        """
         # Store convenience references
         self.topology.aa_mapping = self.aa_mapping
         self.bead_names = self.topology.names
@@ -547,7 +652,13 @@ class Cg_molecule:
         
 
     def to_itp(self, itp_output=None):
-        """Write topology and bartender files to disk."""
+        """Serialise the CG topology to GROMACS ITP format.
+
+        Parameters
+        ----------
+        itp_output : str, optional
+            Output file path.  Returns the ITP string when not provided.
+        """
         topout = self.topology.to_itp()
         
         if self.bartender and self.bartenderfname:
@@ -563,7 +674,8 @@ class Cg_molecule:
             return topout
 
 
-    def to_aa_gro(self, aa_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def to_aa_gro(self, aa_output=None):
+        """Write the all-atom structure to a GROMACS GRO file (or return the string)."""
         # Optional all-atom output to GRO file
         aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
         if aa_output:
@@ -573,7 +685,8 @@ class Cg_molecule:
             return aa_out
 
 
-    def to_gro(self, cg_output=None): # AutoM3 change : molname is the same as argument --mol given at the beginning
+    def to_gro(self, cg_output=None):
+        """Write the CG bead structure to a GROMACS GRO file (or return the string)."""
         # Optional coarse-grained output to GRO file
         cg_out = output.output_gro(self.bead_coords, self.bead_names, self.molname)
         if cg_output:
@@ -614,10 +727,19 @@ class Cg_molecule:
             return cg_out
 
 
-    def output_map(self, 
-        map_file: str = None, 
+    def output_map(self,
+        map_file: str = None,
         to_ff: str = "martini3001"
         ):
+        """Write the atom-to-bead mapping file for use with external tools.
+
+        Parameters
+        ----------
+        map_file : str, optional
+            Output path; prints to stdout when None.
+        to_ff : str, optional
+            Target force-field format identifier passed to the output module.
+        """
         output.output_map(self.topology, map_file, to_ff=to_ff)
 
 
