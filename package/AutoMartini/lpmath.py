@@ -1,3 +1,14 @@
+"""Numerical utilities for trajectory processing and Boltzmann inversion.
+
+This module provides helpers to:
+- read atomistic/coarse-grained trajectories into bead coordinates,
+- compute internal coordinates from trajectories,
+- fit bonded terms (bonds, angles, dihedrals) from sampled distributions.
+
+Angles are expressed in degrees unless otherwise noted.
+Coordinate arrays are expected to be in nm in fitting routines.
+"""
+
 import logging
 import numpy as np
 from . import ligpar_cy
@@ -11,7 +22,18 @@ logger = logging.getLogger(__name__)
 ################################################################################
 
 def circular_mean(angles):
-    """Calculate circular mean of angles in degrees."""
+    """Compute the circular mean of angular samples in degrees.
+
+    Parameters
+    ----------
+    angles : array-like
+        Angle values in degrees.
+
+    Returns
+    -------
+    float
+        Circular mean angle in degrees, in the range ``[-180, 180]``.
+    """
     angles_rad = np.deg2rad(angles)
     sin_mean = np.mean(np.sin(angles_rad))
     cos_mean = np.mean(np.cos(angles_rad))
@@ -20,12 +42,34 @@ def circular_mean(angles):
 
 
 def wrap_to_180(angles):
-    """Wrap angles to [-180, 180] range."""
+    """Wrap angle values to the interval ``[-180, 180)``.
+
+    Parameters
+    ----------
+    angles : array-like or float
+        Angle values in degrees.
+
+    Returns
+    -------
+    numpy.ndarray or float
+        Wrapped angles with the same broadcasted shape as the input.
+    """
     return (angles + 180) % 360 - 180
 
 
 def flat_set(lst):
-    """Flatten a list of lists into a set of unique elements."""
+    """Flatten a nested list into a set of unique values.
+
+    Parameters
+    ----------
+    lst : list[list[Any]]
+        Nested iterable where each inner list contributes elements.
+
+    Returns
+    -------
+    set
+        Unique elements across all inner lists.
+    """
     if not lst:
         return set()
     aset = set(item for sublist in lst for item in sublist) 
@@ -141,7 +185,26 @@ def read_cg_trajectory(in_pdb, in_xtc, start=0, stop=5000, step=1,selection="all
 ################################################################################
 
 def calculate_internal_coordinates(cg_trajectory, topo):
-    """Calculate internal coordinates (bonds, angles, dihedrals) from CG trajectory."""
+    """Compute bonded internal-coordinate time series from a CG trajectory.
+
+    Parameters
+    ----------
+    cg_trajectory : numpy.ndarray
+        Trajectory array of shape ``(n_frames, n_beads, 3)`` in nm.
+    topo : object
+        Topology-like object exposing ``bonds``, ``constraints``, ``angles``,
+        and ``dihedrals`` iterables with bead indices.
+
+    Returns
+    -------
+    dict
+        Mapping from tuple keys to 1D numpy arrays of sampled values:
+        - ``(i, j, "bond")``
+        - ``(i, j, "constraint")``
+        - ``(i, j, k, "angle")``
+        - ``(i, j, k, l, "dihedral")``
+        - optional ``(i, j, k, "adj_angle")`` for dihedral-adjacent angles.
+    """
     n_frames = cg_trajectory.shape[0]
     internal_coords = {}
 
@@ -179,7 +242,24 @@ def calculate_internal_coordinates(cg_trajectory, topo):
 ################################################################################
 
 def gmm_pdf_1d(x, weights, means, variances):
-    """Compute 1D Gaussian mixture PDF."""
+    """Evaluate a 1D Gaussian-mixture probability density function.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Evaluation points, shape ``(n_samples,)``.
+    weights : numpy.ndarray
+        Mixture weights, shape ``(n_components,)``.
+    means : numpy.ndarray
+        Component means, shape ``(n_components,)``.
+    variances : numpy.ndarray
+        Component variances, shape ``(n_components,)``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Density values at ``x``, shape ``(n_samples,)``.
+    """
     x = x[:, None]
     norm = np.sqrt(2.0 * np.pi * variances)[None, :]
     exps = np.exp(-0.5 * (x - means) ** 2 / variances)
@@ -188,19 +268,37 @@ def gmm_pdf_1d(x, weights, means, variances):
 
 def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-6, 
                     min_weight=0.1, min_spacing_std=2.0, min_prob=1e-3):
-    """Fit 1D Gaussian mixture with AIC selection + penalties for low weights and overlap.
-    
+    """Fit a 1D Gaussian mixture and choose model order by AIC.
+
+    Candidate models from 1 to ``max_components`` are fit via EM.
+    Models are rejected when any component has too-low weight or when
+    component means are too close (in standard-deviation units).
+
     Parameters
     ----------
-    min_weight : float
-        Penalty weight for components with weight < this threshold.
-    min_spacing_std : float
-        Penalty if two components' means are < this many std devs apart.
-    
+    data : array-like
+        Input samples.
+    max_components : int, optional
+        Maximum number of mixture components to test.
+    max_iter : int, optional
+        Maximum EM iterations per candidate.
+    tol : float, optional
+        Absolute log-likelihood convergence threshold.
+    var_floor : float, optional
+        Minimum variance used to stabilize EM updates.
+    min_weight : float, optional
+        Minimum allowed component weight; otherwise candidate is discarded.
+    min_spacing_std : float, optional
+        Minimum separation between component means measured in average
+        component standard deviations.
+    min_prob : float, optional
+        Lower bound used when clipping densities in EM computations.
+
     Returns
     -------
-    tuple or None
-        (weights, means, variances) if successful, None otherwise.
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray] or None
+        Best ``(weights, means, variances)`` by AIC among non-rejected models,
+        or ``None`` when fitting is not possible.
     """
     data = np.asarray(data, dtype=float)
     if data.size < 2:
@@ -269,14 +367,27 @@ def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e
 
 
 def boltzmann_inversion_bond(distances, temperature=300.0, fc_scale=1.0, max_components=1):
-    """Estimate harmonic bond parameters from samples.
+    """Estimate harmonic bond parameters from sampled bond lengths.
 
-    This is a *mean-based harmonic approximation* (not PMF-minimum based):
-    - Equilibrium value r0 is the sample mean.
-    - Force constant k is computed from fluctuations: k = kT / var(r).
-    
-    Returns:
-        r0 (float), k (float), gmm (tuple or None)
+    Uses a mean/variance harmonic approximation:
+    ``r0 = mean(r)`` and ``k = fc_scale * kT / var(r)``.
+
+    Parameters
+    ----------
+    distances : array-like
+        Bond-length samples (typically in nm).
+    temperature : float, optional
+        Temperature in K.
+    fc_scale : float, optional
+        Multiplicative scaling factor applied to the fitted force constant.
+    max_components : int, optional
+        Maximum number of components for an auxiliary GMM estimate.
+
+    Returns
+    -------
+    tuple[float, float, numpy.ndarray or None]
+        ``(r0, k, density)``, where ``density`` is the clipped GMM density on
+        an internal support grid, or ``None`` if GMM fitting fails.
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
@@ -470,12 +581,22 @@ def fit_type2_angle(angles, temperature=300.0, fc_scale=1.0, bins=180, min_prob=
 
 
 def boltzmann_inversion_improper(dihedrals, temperature=300.0, fc_scale=1.0):
-    """Estimate harmonic improper dihedral parameters from samples.
+    """Estimate harmonic improper-dihedral parameters from sampled angles.
 
-    Mean-based harmonic approximation for periodic angles:
-    - Equilibrium value phi0 is the circular mean (degrees, wrapped to [-180, 180]).
-    - Force constant k is computed from wrapped residual fluctuations in radians:
-      k = kT / var(phi_rad).
+    Parameters
+    ----------
+    dihedrals : array-like
+        Improper angle samples in degrees.
+    temperature : float, optional
+        Temperature in K.
+    fc_scale : float, optional
+        Multiplicative scaling factor applied to the fitted force constant.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(phi0, k)`` where ``phi0`` is the wrapped circular mean in degrees
+        and ``k = fc_scale * kT / var(residual_rad)`` in kJ/mol.
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * temperature
@@ -535,12 +656,31 @@ def _fit_type9_to_target(
     phi_grid: np.ndarray = None,
     nbins: int = 360,
 ) -> list:
-    """Fit Gromacs type-9 Fourier terms to a target potential on a phi grid.
+    """Fit GROMACS type-9 Fourier terms to a target potential on a phi grid.
 
     U(phi) = const + sum_n [ a_n*cos(n*phi) + b_n*sin(n*phi) ]
     converted to (mult, k, phi0) via  k = hypot(a, b),  phi0 = atan2(b, a).
 
-    Returns list of (mult, k_term, phi0_deg) tuples.
+    Parameters
+    ----------
+    pmf : numpy.ndarray
+        Target potential values evaluated on ``phi_grid``.
+    shift : float
+        Angular shift (degrees) used during fitting; phases are shifted back
+        before returning type-9 parameters.
+    harmonics : list[int]
+        Harmonic multiplicities to include.
+    weights : numpy.ndarray, optional
+        Per-grid-point weights for weighted least squares.
+    phi_grid : numpy.ndarray, optional
+        Grid of dihedral angles in degrees.
+    nbins : int, optional
+        Number of bins if ``phi_grid`` is not provided.
+
+    Returns
+    -------
+    list[tuple[int, float, float]]
+        List of ``(multiplicity, k, phi0_deg)`` terms.
     """
 
     def _k_phi_from_ab(a, b, n: int):
@@ -586,9 +726,24 @@ def _fit_type11_to_target(
     phi_grid: np.ndarray = None,
     nbins: int = 360,
 ):
-    """Fit a type-11 (CBT) potential to a target on a phi grid.
+    """Fit a type-11 (CBT) polynomial potential on a dihedral grid.
 
-    Returns (k_phi, [a0, a1, a2, a3, a4]).
+    Parameters
+    ----------
+    pmf : numpy.ndarray
+        Target potential values on ``phi_grid``.
+    weights : numpy.ndarray, optional
+        Per-grid-point weights for weighted least squares.
+    phi_grid : numpy.ndarray, optional
+        Grid of dihedral angles in degrees.
+    nbins : int, optional
+        Number of bins if ``phi_grid`` is not provided.
+
+    Returns
+    -------
+    tuple[float, list[float]]
+        ``(k_phi, [a0, a1, a2, a3, a4])`` with normalized polynomial
+        coefficients such that ``k_phi * a_n`` recovers fitted amplitudes.
     """
     if phi_grid is None:
         phi_grid = np.linspace(-180.0, 180.0, nbins + 1)
@@ -616,7 +771,7 @@ def fit_type9_dihedral(
     min_prob=1e-6,
     fc_scale: float = 1.0,
 ):
-    r"""Fit Gromacs type-9 dihedral terms from a Gaussian mixture model.
+    r"""Fit GROMACS type-9 dihedral terms from sampled dihedral angles.
 
     1. Fit a GMM to the dihedral distribution (1 to max_n components, BIC selection).
     2. Determine optimal n from the spacing between modes: n = 180 / mean_spacing.
@@ -624,10 +779,27 @@ def fit_type9_dihedral(
         4. Estimate free energy F(\phi) = -kT ln p(\phi) and fit via *density-weighted* least squares,
              focusing the fit on the support (high-probability region).
 
+    Parameters
+    ----------
+    dihedrals : array-like
+        Dihedral samples in degrees.
+    temperature : float, optional
+        Temperature in K.
+    max_n : int, optional
+        Maximum harmonic multiplicity considered.
+    nbins : int, optional
+        Number of bins/grid points for histogram and fitting.
+    min_prob : float, optional
+        Lower bound applied to histogram density before PMF conversion.
+    fc_scale : float, optional
+        Force-constant scaling factor (currently unused in this routine).
+
     Returns
     -------
-    list[tuple[int, float, float]]
-        List of (multiplicity n, k_n, phi_n_deg) terms.
+    tuple[list[tuple[int, float, float]], numpy.ndarray]
+        ``(terms, density)`` where ``terms`` are type-9 entries
+        ``(n, k_n, phi_n_deg)`` and ``density`` is the clipped histogram on
+        the fitting grid.
     """
 
     kB = 0.008314462618  # kJ/mol/K
@@ -720,8 +892,9 @@ def fit_type11_dihedral(
 
     Returns
     -------
-    tuple[float, list[float]]
-        (k_phi, [a0, a1, a2, a3, a4])
+    tuple[tuple[float, list[float]], numpy.ndarray]
+        ``((k_phi, [a0, a1, a2, a3, a4]), density)`` where ``density`` is the
+        clipped histogram used to build the PMF.
     """
     kB = 0.008314462618  # kJ/mol/K
     kT = kB * float(temperature)

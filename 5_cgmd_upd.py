@@ -30,6 +30,22 @@ InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
 
 def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
+    """Compute mean and spread for linear or circular internal coordinates.
+
+    Parameters
+    ----------
+    values : numpy.ndarray
+        Sampled coordinate values.
+    value_type : str
+        Coordinate type. ``"dihedral"`` is treated as periodic and uses
+        circular centering; all other values are treated as linear.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(mu, sigma)`` where ``mu`` is the location estimate and ``sigma`` is
+        the standard deviation in the same units as ``values``.
+    """
     if value_type == "dihedral":
         mu = float(circular_mean(values))
         centered = wrap_to_180(values - mu)
@@ -41,6 +57,14 @@ def _stats(values: np.ndarray, value_type: str) -> Tuple[float, float]:
     return mu, sigma
 
 def _pair_mode_centers(aa_centers, cg_centers):
+    """Pair two AA and two CG mode centers to minimize circular mismatch.
+
+    Returns
+    -------
+    dict or None
+        Mapping from each CG center to its paired AA center, or ``None`` when
+        either input does not contain exactly two centers.
+    """
     if len(aa_centers) != 2 or len(cg_centers) != 2:
         return None
     a0, a1 = aa_centers
@@ -53,6 +77,11 @@ def _pair_mode_centers(aa_centers, cg_centers):
 
 
 def _k_rescale(k_old: float, sigma_target: float, sigma_current: float) -> float:
+    """Rescale a harmonic force constant to match a target fluctuation width.
+
+    Uses ``k_new = k_old * (sigma_current / sigma_target)^2`` and returns the
+    original value when inputs are non-finite or non-positive.
+    """
     if not np.isfinite(k_old) or k_old <= 0:
         return k_old
     if not np.isfinite(sigma_target) or not np.isfinite(sigma_current):
@@ -64,7 +93,7 @@ def _k_rescale(k_old: float, sigma_target: float, sigma_current: float) -> float
 
 
 def _angle_stats_jacobian(values: np.ndarray, bins: int = 180, min_prob: float = 1e-6) -> Tuple[float, float]:
-    """Estimate angle location/spread after correcting for the sin(theta) Jacobian.
+    """Estimate angle location/spread for fitting updates.
 
     For angle distributions on [0, 180], the observed density follows
         p(theta) ~ sin(theta) * exp(-U(theta)/kT).
@@ -72,6 +101,11 @@ def _angle_stats_jacobian(values: np.ndarray, bins: int = 180, min_prob: float =
     then report:
       - mu: mode of q(theta)
       - sigma: weighted std around that mode
+
+    Notes
+    -----
+    The current implementation builds Jacobian-corrected intermediates but
+    ultimately returns arithmetic mean/std of the raw samples.
     """
     if values is None or len(values) == 0:
         return np.nan, np.nan
@@ -107,6 +141,11 @@ def update_bonds(topo, aa_internal: InternalCoords, cg_internal: InternalCoords)
     --------
     - Equilibrium values: shift by (mu_AA - mu_CG)
     - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
+
+    Returns
+    -------
+    tuple[int, int]
+        Number of updated bond terms and updated constraint terms.
     """
     n_bonds_updated = 0
     n_constraints_updated = 0
@@ -175,6 +214,11 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
     - Equilibrium values: shift by (mu_AA - mu_CG)
     - Force constants: rescale by (sigma_CG / sigma_AA)^2 (harmonic approximation)
     - Never removes angles; only updates parameters when data exist.
+
+    Returns
+    -------
+    tuple[int, int]
+        Number of updated angles and number of removed angles (currently 0).
     """
     n_angles_updated = 0
     
@@ -221,12 +265,51 @@ def update_angles(topo, aa_internal: InternalCoords, cg_internal: InternalCoords
 
 
 def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoords):
-    """Update dihedrals by fitting delta PMF and adding it to current terms.
+    """Update dihedrals by refitting PMF corrections onto existing functional forms.
 
     For each torsion, we compute:
         pmf = -kT * log(rho_AA / rho_expected)
     then fit that delta with either type-9 or type-11 form, and combine the
     fitted delta terms with the existing topology terms.
+
+    Returns
+    -------
+    tuple[int, int]
+        Number of updated dihedral keys and number removed (currently 0).
+
+    Type-9 vs type-11 behavior
+    --------------------------
+    The updater groups terms by torsion key ``(i,j,k,l)`` and dispatches by
+    the function type of the first existing term:
+
+    - ``funct=9`` -> calls ``_update_type9_terms``
+    - ``funct=11`` -> calls ``_update_type11_terms``
+    - other funct values are passed through unchanged.
+
+    Type-9 branch (Fourier periodic torsions)
+    ----------------------------------------
+    1. Center AA and CG samples around AA circular mean.
+    2. Build AA and CG histograms on a fixed ``[-180, 180)`` grid.
+    3. Evaluate current type-9 potential on an absolute grid and convert it to
+       a Boltzmann reference density ``rho_expected``.
+    4. Build correction PMF from AA/CG mismatch and current potential
+       contribution.
+    5. Fit selected harmonics via ``_fit_type9_to_target`` and emit updated
+       type-9 terms ``[i,j,k,l,9,phi0,k,mult,comment]``.
+
+    Type-11 branch (CBT)
+    --------------------
+    1. Evaluate current type-11 potential from the first term.
+    2. Form AA/CG densities and construct corrected PMF.
+    3. Fit CBT coefficients ``(k_phi, a0..a4)`` with
+       ``_fit_type11_to_target``.
+    4. Replace the type-11 parameter block in the base term and keep indices,
+       function id, and comment.
+
+    Notes
+    -----
+    The routine is intentionally local: each torsion key is updated from its
+    own AA/CG distributions without global coupling across torsions.
     """
     kB = 0.008314462618  # kJ mol^-1 K^-1
     kT = kB * CFG.temperature
@@ -235,6 +318,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
     png_dir.mkdir(parents=True, exist_ok=True)
 
     def _save_pmf_plot(phi_grid, pmf, u_initial, u_updated, title: str, filename: str):
+        """Save PMF/initial/updated potential overlay for one torsion key."""
         fig, ax = plt.subplots(figsize=(6.0, 4.0))
         pmf_plot = np.asarray(pmf, dtype=float) - float(np.min(pmf))
         u0_plot = np.asarray(u_initial, dtype=float) - float(np.min(u_initial))
@@ -253,6 +337,31 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         plt.close(fig)
 
     def _update_type9_terms(i, j, k, l, aa_vals, cg_vals, terms):
+        """Refit a type-9 torsion key from AA/CG mismatch on a fixed dihedral grid.
+
+        Parameters
+        ----------
+        i, j, k, l : int
+            Bead indices defining the torsion.
+        aa_vals, cg_vals : array-like
+            Sampled AA and CG dihedral values in degrees.
+        terms : list
+            Existing type-9 terms for this key; multiplicities are reused.
+
+        Returns
+        -------
+        list[list]
+            Updated topology rows in type-9 layout
+            ``[i,j,k,l,9,phi0,k,mult,comment]``.
+
+        Notes
+        -----
+        - Histograms are normalized and clipped by ``CFG.min_prob`` for
+          numerical stability.
+        - ``alpha`` controls PMF update strength and is bounded by
+          ``CFG.alpha_min``/``CFG.alpha_max`` (with an extra cap when multiple
+          terms already exist).
+        """
         aa_vals = np.asarray(aa_vals, dtype=float)
         cg_vals = np.asarray(cg_vals, dtype=float)
         shift_aa = float(circular_mean(aa_vals))
@@ -330,6 +439,21 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         return component_terms
 
     def _update_type11_terms(terms, aa_vals, cg_vals):
+        """Refit a type-11 (CBT) torsion key from AA/CG dihedral distributions.
+
+        Parameters
+        ----------
+        terms : list
+            Existing type-11 terms for one torsion key.
+        aa_vals, cg_vals : array-like
+            Sampled AA and CG dihedral values in degrees.
+
+        Returns
+        -------
+        list[list]
+            Single updated type-11 topology row with replaced
+            ``k_phi, a0..a4`` coefficients.
+        """
         aa_vals = np.asarray(aa_vals, dtype=float)
         cg_vals = np.asarray(cg_vals, dtype=float)
         phi_grid = np.linspace(-180.0, 180.0, nbins, endpoint=False)
@@ -437,7 +561,7 @@ def update_topology_from_cg_vs_aa(
     cg_internal: InternalCoords,
     output_itp,
 ):
-    """Refine an existing CG topology by matching CG distributions to AA ones.
+    """Refine a CG topology by iteratively updating bonded terms from AA-vs-CG mismatch.
 
     Strategy
     --------
@@ -449,6 +573,11 @@ def update_topology_from_cg_vs_aa(
     - Bonds/constraints use linear mean/std.
     - Dihedrals use circular mean + std of wrapped residuals.
     - Writes a NEW ITP and returns the updated topology.
+
+    Returns
+    -------
+    object
+        Deep-copied topology after bond, angle, and dihedral updates and write-out.
     """
     updated = copy.deepcopy(topo)
 

@@ -151,6 +151,28 @@ def boltzmann_invert_bonds(
     topo,
     internal_coords,
 ):
+    """Fit bond/constraint parameters from sampled bond-length distributions.
+
+    Parameters
+    ----------
+    topo : object
+        Input topology object containing ``bonds`` and ``constraints`` tables.
+    internal_coords : dict
+        Internal-coordinate time series produced by
+        ``calculate_internal_coordinates``.
+
+    Returns
+    -------
+    tuple
+        ``(updated_topo, fit_cache)`` where:
+        - ``updated_topo`` has re-fitted bond entries,
+        - ``fit_cache["bonds"]`` stores fitted 1D densities for plotting.
+
+    Notes
+    -----
+    Constraints are currently reinserted into ``updated_topo.bonds`` using
+    bond-like harmonic parameters derived from constraint samples.
+    """
     updated_topo = copy.deepcopy(topo)
     updated_topo.bonds = []  
     updated_topo.constraints = []  
@@ -186,6 +208,29 @@ def boltzmann_invert_bonds(
 
 
 def boltzmann_invert_angles(topo, internal_coords):
+    """Fit angle parameters and select angle functional form per triplet.
+
+    Parameters
+    ----------
+    topo : object
+        Input topology object containing ``angles``.
+    internal_coords : dict
+        Internal-coordinate time series produced by
+        ``calculate_internal_coordinates``.
+
+    Returns
+    -------
+    tuple
+        ``(updated_topo, fit_cache)`` where ``fit_cache["angles"]`` stores
+        histogram densities used during fitting.
+
+    Notes
+    -----
+    Selection logic:
+    - linear, non-ring 3-bead fragments are fit with type-1 harmonic angles;
+    - otherwise type-10 restricted-bending is attempted;
+    - fallback to type-1 occurs for near-linear or weak type-10 fits.
+    """
     updated_topo = copy.deepcopy(topo)
     fit_cache = {"angles": {}}
     bead_bond_degree = _build_bead_bond_degree(updated_topo)
@@ -236,6 +281,45 @@ def boltzmann_invert_angles(topo, internal_coords):
 
 
 def boltzmann_invert_ill_defined_dihedrals(topo, internal_coords, ):
+    """Re-fit only ill-defined torsions using GROMACS type-11 (CBT).
+
+    This routine is intentionally conservative: it keeps existing type-9
+    torsions unchanged and only rebuilds torsions that are geometrically
+    ill-defined due to near-linear adjacent angles.
+
+    Parameters
+    ----------
+    topo : object
+        Input topology object containing ``angles`` and ``dihedrals``.
+    internal_coords : dict
+        Internal-coordinate trajectories including ``("dihedral")`` and,
+        optionally, auxiliary ``("adj_angle")`` series.
+
+    Returns
+    -------
+    tuple
+        ``(updated_topo, fit_cache)`` where:
+        - ``updated_topo.dihedrals`` contains only newly produced type-11 terms
+          for the ill-defined torsions encountered in this pass,
+        - ``fit_cache["dihedrals"]`` stores fitted dihedral densities.
+
+    Dihedral type selection
+    -----------------------
+    For each torsion ``(i,j,k,l)``:
+    1. Resolve adjacent equilibrium angles ``(i,j,k)`` and ``(j,k,l)`` from
+       topology, then fallback to ``adj_angle`` trajectory means, then fallback
+       to a bond-length triangle estimate.
+    2. Mark as ill-defined when either adjacent angle cannot be inferred.
+    3. Also mark as ill-defined when either adjacent angle is in
+       ``linear_angle_set`` (angle funct in ``{1,2}``, treated as linear-style).
+    4. If ill-defined: fit CBT (type-11) via ``fit_type11_dihedral`` and write
+       one term ``[i,j,k,l,11,kphi,a0..a4,comment]``.
+    5. If not ill-defined: keep existing terms as-is in this specialized mode.
+
+    Notes
+    -----
+    The fitted ``kphi`` is currently down-scaled by ``0.1`` after fitting.
+    """
 
     def get_eq_angle(i, j, k):
         if (i, j, k) in angle_lookup:
@@ -318,6 +402,55 @@ def boltzmann_invert_dihedrals(topo,
     internal_coords, 
     angle_cutoff: float = 150.0, 
     ):
+    """Fit dihedrals by routing each torsion to type-9 or type-11 fitting.
+
+    Parameters
+    ----------
+    topo : object
+        Input topology object containing ``angles`` and ``dihedrals``.
+    internal_coords : dict
+        Internal-coordinate time series with dihedral samples.
+    angle_cutoff : float, optional
+        Reserved threshold parameter; currently not used directly in the
+        decision logic.
+
+    Returns
+    -------
+    tuple
+        ``(updated_topo, fit_cache)`` where ``updated_topo.dihedrals`` is
+        rebuilt from fitted terms and ``fit_cache["dihedrals"]`` stores
+        histogram densities used for PMF fitting.
+
+    Type-9 vs type-11 logic
+    -----------------------
+    Each unique torsion key ``(i,j,k,l)`` is processed independently.
+
+    **Step 1: infer adjacent angle context**
+    - Retrieve equilibrium angles for ``(i,j,k)`` and ``(j,k,l)`` from
+      topology.
+    - If missing, fallback to trajectory-derived ``adj_angle`` means.
+    - Final fallback is geometric inference from bond/constraint lengths.
+
+    **Step 2: classify ill-defined torsions**
+    A torsion is classified ill-defined if either:
+    - an adjacent angle could not be inferred, or
+    - an adjacent angle is tagged as linear-style (funct in ``{1,2}``) and
+      ``CFG.use_type11_for_linear`` is enabled.
+
+    **Step 3: fit according to class**
+    - ill-defined torsions -> ``fit_type11_dihedral``:
+      produces one CBT term ``[i,j,k,l,11,kphi,a0..a4,comment]``.
+    - regular torsions -> ``fit_type9_dihedral``:
+      produces one or more Fourier terms
+      ``[i,j,k,l,9,phi0,k,multiplicity,comment]``.
+
+    Rationale
+    ---------
+    Type-9 periodic Fourier terms are robust for well-defined torsional axes.
+    Near linear adjacent angles make torsional azimuth poorly defined; in that
+    regime type-11 (CBT polynomial form) is used as a numerically stable
+    surrogate representation.
+    """
 
     def get_eq_angle(i, j, k):
         if (i, j, k) in angle_lookup:
@@ -413,7 +546,26 @@ def update_bonds(
     topo,
     k_cutoff=20000,
 ):
-    """update/post-process bond+constraint terms."""
+    """Post-process bond terms by moving very stiff bonds to constraints.
+
+    Parameters
+    ----------
+    topo : object
+        Topology containing ``bonds`` and ``constraints``.
+    k_cutoff : float, optional
+        Harmonic bond force-constant threshold above which a bond is converted
+        to a constraint.
+
+    Returns
+    -------
+    object
+        Updated topology with filtered ``bonds`` and rebuilt ``constraints``.
+
+    Notes
+    -----
+    Bonds identified as links between two different rings are never converted
+    to constraints.
+    """
     updated_topo = copy.deepcopy(topo)
     bead_to_rings = _build_bead_to_rings(updated_topo)
     
@@ -448,7 +600,20 @@ def update_angles(
     topo,
     angle_cutoff=150.0
 ):
-    """update/post-process angle terms."""
+    """Placeholder for angle post-processing.
+
+    Parameters
+    ----------
+    topo : object
+        Topology containing ``angles``.
+    angle_cutoff : float, optional
+        Reserved threshold for potential future filtering logic.
+
+    Returns
+    -------
+    object
+        Currently returns a deep-copied topology unchanged.
+    """
     updated_topo = copy.deepcopy(topo)
 
     bead_bond_degree = _build_bead_bond_degree(updated_topo)
@@ -469,6 +634,8 @@ def update_dihedrals(
     - k_cutoff is applied only to funct=9 terms.
     - duplicate scaling is applied to funct=9 and funct=11 terms.
     - funct=11 dihedrals are produced during inversion; we do not convert types here.
+        - scaling is ``CFG.fc_scale / n_perm`` where ``n_perm`` is the number of
+            key permutations sharing the same sorted bead tuple.
     """
     updated_topo = copy.deepcopy(topo)
 
