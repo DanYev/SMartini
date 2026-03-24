@@ -57,7 +57,19 @@ def sort_nested(lst):
 #############################################################################
 
 def _get_ha_graph(molecule):
-    """Extract molecule info needed for partitioning."""
+    """Build the heavy-atom graph used by the mapping workflow.
+
+    Returns
+    -------
+    tuple[list, list[list[int, int]]]
+        - heavy atoms (non-hydrogen RDKit atom objects),
+        - undirected heavy-atom bond list as ``[i, j]`` pairs.
+
+    Notes
+    -----
+    Partitioning is done on heavy atoms only. Hydrogens are removed up front so
+    all subsequent graph logic uses a stable, reduced representation.
+    """
     molecule = Chem.RemoveHs(molecule)
     atoms = molecule.GetAtoms()
     ha_list = [a for a in atoms if a.GetAtomicNum() > 1]
@@ -72,8 +84,11 @@ def _get_ha_graph(molecule):
 
 
 def _remove_shared_atoms_from_bonds(bonds, shared_atoms):
-    """Remove bonds between shared atoms, since they will be part of the same fragment.
-    Otherwise, the mapping of the shared atoms to beads may not be consistent across fragments.
+    """Drop bonds fully inside inter-fragment overlap atoms.
+
+    Shared atoms are intentionally handled during fragment stitching; keeping
+    overlap-overlap bonds in per-fragment mapping can over-constrain local
+    anchor selection and lead to inconsistent bead assignment across fragments.
     """
     shared_atoms_flat = flat_set(shared_atoms)
     new_bonds = []
@@ -85,12 +100,29 @@ def _remove_shared_atoms_from_bonds(bonds, shared_atoms):
     
 
 def split_into_fragments(molecule):
-    """Split molecule into overlapping fragments based on rings and their neighbors.
-    Rings are fused together if they share any atoms. Initial fragments are rings and their nearest neighbors.
-    If 2 ring fragments overlap along a bond (with 2 shared atoms), then one of the shared atoms is removed from one of the fragments.
-    Therefore, the length of the overlap between each pair of fragments is at most 1 atom per connection.
-    This will set up for easier merging of the fragments after mapping, since we can allow the shared atom to be in different beads 
-    in the two fragments and then merge the beads together when we merge the fragments together.
+    """Decompose the molecule into overlapping ring/linear fragments.
+
+    Logic overview
+    --------------
+    1. Detect and fuse ring systems that share atoms.
+    2. Build ring-centered fragments (ring atoms + nearest heavy neighbors).
+    3. Build linear fragments around non-ring branching atoms.
+    4. Assign leftover atoms to nearby fragments so every heavy atom is covered.
+    5. Keep overlaps small (ideally one atom per connection) to simplify
+       downstream fragment stitching.
+
+    Why this decomposition is used
+    ------------------------------
+    Enumerating mappings on the whole molecule is combinatorially expensive.
+    Fragment-first mapping keeps search tractable while preserving chemically
+    important local contexts (rings and branching points), then reconciles
+    overlaps during merge.
+
+    Returns
+    -------
+    tuple
+        ``(fragments, frag_ranks_list, rings, shared_atoms)`` where
+        ``fragments`` are heavy-atom index lists used by the mapper.
     """
 
     def fuse_rings(molecule):
@@ -173,7 +205,24 @@ def split_into_fragments(molecule):
 
 @timeit(level=logging.DEBUG)
 def map_fragment(fragment, atoms, bonds, dtype=np.int32):
-    """Map a fragment to beads, trying out all combinations of anchor atoms for different numbers of beads."""
+    """Enumerate feasible bead mappings for a single fragment.
+
+    Logic overview
+    --------------
+    - Choose a bead-count search range from fragment chemistry
+      (aromatic/ring/non-ring heuristics).
+    - For each bead count, enumerate anchor-atom combinations.
+    - Keep only connectivity-consistent anchor sets.
+    - Expand each anchor set into provisional beads (anchor + neighbors).
+    - Resolve overlapping atom assignments to produce non-overlapping mappings
+      that still cover the full fragment.
+
+    Returns
+    -------
+    list[list[list[int]]]
+        Candidate mappings for the fragment. Each mapping is a list of beads,
+        and each bead is a list of atom indices.
+    """
 
     def get_min_max_beads(fragment, atoms):
         is_aromatic = any(atoms[a].GetIsAromatic() for a in fragment)
@@ -269,8 +318,27 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
 
 @timeit(level=logging.INFO)
 def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
-    """Try out all possible combinations of CG beads up to threshold number of beads per atom. Find
-    arrangement with best energy score. Return all possible arrangements sorted by energy score.
+    """Generate whole-molecule mapping candidates via fragment-map-merge workflow.
+
+    Logic overview
+    --------------
+    1. Build heavy-atom graph and split into overlapping fragments.
+    2. Enumerate candidate mappings independently per fragment.
+    3. Merge fragment mappings along overlap atoms.
+    4. After each merge, filter and rank candidates to control combinatorial
+       growth.
+    5. Apply final molecule-level filtering and sorting.
+
+    Design intent
+    -------------
+    This staged workflow trades exact global search for tractable, chemically
+    guided exploration. Ring-aware fragmentation and overlap stitching preserve
+    local structure while avoiding explosion in candidate count.
+
+    Returns
+    -------
+    list[list[list[int]]]
+        Sorted candidate mappings (best-first according to internal heuristics).
     """
 
     def find_overlaps(frag, other_frags):
@@ -394,14 +462,16 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     # new_fragments = [fragments[i] for i in alist]
     # fragments = new_fragments
 
-    # Map each fragment to beads, and collect all the combinations of mappings for each fragment
+    # Stage 1: local enumeration on each fragment.
+    # We intentionally solve small local mapping problems first.
     all_mappings = []
     for fragment in fragments:
         fragment_mappings = map_fragment(fragment, atoms, bonds)
         all_mappings.append(fragment_mappings)
     logger.info(f"Number of combinations for fragment mappings. Sizes: {[len(r) for r in all_mappings]}")
 
-    # Merge all the fragments
+    # Stage 2: progressive stitching of fragment mappings across overlaps.
+    # At each merge step we filter/rank to keep the search size manageable.
     merged_mappings = all_mappings.pop(0) 
     merged_frag = fragments.pop(0)
     for x in range(len(fragments)):
@@ -420,6 +490,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     mappings = merged_mappings
     logger.info(f"Total combinations of mappings: {len(mappings)}")
 
+    # Stage 3: final global filtering/ranking on complete molecule mappings.
     logger.info("Filtering and sorting the mappings...")
     mappings = filter_mappings(mappings, molecule, fused_rings, CFG.max_bead_size, CFG.max_ring_bead_size)
     mappings = sort_mappings(mappings, molecule, fused_rings)
@@ -441,11 +512,18 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
 
 def sort_mappings(mappings, molecule, fused_rings):
-    """ Sort mappings based on heuristics to try to preserve important atoms as anchors and keep rings together.
-    Heuristics:
-    1. Prefer fewer beads (more coarse graining)
-    2. Prefer keeping rings together (no mixing ring/non-ring)
-    3. Prefer keeping ring beads small (since rings are usually more rigid and less flexible)
+    """Rank mapping candidates using coarse-graining and ring-preservation heuristics.
+
+    Prioritization logic
+    --------------------
+    - favor stronger coarse graining (fewer total beads),
+    - discourage terminal non-ring micro-beads,
+    - discourage tiny ring-local beads that over-fragment rigid motifs.
+
+    Returns
+    -------
+    list
+        Sorted mapping list in preferred-first order.
     """
 
     def num_terminal_nonring_beads(mapping):
@@ -502,7 +580,21 @@ def filter_mappings(
     max_ring_bead_size=CFG.max_ring_bead_size,
     keep_rings_together=CFG.keep_rings_together,
     ):
-    """Find acceptable mappings of atoms to beads for given trial combination"""
+    """Filter mapping candidates by hard structural constraints.
+
+    Filtering logic (applied progressively)
+    ---------------------------------------
+    1. Remove mappings containing single-atom beads.
+    2. Remove mappings with oversized beads.
+    3. Optionally enforce ring cohesiveness (no ring/non-ring mixing in a bead).
+    4. Enforce maximum bead size for fully ring-local beads.
+    5. Remove duplicate mappings after canonical sorting.
+
+    Returns
+    -------
+    list
+        Candidate mappings that satisfy the active constraints.
+    """
 
     def single_atom_in_mapping(mapping):
         for bead in mapping:
@@ -784,7 +876,7 @@ def identify_functional_groups(mol): # AutoM3 change
 #############################################################################
 
 def make_mapping_dictionary(atom_partitioning):
-    """Create mapping dictionary from atom_partitioning"""
+    """Convert atom->bead assignment to bead->atom-list representation."""
     mapping_dict = {}
     for atom_idx, bead_idx in atom_partitioning.items():
         if bead_idx not in mapping_dict:
@@ -794,7 +886,7 @@ def make_mapping_dictionary(atom_partitioning):
 
 
 def invert_mapping_dictionary(mapping_dict):
-    """Inverse of make_mapping_dictionary(): bead_idx -> [atom_idx] to atom_idx -> bead_idx."""
+    """Convert bead->atoms representation back to atom->bead assignment."""
     atom_partitioning = {}
     for bead_idx, atom_indices in mapping_dict.items():
         for atom_idx in atom_indices:

@@ -10,6 +10,14 @@ from config import CFG
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+"""Coarse-grained (Martini) MD setup, run, and trajectory extraction workflow.
+
+Pipeline:
+1. Prepare solvated CG system and runtime files.
+2. Run EM + production MD with GROMACS.
+3. Export fitted trajectory/topology for analysis.
+"""
+
 # Use configuration from config.py
 ligand = CFG.molname
 sysdir = CFG.wdir
@@ -22,6 +30,7 @@ NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
 
 
 def setup(sysdir, sysname):
+    """Prepare CG system directory, topology, solvent box, and index groups."""
     root = Path(sysdir).resolve() / sysname
     data_dir = Path(__file__).resolve().parent / "cgmd_data"
     topdir = root / "topol"
@@ -144,6 +153,7 @@ def setup(sysdir, sysname):
 
     
 def md_npt(sysdir, sysname, runname, nsteps=NSTEPS): 
+    """Run CG energy minimization and production MD in GROMACS."""
     root = Path(sysdir).resolve() / sysname
     rundir = root / "mdrun"
     mdpdir = root / "mdp"
@@ -160,6 +170,7 @@ def md_npt(sysdir, sysname, runname, nsteps=NSTEPS):
     
     
 def trjconv(sysdir, sysname, runname):
+    """Extract aligned CG samples/topology from MD outputs and clean run directory."""
     root = Path(sysdir).resolve() / sysname
     rundir = root / "mdrun"
     sysndx = root / "system.ndx"

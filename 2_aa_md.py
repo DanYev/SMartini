@@ -12,6 +12,14 @@ from config import CFG
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+"""Atomistic MD setup and production workflow for a single ligand system.
+
+Pipeline:
+1. Build solvated OpenMM system from ligand SDF.
+2. Run minimization, heating, equilibration, and production NPT.
+3. Export selected trajectory/topology for downstream CG fitting.
+"""
+
 # Use configuration from config.py
 ligand_name = CFG.molname
 sysdir = CFG.systems_dir
@@ -22,6 +30,12 @@ system_xml = aa_dir / "system.xml"
 
 
 def process_ligand():
+    """Build and solvate the ligand AA system, then write topology artifacts.
+
+    Writes:
+    - ``system.pdb`` and ``system.xml`` for simulation,
+    - ``md.pdb`` with ``CFG.aa_selection`` for trajectory output reference.
+    """
     # INPUTS
     ligand_name = CFG.molname
     logger.info("Working directory: %s", wdir)
@@ -65,6 +79,7 @@ def process_ligand():
 
 
 def md_npt(): 
+    """Run AA MD in OpenMM: minimize, heat, equilibrate, then produce trajectory."""
     # Prep
     logger.info("Loading the PDB file...")
     pdb = app.PDBFile(str(system_pdb))
@@ -104,6 +119,16 @@ def md_npt():
 
 
 def trjconv(start=0, stop=None, step=1, fit=True):
+    """Post-process AA trajectory and write aligned sampled outputs.
+
+    Parameters
+    ----------
+    start, stop, step : int or None
+        Frame slicing applied to ``md.xtc``.
+    fit : bool
+        If ``True``, perform rotational/translational fitting to the selected
+        atom group before writing.
+    """
     top = aa_dir / "md.pdb"
     traj = aa_dir / "md.xtc"
     out_top = aa_dir / "topology.pdb"
@@ -125,12 +150,14 @@ def trjconv(start=0, stop=None, step=1, fit=True):
 
 
 def _save_system_to_xml(system, filename):
+    """Serialize an OpenMM ``System`` to XML."""
     with open(str(filename), "w", encoding="utf-8") as file:
         file.write(mm.XmlSerializer.serialize(system))
     logger.info(f"Saved system to {filename}")
 
 
 def _load_system_from_xml(filename):
+    """Load an OpenMM ``System`` from XML."""
     with open(str(filename), 'r') as file:
         system = mm.XmlSerializer.deserialize(file.read())
     logger.info(f"Loaded system from {filename}")
