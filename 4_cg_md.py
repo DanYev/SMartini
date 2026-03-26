@@ -24,6 +24,7 @@ sysdir = CFG.wdir
 outdir = CFG.mol_dir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
+data_dir = Path(__file__).resolve().parent / "cgmd_data"
 
 # Compute NSTEPS from config
 NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
@@ -32,7 +33,6 @@ NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
 def setup(sysdir, sysname):
     """Prepare CG system directory, topology, solvent box, and index groups."""
     root = Path(sysdir).resolve() / sysname
-    data_dir = Path(__file__).resolve().parent / "cgmd_data"
     topdir = root / "topol"
     mdpdir = root / "mdp"
     solupdb = root / "solute.pdb"
@@ -75,25 +75,10 @@ def setup(sysdir, sysname):
     if solvent_src.exists():
         shutil.copy(solvent_src, root / "water.gro")
 
-    # Copy mdp templates from cgmd_data naming to runtime naming
-    mdp_map = {
-        "mdp_em.mdp": "em_cg.mdp",
-        "mdp_md.mdp": "md_cg.mdp",
-    }
-    for src_name, dst_name in mdp_map.items():
-        src = data_dir / src_name
-        if src.exists():
-            shutil.copy(src, mdpdir / dst_name)
-
     # Keep ions.mdp if already present in runtime folder; otherwise optional from data dir
     ions_src = data_dir / "ions.mdp"
     if ions_src.exists():
         shutil.copy(ions_src, mdpdir / "ions.mdp")
-
-    if not (mdpdir / "em_cg.mdp").exists() or not (mdpdir / "md_cg.mdp").exists():
-        raise FileNotFoundError(
-            f"Missing required mdp templates in {mdpdir}: need em_cg.mdp and md_cg.mdp"
-        )
 
     pdb_file = outdir / f"{ligand}.pdb"
     itp_file = outdir / f"{ligand}.itp"
@@ -156,17 +141,28 @@ def md_npt(sysdir, sysname, runname, nsteps=NSTEPS):
     """Run CG energy minimization and production MD in GROMACS."""
     root = Path(sysdir).resolve() / sysname
     rundir = root / "mdrun"
-    mdpdir = root / "mdp"
+    mdpdir = root / "mdp"    
     sysgro = root / "system.gro"
     systop = root / "system.top"
     sysndx = root / "system.ndx"
+    # Copy ligand .itp to top directory for GROMACS to find during mdp processing
+    itp_file = outdir / f"{ligand}.itp"
+    ligand_itp = root / "topol" / f"ligand_{ligand}.itp"
+    shutil.copy(itp_file, ligand_itp)
+    # Copy mdp templates from cgmd_data naming to runtime naming
+    mdp_files = ["mdp_em.mdp", "mdp_md.mdp"]
+    for mdp_file in mdp_files:
+        src_name = mdp_file
+        src = data_dir / src_name
+        if src.exists():
+            shutil.copy(src, mdpdir / src_name)
     ntomp = get_ntomp()
     rundir.mkdir(parents=True, exist_ok=True)
     with cd(rundir):
-        gmx("grompp", f=mdpdir / "em_cg.mdp", c=sysgro, r=sysgro, p=systop, n=sysndx, o="em.tpr")
+        gmx("grompp", f=mdpdir / "mdp_em.mdp", c=sysgro, r=sysgro, p=systop, n=sysndx, o="em.tpr")
         gmx("mdrun", deffnm="em", ntomp=ntomp)
-        gmx("grompp", f=mdpdir / "md_cg.mdp", c="em.gro", r="em.gro", p=systop, n=sysndx, o="md.tpr", maxwarn="1")
-        gmx("mdrun", deffnm="md", ntomp=ntomp, nsteps=nsteps)  # bonded="gpu"
+        gmx("grompp", f=mdpdir / "mdp_md.mdp", c="em.gro", r="em.gro", p=systop, n=sysndx, o="md.tpr", maxwarn="1")
+        gmx("mdrun", deffnm="md", ntomp=ntomp, nsteps=nsteps) 
     
     
 def trjconv(sysdir, sysname, runname):

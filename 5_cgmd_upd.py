@@ -395,13 +395,12 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         cg_std = np.std(cg_centered)
         delta_shift = float(np.abs(aa_mean - cg_mean))
         inv_rel_shift = np.sqrt(aa_std * cg_std) / (delta_shift + 1e-6)
-        print(f"Dihedral ({i},{j},{k},{l}): AA-CG density overlap = {overlap:.4f}, inv rel shift = {inv_rel_shift:.4f}")
+        logger.debug(f"Dihedral ({i},{j},{k},{l}): AA-CG density overlap = {overlap:.4f}, inv rel shift = {inv_rel_shift:.4f}")
         alpha = overlap
         alpha = min(alpha, CFG.alpha_max)
         alpha = max(alpha, CFG.alpha_min)
         if len(terms) > 1:
             alpha = min(alpha, 0.02)  # Be more conservative when multiple terms already exist to avoid overfitting
-        print(alpha)
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = -alpha * kT * np.log(cg_density)
         pmf_pot = -kT * np.log(pot_density)
@@ -454,6 +453,14 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             Single updated type-11 topology row with replaced
             ``k_phi, a0..a4`` coefficients.
         """
+        def _mean_aa_adjacent_angle(i0: int, j0: int, k0: int) -> float:
+            vals = aa_internal.get((i0, j0, k0, "angle"))
+            if vals is None:
+                vals = aa_internal.get((i0, j0, k0, "adj_angle"))
+            if vals is None:
+                return np.nan
+            return float(np.mean(np.asarray(vals, dtype=float)))
+
         aa_vals = np.asarray(aa_vals, dtype=float)
         cg_vals = np.asarray(cg_vals, dtype=float)
         phi_grid = np.linspace(-180.0, 180.0, nbins, endpoint=False)
@@ -491,6 +498,16 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             weights=weights,
             phi_grid=phi_grid,
         )
+
+        theta_ijk_avg = _mean_aa_adjacent_angle(i, j, k)
+        theta_jkl_avg = _mean_aa_adjacent_angle(j, k, l)
+        if np.isfinite(theta_ijk_avg) and np.isfinite(theta_jkl_avg):
+            sin_ijk = np.sin(np.deg2rad(theta_ijk_avg))
+            sin_jkl = np.sin(np.deg2rad(theta_jkl_avg))
+            scale_cbt = float((sin_ijk ** 3) * (sin_jkl ** 3))
+            print(scale_cbt)
+            k_phi_new = float(k_phi_new * scale_cbt)
+
         base = list(terms[0])
         base[5] = k_phi_new
         for n in range(5):

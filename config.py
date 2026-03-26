@@ -11,7 +11,7 @@ class LigParConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "ANP"
+    molname: str = "CLA"
     specify_beads: Optional[list[list[int]]] = None
     # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
     # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
@@ -65,13 +65,13 @@ class LigParConfig:
     # Fitting /filtering defaults 
     temperature: float = 300.0
     bond_k_lower: float = 2000.0
-    bond_k_upper: float = 25000.0
+    bond_k_upper: float = 20000.0
     angle_k_lower: float = 3.0
     angle_k_upper: float = 2000.0
     dihedral_k_lower: float = 0.0
     dihedral_k_upper: float = 1000.0
     ill_defined_angle_cutoff: float = 155.0
-    use_type11_for_linear: bool = False  # Whether to use type 11 dihedrals for linear angles
+    use_type11_for_linear: bool = True  # Whether to use type 11 dihedrals for linear angles
     type9_max_n: int = 6
     nbins: int = 120
     min_prob: float = 1e-12

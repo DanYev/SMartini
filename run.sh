@@ -4,9 +4,9 @@
 #SBATCH --qos=public
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=4G
-#SBATCH --gres=gpu:1
+##SBATCH --gres=gpu:1
 #SBATCH -o slurm_jobs/output.%A.out
 #SBATCH -e slurm_jobs/error.%A.err
 

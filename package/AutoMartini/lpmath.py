@@ -13,7 +13,9 @@ import logging
 import numpy as np
 from . import ligpar_cy
 from MDAnalysis import Universe
+from sklearn.mixture import GaussianMixture
 from typing import Dict, Tuple
+
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +268,7 @@ def gmm_pdf_1d(x, weights, means, variances):
     return np.sum(weights * exps / norm, axis=1)
 
 
-def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-6, 
+def fit_gmm_1d_best_old(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e-6, 
                     min_weight=0.1, min_spacing_std=2.0, min_prob=1e-3):
     """Fit a 1D Gaussian mixture and choose model order by AIC.
 
@@ -319,12 +321,12 @@ def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e
             pdf = np.clip(pdf, min_prob, None)
             resp = (weights * np.exp(-0.5 * (data[:, None] - means) ** 2 / variances)
                     / np.sqrt(2.0 * np.pi * variances))
-            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), 1e-12, None)
+            resp = resp / np.clip(resp.sum(axis=1, keepdims=True), min_prob, None)
 
             Nk = resp.sum(axis=0)
             weights = Nk / data.size
-            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, 1e-12, None)
-            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, 1e-12, None)
+            means = (resp * data[:, None]).sum(axis=0) / np.clip(Nk, min_prob, None)
+            variances = (resp * (data[:, None] - means) ** 2).sum(axis=0) / np.clip(Nk, min_prob, None)
             variances = np.clip(variances, var_floor, None)
 
             ll = np.sum(np.log(pdf))
@@ -361,6 +363,108 @@ def fit_gmm_1d_best(data, max_components=1, max_iter=100, tol=1e-4, var_floor=1e
         
         if best_aic_penalized is None or aic_penalized < best_aic_penalized:
             best_aic_penalized = aic_penalized
+            best = (weights, means, variances)
+
+    return best
+
+
+def fit_gmm_1d_best(
+    data,
+    max_components=6,
+    max_iter=100,
+    tol=1e-4,
+    var_floor=1e-6,
+    min_weight=0.1,
+    min_spacing_std=2.0,
+    min_prob=1e-3,
+):
+    """Fit a 1D Gaussian mixture and choose model order by AIC.
+
+    Uses ``sklearn.mixture.GaussianMixture`` and preserves the historical
+    return shape and filtering heuristics used in LigPar.
+
+    Parameters
+    ----------
+    data : array-like
+        Input samples.
+    max_components : int, optional
+        Maximum number of mixture components to test.
+    max_iter : int, optional
+        Maximum EM iterations per candidate.
+    tol : float, optional
+        EM convergence threshold for sklearn.
+    var_floor : float, optional
+        Minimum variance floor (mapped to sklearn ``reg_covar``).
+    min_weight : float, optional
+        Minimum allowed component weight; otherwise candidate is discarded.
+    min_spacing_std : float, optional
+        Minimum separation between component means measured in average
+        component standard deviations.
+    min_prob : float, optional
+        Kept for API compatibility (unused in sklearn path).
+
+    Returns
+    -------
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray] or None
+        Best ``(weights, means, variances)`` by AIC among non-rejected models,
+        or ``None`` when fitting is not possible.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.size < 2:
+        return None
+    max_components = int(max(1, int(max_components)))
+
+    best = None
+    best_aic = None
+
+    X = data.reshape(-1, 1)
+    for n_components in range(1, max_components + 1):
+        try:
+            gmm = GaussianMixture(
+                n_components=n_components,
+                covariance_type="full",
+                max_iter=int(max_iter),
+                tol=float(tol),
+                reg_covar=float(var_floor),
+                n_init=5,
+                random_state=0,
+            )
+            gmm.fit(X)
+        except Exception:
+            continue
+
+        weights = np.asarray(gmm.weights_, dtype=float)
+        means = np.asarray(gmm.means_.reshape(-1), dtype=float)
+        variances = np.asarray(gmm.covariances_.reshape(-1), dtype=float)
+        variances = np.clip(variances, var_floor, None)
+
+        order = np.argsort(means)
+        weights = weights[order]
+        means = means[order]
+        variances = variances[order]
+
+        if np.any(weights < min_weight):
+            continue
+
+        if n_components > 1:
+            too_close = False
+            for i in range(n_components):
+                for j in range(i + 1, n_components):
+                    std_i = np.sqrt(variances[i])
+                    std_j = np.sqrt(variances[j])
+                    avg_std = 0.5 * (std_i + std_j)
+                    spacing = abs(means[j] - means[i]) / max(avg_std, 1e-12)
+                    if spacing < min_spacing_std:
+                        too_close = True
+                        break
+                if too_close:
+                    break
+            if too_close:
+                continue
+
+        aic = float(gmm.aic(X))
+        if best_aic is None or aic < best_aic:
+            best_aic = aic
             best = (weights, means, variances)
 
     return best
@@ -815,12 +919,10 @@ def fit_type9_dihedral(
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
-    best_gmm = fit_gmm_1d_best(values, max_components=3)
+    best_gmm = fit_gmm_1d_best(values, max_components=3, min_prob=min_prob)
     best_means = best_gmm[1] if best_gmm is not None else None
     
-    # Fit free energy from GMM density
-    gmm_density = gmm_pdf_1d(phi_centers, *best_gmm)
-    # density = np.clip(gmm_density, min_prob, None)
+    # Fit free energy from histogram density
     density = np.histogram(values, bins=np.linspace(-180.0, 180.0, nbins + 1), density=True)[0]
     density = np.clip(density, min_prob, None)
     pmf = -kT * np.log(density)
