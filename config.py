@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 @dataclass()
-class LigParConfig:
+class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
@@ -78,13 +78,13 @@ class LigParConfig:
     alpha_min: float = 0.01
 
 
-def _default_config_path(base_cfg: LigParConfig) -> Path:
-    molname = os.environ.get("LIGPAR_MOLNAME", base_cfg.molname)
+def _default_config_path(base_cfg: SMConfig) -> Path:
+    molname = os.environ.get("SM_MOLNAME", base_cfg.molname)
     return base_cfg.systems_dir / molname / "config.yml"
 
 
-def _resolve_config_path(base_cfg: LigParConfig) -> Path:
-    env_path = os.environ.get("LIGPAR_CONFIG_YML")
+def _resolve_config_path(base_cfg: SMConfig) -> Path:
+    env_path = os.environ.get("SM_CONFIG_YML")
     if env_path:
         return Path(env_path)
 
@@ -106,7 +106,7 @@ def _load_overrides(path: Path) -> dict:
     return data
 
 
-def _apply_overrides(cfg: LigParConfig, overrides: dict) -> LigParConfig:
+def _apply_overrides(cfg: SMConfig, overrides: dict) -> SMConfig:
     path_fields = {"systems_dir", "ligands_dir", "wdir", "mol_dir", "aa_dir", "cg_dir"}
     for key, value in overrides.items():
         if not hasattr(cfg, key):
@@ -117,7 +117,7 @@ def _apply_overrides(cfg: LigParConfig, overrides: dict) -> LigParConfig:
     return cfg
 
 
-def _refresh_paths(cfg: LigParConfig) -> LigParConfig:
+def _refresh_paths(cfg: SMConfig) -> SMConfig:
     cfg.wdir = cfg.systems_dir / cfg.molname
     cfg.mol_dir = cfg.wdir
     cfg.aa_dir = cfg.wdir / cfg.aa_sysname
@@ -125,8 +125,8 @@ def _refresh_paths(cfg: LigParConfig) -> LigParConfig:
     return cfg
 
 
-def load_config() -> LigParConfig:
-    cfg = LigParConfig()
+def load_config() -> SMConfig:
+    cfg = SMConfig()
     cfg = _apply_overrides(cfg, _load_overrides(_resolve_config_path(cfg)))
     cfg = _refresh_paths(cfg)
     return cfg

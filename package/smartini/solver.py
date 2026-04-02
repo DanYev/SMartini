@@ -1,6 +1,17 @@
+import logging
+import math
+import os
+import sys
+import numpy as np
 import requests
+from collections import defaultdict
+from itertools import chain
 from bs4 import BeautifulSoup
+from rdkit import Chem, RDConfig
+from rdkit.Chem import AllChem, ChemicalFeatures, rdMolDescriptors, rdchem
+
 from . import partitioning, output
+from .sanifix4 import AdjustAromaticNs
 from .topology import Topology, run_bartender
 
 logger = logging.getLogger(__name__)
