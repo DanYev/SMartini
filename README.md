@@ -5,7 +5,9 @@ SMart
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
 
-SMart uses parts of the AutoMartini M3 bead-type assignment workflow and extends it with an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+CG topology generation is now much faster: initial topologies are generated in seconds, even for molecules like chlorophyll (~64 heavy atoms).
+
+SMart runs an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
 
 
 ## How it works (1-5 scripts)
@@ -15,7 +17,7 @@ SMart uses parts of the AutoMartini M3 bead-type assignment workflow and extends
 	- Writes initial outputs in the molecule directory: `*_initial.itp`, CG `*.pdb`, and `*.map`.
 
 2. **`2_aa_md.py` — Atomistic reference simulation**
-	- Builds a solvated OpenMM AA system, runs minimization/heating/equilibration/production MD.
+	- Generates ligand AA force-field parameters with OpenFF (SMIRNOFF), builds a solvated OpenMM system, then runs minimization/heating/equilibration/production MD.
 	- Exports sampled AA trajectory files (`topology.pdb`, `samples.xtc`) for fitting.
 
 3. **`3_boltz_inv.py` — First bonded-parameter fit from AA data**
