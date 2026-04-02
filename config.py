@@ -11,10 +11,10 @@ class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "CLA"
+    molname: str = "UNK"
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
-    use_vsites: bool = True
+    use_vsites: bool = False
     symmetrize_rings: bool = False
     keep_rings_together: bool = False
     max_combs_merged: int = 1000

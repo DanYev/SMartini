@@ -175,31 +175,16 @@ class Cg_molecule:
         ``self.bead_names``, and ``self.aa_mapping``.
         """
         # Find coarse-grained bead positions
-        # -- keep all possibilities in case something goes wrong later in the code.
-        import pickle
-        # mapping_pickle = Path(f"{self.molname}_candidate_mappings.pkl")
-        # if not mapping_pickle.exists():
-        #     mappings = partitioning.generate_mappings(
-        #         self.molecule, 
-        #         min_beads=self.min_beads,
-        #         max_beads=self.max_beads,
-        #     )
-        #     logger.info("Generated %d candidate bead mappings", len(mappings))
-        #     with open(mapping_pickle, "wb") as f:
-        #         pickle.dump(mappings, f)
-        # else:
-        #     with open(mapping_pickle, "rb") as f:
-        #         mappings = pickle.load(f)
-        
         mappings = partitioning.generate_mappings(
                 self.molecule, 
                 min_beads=self.min_beads,
                 max_beads=self.max_beads,
             )
 
-        logger.info("Going through the candidate mappings")
         attempt = -1
         self.max_attempts = len(mappings) 
+
+        logger.info("Going through the candidate mappings")
         for mapping in mappings:
 
             attempt += 1
@@ -431,10 +416,11 @@ class Cg_molecule:
                 bead = [ring[i], ring[(i + 1) % len(ring)], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)]]
                 shifted_odd.append(bead)
 
-            def apply_shift(base_mapping_dict, replacement_beads):
-                updated = {idx: bead.copy() for idx, bead in base_mapping_dict.items()}
-                for bead_idx, bead in zip(ring_bead_indices, replacement_beads):
-                    updated[bead_idx] = bead
+            def apply_shift(mapping_dict, replacement_beads):
+                updated = {idx: bead.copy() for idx, bead in mapping_dict.items()}
+                for bead_idx in ring_bead_indices:
+                    new_bead = [x for x in replacement_beads if all(atom in x for atom in mapping_dict[bead_idx])][0]
+                    updated[bead_idx] = new_bead 
                 return [updated[idx] for idx in range(len(updated))]
 
             mapping_1 = apply_shift(mapping_dict, shifted_even)
