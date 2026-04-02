@@ -1,3 +1,4 @@
+import itertools
 import logging
 import multiprocessing as mp
 import numpy as np

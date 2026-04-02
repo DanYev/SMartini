@@ -1,4 +1,5 @@
 import logging
+import math
 import numpy as np
 from rdkit import Chem
 from dataclasses import dataclass, field

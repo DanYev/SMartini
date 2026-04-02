@@ -66,7 +66,8 @@ if __name__ == "__main__":
         min_beads=n_beads, 
         max_beads=n_beads, 
         raw_molecule=raw_mol)
-
+    cg_mol.process()
+    
     # Write .itp file
     itp_path = mol_dir / f"{molname}_initial.itp"
     cg_mol.to_itp(itp_path)  
