@@ -13,7 +13,7 @@ SMartini runs an AA→CG fitting loop: initial mapping, atomistic sampling, Bolt
 ## How it works (1-5 scripts)
 
 1. **`1_gen_cg_topo.py` — Initial CG topology generation**
-	- Reads the ligand (SDF/SMILES), builds an RDKit molecule, and runs `AutoMartini.solver.Cg_molecule`.
+	- Reads the ligand (SDF/SMILES), builds an RDKit molecule, and runs `smartini.solver.Cg_molecule`.
 	- Writes initial outputs in the molecule directory: `*_initial.itp`, CG `*.pdb`, and `*.map`.
 
 2. **`2_aa_md.py` — Atomistic reference simulation**

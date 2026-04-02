@@ -1,5 +1,5 @@
 """
-Basic sanity test for the auto_martini package.
+Basic sanity test for the smartini package.
 """
 import filecmp
 import os
@@ -14,7 +14,7 @@ import smartini
 dpath = Path("tests/files")
 
 
-def test_auto_martini_imported():
+def test_smartini_imported():
     """Sample test, will always pass so long as import statement worked"""
     import sys
     assert "smartini" in sys.modules
@@ -38,7 +38,7 @@ def test_connection_to_ALOGPS(smiles: str):
         ("CCC", "PRO", 1),
     ],  
 )
-def test_auto_martini_run_smiles(smiles: str, name: str, num_beads: int):
+def test_smartini_run_smiles(smiles: str, name: str, num_beads: int):
     mol, _ = smartini.topology.gen_molecule_smi(smiles)
     cg_mol = smartini.solver.Cg_molecule(mol, smiles, name, forcepred=True, )
     assert len(cg_mol.cg_bead_names) == num_beads
@@ -51,7 +51,7 @@ def test_auto_martini_run_smiles(smiles: str, name: str, num_beads: int):
         (dpath / "ibuprofen.sdf", "IBUP", 6)
     ],
 )
-def test_auto_martini_run_sdf(sdf_file: str, name:str, num_beads: int):
+def test_smartini_run_sdf(sdf_file: str, name:str, num_beads: int):
     mol = smartini.topology.gen_molecule_sdf(str(sdf_file))
     smiles = str(Chem.MolToSmiles(mol, isomericSmiles=False))
     cg_mol = smartini.solver.Cg_molecule(mol, smiles, name, forcepred=True, )

@@ -1,5 +1,6 @@
 import logging
 import sys
+import smartini
 import MDAnalysis as mda
 import openmm as mm
 from openmm import app, unit
@@ -10,7 +11,7 @@ from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 from config import CFG
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+smartini.setup_logging(level=logging.INFO)
 
 """Atomistic MD setup and production workflow for a single ligand system.
 

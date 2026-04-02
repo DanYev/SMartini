@@ -110,7 +110,7 @@ class Cg_molecule:
         self.topology = Topology(molname=self.molname, mol_smi=self.smiles, nrexcl=2)
         self.force_map = False
 
-        logger.info("Starting coarse-graining for '%s' (forcepred=%s)", self.molname, self.forcepred)
+        logger.info("Initiating coarse-graining for '%s' (forcepred=%s)", self.molname, self.forcepred)
         # INITIALIZE THE AA MOLECULE
         logger.info("Embedding the AA molecule + MMFF optimization")
         self.molecule = Chem.Mol(self.molecule)
@@ -148,8 +148,6 @@ class Cg_molecule:
                     self.is_arom, 
                     self.num_arom)
 
-        # Actual mapping process
-        self.process()
 
     def process(self):
         """Run the mapping search and populate topology on the first valid result.

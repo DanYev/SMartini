@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -82,12 +81,5 @@ class LigParConfig:
 
 
 CFG = LigParConfig()
-
-# Configure logging once for all scripts
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
-    force=True,
-)
 
 
