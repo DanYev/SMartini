@@ -11,9 +11,7 @@ png/
 *.npy
 *.npz
 *.pkl
-*.pdb
 *.gro
-*.sdf
 
 # ---- Python ----
 __pycache__/
@@ -79,3 +77,5 @@ slurm*.err
 # keep top-level entries above; add common scratch patterns
 **/output/
 **/systems/
+**/aa_md*/
+**/cg_md*/

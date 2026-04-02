@@ -1,11 +1,14 @@
-SMartini 
+SMartini
 ============
 
 ## What is SMartini?
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
 
-SMartini uses parts of the AutoMartini M3 mapping/type-assignment workflow and extends it with an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+CG topology generation is now much faster: initial topologies are generated in seconds, even for molecules like chlorophyll (~64 heavy atoms).
+
+SMartini runs an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+
 
 ## How it works (1-5 scripts)
 
@@ -14,7 +17,7 @@ SMartini uses parts of the AutoMartini M3 mapping/type-assignment workflow and e
 	- Writes initial outputs in the molecule directory: `*_initial.itp`, CG `*.pdb`, and `*.map`.
 
 2. **`2_aa_md.py` — Atomistic reference simulation**
-	- Builds a solvated OpenMM AA system, runs minimization/heating/equilibration/production MD.
+	- Generates ligand AA force-field parameters with OpenFF (SMIRNOFF), builds a solvated OpenMM system, then runs minimization/heating/equilibration/production MD.
 	- Exports sampled AA trajectory files (`topology.pdb`, `samples.xtc`) for fitting.
 
 3. **`3_boltz_inv.py` — First bonded-parameter fit from AA data**
@@ -38,6 +41,13 @@ SMartini uses parts of the AutoMartini M3 mapping/type-assignment workflow and e
 - generate overlay plots (`5_cgmd_upd.py plot`).
 
 This cycle is repeated until CG distributions reasonably match AA references.
+
+## License and upstream attribution
+
+This project uses and adapts parts of AutoMartini M3:
+- https://github.com/Martini-Force-Field-Initiative/Automartini_M3/
+
+The project is distributed under **GNU GPL v2.0 (or later)** terms, consistent with upstream usage of GPL-licensed code.
 
 ## Developers
 * Danis Yangaliev
