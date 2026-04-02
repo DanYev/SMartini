@@ -1,0 +1,26 @@
+[ molecule ]
+DMBI
+
+[ from ]
+amber charmm
+
+[ to ]
+martini3001
+
+[ martini ]
+  N01 N02 N03 C04 C05 C06 C07 C08 C09
+
+[ mapping ]
+amber charmm
+
+[ atoms ]
+     1   N1 C1     N01
+     2   N2 C2     N02
+     3  N3 C3 C4     N03
+     4  C5 C6 C7     C04
+     5   C8 C9     C05
+     6  C10 C11     C06
+     7  C12 C13     C07
+     8  C14 C15     C08
+     9  C16 C17     C09
+

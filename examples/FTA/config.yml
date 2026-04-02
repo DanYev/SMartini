@@ -1,0 +1,7 @@
+molname: FTA
+keep_rings_together: false
+symmetrize_rings: true
+ # when symmetrizing rings, there are typically two equivalent ways to assign beads. 
+ # This specifies which one to use. Only one bead is needed. The final mapping will be forced to contain this bead
+specify_beads:
+  - [1, 2, 6]

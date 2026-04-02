@@ -1,0 +1,4 @@
+molname: THC
+keep_rings_together: false
+specify_beads:
+  - [9, 15]
