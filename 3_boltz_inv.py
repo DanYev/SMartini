@@ -4,7 +4,7 @@ import pickle
 import os
 import sys
 
-import smartini as am
+import smartini
 import numpy as np
 
 from pathlib import Path
@@ -22,8 +22,8 @@ from smartini.lpmath import (
 )
 from smartini.plots import plot_internal_coordinates
 
-logger = logging.getLogger("AutoMartini")
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("smartini")
+smartini.setup_logging(level=logging.INFO)
 
 ################################################################################
 ### Helper Functions for Topology Analysis and Post-processing ###
@@ -694,7 +694,7 @@ if __name__ == "__main__":
 
     in_itp = mol_dir / f"{molname}_initial.itp"
     logger.info("Reading topology from %s", in_itp)
-    topo = am.topology.read_itp(str(in_itp))
+    topo = smartini.topology.read_itp(str(in_itp))
 
     pickle_file = wdir / "internal_coords.pkl"
     if pickle_file.exists():
@@ -718,7 +718,7 @@ if __name__ == "__main__":
     if "only_ill_defined" in sys.argv:
         logger.info("Running only ill-defined dihedral fitting...")
         in_itp = mol_dir / f"{molname}.itp"
-        topo = am.topology.read_itp(str(in_itp))
+        topo = smartini.topology.read_itp(str(in_itp))
         topo, fit_cache = boltzmann_invert_ill_defined_dihedrals(topo, internal_coords)
         master_fit_cache["dihedrals"].update(fit_cache["dihedrals"])
         out_itp = mol_dir / f"{molname}.itp"

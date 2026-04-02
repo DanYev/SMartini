@@ -1,0 +1,6 @@
+molname: CLA
+use_vsites: false
+symmetrize_rings: true
+max_mappings_to_keep: 1000
+specify_beads:
+  - [4, 5, 8]

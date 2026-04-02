@@ -1,3 +1,7 @@
+import logging
+import math
+import numpy as np
+from rdkit import Chem
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -615,11 +619,9 @@ class Topology:
     
     def format_header(self):
         """Format Topology header section."""
-        text = "; GENERATED WITH Auto_Martini for {}\n".format(self.molname)
+        text = "; GENERATED WITH smartini for {}\n".format(self.molname)
         info = (
-            "; Developed by: Kiran Kanekal, Tristan Bereau, and Andrew Abi-Mansour\n"
-            + "; updated to Martini 3 force field by Magdalena Szczuka\n"
-            + "; supervised by Matthieu Chavent, Pierre Poulain and Paulo C. T. Souza \n"
+            "; Developed by: DY\n"
             + "; SMILES code : " + self.mol_smi + "\n"
             + "; Mapping: " + str(self.aa_mapping) + "\n"
             + "; Ringbeads: " + str(self.ringbeads) + "\n"

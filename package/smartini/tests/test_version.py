@@ -1,5 +1,5 @@
 """
-Basic version test for the auto_martini package.
+Basic version test for the smartini package.
 """
 import pytest
 import smartini
@@ -10,10 +10,10 @@ except ImportError:
     import importlib_metadata as metadata
 
 
-def test_auto_martini_version():
+def test_smartini_version():
     try:
         dist_version = metadata.version("smartini")
     except metadata.PackageNotFoundError:
-        pytest.skip("auto_martiniM3 distribution metadata not installed in this environment")
+        pytest.skip("smartini distribution metadata not installed in this environment")
 
     assert smartini.__version__ == dist_version

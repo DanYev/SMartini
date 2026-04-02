@@ -1,7 +1,7 @@
 """Utility wrappers and functions
 
 Description:
-    This module provides utility functions and decorators for the AutoMartini workflow.
+    This module provides utility functions and decorators for the smartini workflow.
     It includes decorators for timing and memory profiling functions, a context manager
     for changing the working directory, and helper functions for cleaning directories and
     detecting CUDA availability.

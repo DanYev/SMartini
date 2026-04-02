@@ -6,7 +6,7 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
-import smartini as am
+import smartini
 
 from pathlib import Path
 from typing import Dict, Tuple, Optional
@@ -25,6 +25,7 @@ from smartini.plots import plot_internal_coordinates_overlay
 from config import CFG
 
 logger = logging.getLogger(__name__)
+smartini.setup_logging(level=logging.INFO)
 
 InternalCoords = Dict[Tuple[int, ...], np.ndarray]
 
@@ -623,11 +624,11 @@ if __name__ == "__main__":
     outdir = CFG.mol_dir
 
     in_itp = outdir / f"{molname}.itp"
-    topo = am.topology.read_itp(str(in_itp))
+    topo = smartini.topology.read_itp(str(in_itp))
     logger.info("Reading topology from %s", in_itp)
     # # DEBUG
     # ref_itp = outdir / f"{molname}_ref.itp"
-    # topo = am.topology.read_itp(str(ref_itp))
+    # topo = smartini.topology.read_itp(str(ref_itp))
 
     unique_dihedrals = {(int(d[0]), int(d[1]), int(d[2]), int(d[3])) for d in topo.dihedrals}
     logger.info(

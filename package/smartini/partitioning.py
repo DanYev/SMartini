@@ -1,4 +1,8 @@
+import itertools
+import logging
 import multiprocessing as mp
+import numpy as np
+from rdkit import Chem
 from . import optimization_cy as opcy
 from .utils import timeit, memprofit
 from config import CFG

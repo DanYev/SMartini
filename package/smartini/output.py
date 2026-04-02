@@ -13,7 +13,7 @@ def output_gro(sites, site_names, molname):
     if len(sites) != len(site_names):
         logger.warning("Error. Incompatible number of beads and bead names.")
         exit(1)
-    gro_out += "{:s} generated from auto_martiniM3\n".format(molname)
+    gro_out += "{:s} generated from smartini\n".format(molname)
     gro_out += "{:5d}\n".format(num_beads)
     if len(molname)>4:molname=molname[:4]
     for i in range(num_beads):
@@ -60,7 +60,7 @@ def output_pdb(sites, site_names, molname, bonds=None, constraints=None):
         exit(1)
     
     # Write header
-    pdb_out += "REMARK   Generated from AutoMartini\n"
+    pdb_out += "REMARK   Generated from smartini\n"
     pdb_out += f"REMARK   Molecule: {molname}\n"
     
     # Truncate molname if needed for PDB format (3-letter residue name)

@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import logging
+import os
+import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-
 @dataclass()
-class LigParConfig:
+class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "CLA"
+    molname: str = "UNK"
     specify_beads: Optional[list[list[int]]] = None
-    # specify_beads: tuple[list[int]] = ([4, 5, 8],) # FOR CLA
-    # specify_beads: tuple[list[int]] = ([3, 6], ) # FOR DMBI
-    # specify_beads: tuple[list[int]] = ([9, 15], ) # FOR THC
     n_beads: Optional[int] = None 
-    use_vsites: bool = True
+    use_vsites: bool = False
     symmetrize_rings: bool = False
-    keep_rings_together: bool = False
+    keep_rings_together: bool = True
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
     max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
@@ -32,7 +29,7 @@ class LigParConfig:
     systems_dir: Path = Path("systems")
     ligands_dir: Path = Path("ligands")
     wdir: Path = systems_dir / molname
-    mol_dir: Path = wdir / "molecule"
+    mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
@@ -81,13 +78,60 @@ class LigParConfig:
     alpha_min: float = 0.01
 
 
-CFG = LigParConfig()
+def _default_config_path(base_cfg: SMConfig) -> Path:
+    molname = os.environ.get("SM_MOLNAME", base_cfg.molname)
+    return base_cfg.systems_dir / molname / "config.yml"
 
-# Configure logging once for all scripts
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s [%(filename)s:%(lineno)d] %(message)s",
-    force=True,
-)
+
+def _resolve_config_path(base_cfg: SMConfig) -> Path:
+    env_path = os.environ.get("SM_CONFIG_YML")
+    if env_path:
+        return Path(env_path)
+
+    default_yml = _default_config_path(base_cfg)
+    if default_yml.exists():
+        return default_yml
+
+    default_yaml = default_yml.with_suffix(".yaml")
+    return default_yaml
+
+
+def _load_overrides(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as stream:
+        data = yaml.safe_load(stream) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file must contain a top-level mapping: {path}")
+    return data
+
+
+def _apply_overrides(cfg: SMConfig, overrides: dict) -> SMConfig:
+    path_fields = {"systems_dir", "ligands_dir", "wdir", "mol_dir", "aa_dir", "cg_dir"}
+    for key, value in overrides.items():
+        if not hasattr(cfg, key):
+            raise ValueError(f"Unknown config key in YAML: {key}")
+        if key in path_fields and value is not None:
+            value = Path(value)
+        setattr(cfg, key, value)
+    return cfg
+
+
+def _refresh_paths(cfg: SMConfig) -> SMConfig:
+    cfg.wdir = cfg.systems_dir / cfg.molname
+    cfg.mol_dir = cfg.wdir
+    cfg.aa_dir = cfg.wdir / cfg.aa_sysname
+    cfg.cg_dir = cfg.wdir / cfg.cg_sysname
+    return cfg
+
+
+def load_config() -> SMConfig:
+    cfg = SMConfig()
+    cfg = _apply_overrides(cfg, _load_overrides(_resolve_config_path(cfg)))
+    cfg = _refresh_paths(cfg)
+    return cfg
+
+
+CFG = load_config()
 
 

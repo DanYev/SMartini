@@ -45,7 +45,7 @@ def checkArgs(args):
         parser.error("run requires --mol")
 
 parser = argparse.ArgumentParser(
-    prog="auto_martiniM3",
+    prog="smartini",
     description="Generates Martini 3 force field for atomistic structures of small organic molecules",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog="""Developers:\n===========\nMagdalena Szczuka (magdalena.szczuka [at] univ-tlse3.fr)\nTristan Bereau (bereau [at] mpip-mainz.mpg.de)\nKiran Kanekal (kanekal [at] mpip-mainz.mpg.de)
@@ -97,14 +97,14 @@ else:
     level = logging.WARNING
 
 logging.basicConfig(
-    filename="auto_martiniM3.log",
+    filename="smartini.log",
     format="%(asctime)s [%(levelname)s](%(name)s:%(funcName)s:%(lineno)d): %(message)s",
     level=level,
 )
 
 logger = logging.getLogger(__name__)
 
-logger.info("Running auto_martiniM3 v{}".format(__version__))
+logger.info("Running smartini v{}".format(__version__))
 
 # Generate molecule's structure from SDF or SMILES
 if args.sdf:

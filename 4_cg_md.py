@@ -2,13 +2,14 @@ import logging
 import shutil
 import sys
 from pathlib import Path
+import smartini
 import MDAnalysis as mda
 from smartini.utils import cd, clean_dir, get_ntomp, gmx
 
 from config import CFG
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+smartini.setup_logging(level=logging.INFO)
 
 """Coarse-grained (Martini) MD setup, run, and trajectory extraction workflow.
 
