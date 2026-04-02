@@ -31,17 +31,6 @@ def gen_aa_molecule(molname, from_file=None, from_smiles=None):
     return molecule, mol.to_rdkit()
 
 
-def extract_ligand_from_pdb(pdb_file, selection, out_file="ligand.pdb"):
-    logger.info("Extracting ligand from PDB: %s with selection: %s", pdb_file, selection)
-    u = mda.Universe(str(pdb_file))
-    ligand = u.select_atoms(selection)
-    if len(ligand) == 0:
-        raise ValueError(f"No atoms found for selection: {selection}")
-    ligand.write(out_file)
-    logger.info("Extracted ligand with %d atoms", len(ligand))
-    return ligand
-
-
 if __name__ == "__main__":
     molname = CFG.molname
     n_beads = CFG.n_beads
@@ -62,16 +51,6 @@ if __name__ == "__main__":
     # smiles = "CCC1=C(C2=NC1=CC3=C(C4=C([N-]3)C(=C5C(C(C(=N5)C=C6C(=C(C(=C2)[N-]6)C=C)C)C)CCC(=O)OC/C=C(\C)/CCCC(C)CCCC(C)CCCC(C)C)C(C4=O)C(=O)OC)C)C.[Mg+2]" # CLA
     # mol, _ = smartini.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
-
-    # # PDB
-    # ligand_pdb = wdir / f"{molname}.pdb"
-    # mol = Chem.MolFromPDBFile(ligand_pdb, removeHs=True)
-    # Chem.AddHs(mol)
-    # Chem.SanitizeMol(mol)
-    # Chem.AllChem.EmbedMolecule(mol, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
-    # Chem.AllChem.UFFOptimizeMolecule(mol)
-    # smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
-
 
     ligand_sdf = wdir / f"{molname}.sdf"
     mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
