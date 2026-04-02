@@ -1,0 +1,23 @@
+name: smartini
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - numpy
+  - matplotlib
+  - scikit-learn
+  - mdanalysis
+  - rdkit
+  - openmm
+  - openmmforcefields
+  - openff-toolkit
+  - openff-interchange
+  - requests
+  - beautifulsoup4
+  - lxml
+  - cython
+  - setuptools
+  - wheel
+  - pip:
+      - -e ./package
