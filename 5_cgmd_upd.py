@@ -399,6 +399,8 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         alpha = overlap
         alpha = min(alpha, CFG.alpha_max)
         alpha = max(alpha, CFG.alpha_min)
+        # if len(terms) > 1:
+        #     alpha = min(alpha, 0.05)  
         if len(terms) > 1:
             alpha = min(alpha, 0.02)  # Be more conservative when multiple terms already exist to avoid overfitting
         pmf_aa = -alpha * kT * np.log(aa_density)
@@ -457,9 +459,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             vals = aa_internal.get((i0, j0, k0, "angle"))
             if vals is None:
                 vals = aa_internal.get((i0, j0, k0, "adj_angle"))
-            if vals is None:
-                return np.nan
-            return float(np.mean(np.asarray(vals, dtype=float)))
+            return float(np.min(np.asarray(vals, dtype=float)))
 
         aa_vals = np.asarray(aa_vals, dtype=float)
         cg_vals = np.asarray(cg_vals, dtype=float)
@@ -499,14 +499,13 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             phi_grid=phi_grid,
         )
 
-        theta_ijk_avg = _mean_aa_adjacent_angle(i, j, k)
-        theta_jkl_avg = _mean_aa_adjacent_angle(j, k, l)
-        if np.isfinite(theta_ijk_avg) and np.isfinite(theta_jkl_avg):
-            sin_ijk = np.sin(np.deg2rad(theta_ijk_avg))
-            sin_jkl = np.sin(np.deg2rad(theta_jkl_avg))
-            scale_cbt = float((sin_ijk ** 3) * (sin_jkl ** 3))
-            print(scale_cbt)
-            k_phi_new = float(k_phi_new * scale_cbt)
+        # theta_ijk_avg = _mean_aa_adjacent_angle(i, j, k)
+        # theta_jkl_avg = _mean_aa_adjacent_angle(j, k, l)
+        # sin_ijk = np.sin(np.deg2rad(theta_ijk_avg))
+        # sin_jkl = np.sin(np.deg2rad(theta_jkl_avg))
+        # scale_cbt = float((sin_ijk ** 3) * (sin_jkl ** 3))
+        # k_phi_new = float(k_phi_new / scale_cbt)
+        # k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower, CFG.dihedral_k_upper))
 
         base = list(terms[0])
         base[5] = k_phi_new
