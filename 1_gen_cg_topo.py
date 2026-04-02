@@ -4,7 +4,7 @@ import rdkit
 import AutoMartini as am
 
 from pathlib import Path
-from openff.toolkit import ForceField, Molecule, Topology 
+from openff.toolkit import Molecule
 from rdkit import Chem
 from config import CFG
 
@@ -59,6 +59,7 @@ if __name__ == "__main__":
     # smiles = "N#C/C(=C/Nc1ccc(Nc2ccccc2)cc1)c3n[nH]nn3" # FTA
     # smiles = "Nc1ncnc2n(cnc12)[C@@H]3O[C@H](CO[P](O)(=O)O[P](O)(=O)N[P](O)(O)=O)[C@@H](O)[C@H]3O" # ANP
     # smiles = "CN(C)c1ccc(C2N(C)c3ccccc3N2C)cc1" # DMBI
+    # smiles = "CCC1=C(C2=NC1=CC3=C(C4=C([N-]3)C(=C5C(C(C(=N5)C=C6C(=C(C(=C2)[N-]6)C=C)C)C)CCC(=O)OC/C=C(\C)/CCCC(C)CCCC(C)CCCC(C)C)C(C4=O)C(=O)OC)C)C.[Mg+2]" # CLA
     # mol, _ = am.topology.gen_molecule_smi(smiles)
     # raw_molecule = None
 
@@ -73,27 +74,31 @@ if __name__ == "__main__":
 
 
     ligand_sdf = wdir / f"{molname}.sdf"
-    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf, from_smiles=None)
+    mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
+    # mol, raw_mol = gen_aa_molecule(molname, from_smiles=smiles)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     
-    # Use auto_martiniM3's built-in .itp writer via topfname
-    itp_path = mol_dir / f"{molname}.itp"
-    cg = am.solver.Cg_molecule(mol, smiles, molname, topfname=str(itp_path), forcepred=True, 
-        min_beads=n_beads, max_beads=n_beads, raw_molecule=raw_mol)
+    # Generate the CG molecule
+    cg_mol = am.solver.Cg_molecule(mol, smiles, molname, 
+        specify_beads=CFG.specify_beads,
+        use_vsites=CFG.use_vsites,
+        symmetrize_rings=CFG.symmetrize_rings,
+        min_beads=n_beads, 
+        max_beads=n_beads, 
+        raw_molecule=raw_mol)
+
+    # Write .itp file
+    itp_path = mol_dir / f"{molname}_initial.itp"
+    cg_mol.to_itp(itp_path)  
     logging.info(f"Wrote: {itp_path}")
 
     # Save CG structure (.pdb)
     pdb_path = mol_dir / f"{molname}.pdb"
-    cg.output_cg_pdb(str(pdb_path))
-    logging.info(f"Wrote: {pdb_path}")
-
-    # Save CG structure (.pdb)
-    pdb_path = mol_dir / f"{molname}.pdb"
-    cg.output_cg_pdb(str(pdb_path))
+    cg_mol.to_pdb(str(pdb_path))
     logging.info(f"Wrote: {pdb_path}")
 
     # Make .map file
     map_path = mol_dir / f"{molname}.map"
-    am.output.make_map_from_itp(str(itp_path), str(map_path), resname=molname)
+    cg_mol.output_map(str(map_path))
     logging.info(f"Wrote: {map_path}")

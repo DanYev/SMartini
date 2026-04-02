@@ -3,10 +3,9 @@ output/
 slurm*
 systems/
 tmp/
-Automartini_M3/
+png/
 *.log
 *.tmp
-*.itp
 *.png
 *.txt
 *.npy
@@ -26,6 +25,7 @@ __pycache__/
 venv/
 ENV/
 env/
+activate_env.sh
 
 # Packaging / build
 build/
@@ -62,15 +62,18 @@ nosetests.xml
 *.pyd
 *.dll
 *.dylib
+*.so
+
 
 # Cython build artifacts
 *.c
 *.cpp
 *.html
+*.nfs*
 
 # ---- HPC / cluster outputs ----
-slurm-*.out
-slurm-*.err
+slurm*.out
+slurm*.err
 
 # ---- Data / outputs (project-specific) ----
 # keep top-level entries above; add common scratch patterns
