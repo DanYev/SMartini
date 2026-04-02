@@ -5,7 +5,8 @@ SMart
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
 
-SMart uses parts of the AutoMartini M3 mapping/type-assignment workflow and extends it with an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+SMart uses parts of the AutoMartini M3 bead-type assignment workflow and extends it with an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+
 
 ## How it works (1-5 scripts)
 
@@ -38,6 +39,13 @@ SMart uses parts of the AutoMartini M3 mapping/type-assignment workflow and exte
 - generate overlay plots (`5_cgmd_upd.py plot`).
 
 This cycle is repeated until CG distributions reasonably match AA references.
+
+## License and upstream attribution
+
+This project uses and adapts parts of AutoMartini M3:
+- https://github.com/Martini-Force-Field-Initiative/Automartini_M3/
+
+The project is distributed under **GNU GPL v2.0 (or later)** terms, consistent with upstream usage of GPL-licensed code.
 
 ## Developers
 * Danis Yangaliev
