@@ -1,7 +1,7 @@
-SMart
+SMartini 
 ============
 
-## What is SMart?
+## What is SMartini?
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
 
