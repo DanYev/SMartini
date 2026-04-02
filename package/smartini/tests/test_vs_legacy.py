@@ -39,17 +39,17 @@ def _generate_itp(smiles: str, molname: str, mode: str) -> str:
     else:
         os.environ.pop("AUTO_MARTINI_OPTIMIZATION", None)
 
-    import AutoMartini
+    import smartini
 
-    importlib.reload(AutoMartini)
+    importlib.reload(smartini)
 
     # Force solver.py to pick up the aliased optimization module.
-    import AutoMartini.solver
+    import smartini.solver
 
-    importlib.reload(AutoMartini.solver)
+    importlib.reload(smartini.solver)
 
-    mol, _ = AutoMartini.topology.gen_molecule_smi(smiles)
-    cg = AutoMartini.solver.Cg_molecule(
+    mol, _ = smartini.topology.gen_molecule_smi(smiles)
+    cg = smartini.solver.Cg_molecule(
         mol,
         smiles,
         molname,

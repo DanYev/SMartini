@@ -6,11 +6,11 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
-import AutoMartini as am
+import smartini as am
 
 from pathlib import Path
 from typing import Dict, Tuple, Optional
-from AutoMartini.lpmath import (
+from smartini.lpmath import (
     read_cg_trajectory,
     read_cog_trajectory,
     calculate_internal_coordinates,
@@ -21,7 +21,7 @@ from AutoMartini.lpmath import (
     circular_mean,
     wrap_to_180,
 )
-from AutoMartini.plots import plot_internal_coordinates_overlay
+from smartini.plots import plot_internal_coordinates_overlay
 from config import CFG
 
 logger = logging.getLogger(__name__)

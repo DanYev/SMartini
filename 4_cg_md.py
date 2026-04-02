@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 import MDAnalysis as mda
-from AutoMartini.utils import cd, clean_dir, get_ntomp, gmx
+from smartini.utils import cd, clean_dir, get_ntomp, gmx
 
 from config import CFG
 

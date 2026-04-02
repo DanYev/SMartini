@@ -24,16 +24,16 @@ from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
 
-def get_logger(name="AutoMartini"):
+def get_logger(name="smartini"):
     """Get the configured logger instance.
     
-    Since logging is now configured in AutoMartini.__init__.py, this function
+    Since logging is now configured in smartini.__init__.py, this function
     simply returns the already-configured logger instance.
     
     Parameters
     ----------
     name : str, optional
-        Logger name (default: "AutoMartini")
+        Logger name (default: "smartini")
         
     Returns
     -------
@@ -44,7 +44,7 @@ def get_logger(name="AutoMartini"):
 
 
 # Backward compatibility - provide logger at module level
-# For new code, prefer: from AutoMartini.utils import get_logger; logger = get_logger()
+# For new code, prefer: from smartini.utils import get_logger; logger = get_logger()
 logger = get_logger()
 
 

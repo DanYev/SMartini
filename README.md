@@ -1,13 +1,13 @@
-SMart
+SMartini
 ============
 
-## What is SMart?
+## What is SMartini?
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
 
 CG topology generation is now much faster: initial topologies are generated in seconds, even for molecules like chlorophyll (~64 heavy atoms).
 
-SMart runs an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
+SMartini runs an AA→CG fitting loop: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms, CG simulation, and parameter updates from CG-vs-AA distribution mismatch.
 
 
 ## How it works (1-5 scripts)
