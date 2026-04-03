@@ -10,6 +10,15 @@
 #SBATCH -o slurm_jobs/output.%A.out
 #SBATCH -e slurm_jobs/error.%A.err
 
+# Run full ligand pipeline (scripts 1->5) for one molecule name.
+#
+# Expected inputs by default (from config.py):
+# - Required SDF: <systems_dir>/<MOLNAME>/<MOLNAME>.sdf
+# - Optional config: <systems_dir>/<MOLNAME>/config.yml (or config.yaml)
+#
+# You can override config location by exporting SM_CONFIG_YML before launch.
+# Example: SM_CONFIG_YML=<systems_dir>/THC/config.yml bash martinize_ligand.sh THC
+
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -36,7 +45,9 @@ nsteps=200000
 
 python 1_gen_cg_topo.py
 python 2_aa_md.py
-python 3_boltz_inv.py
+python 3_boltz_inv.py plot
+python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples
+python 5_cgmd_upd.py
 python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples
 python 5_cgmd_upd.py
 python 4_cg_md.py md nsteps $nsteps

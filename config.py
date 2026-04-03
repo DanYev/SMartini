@@ -1,3 +1,13 @@
+"""Runtime configuration for the ligand fitting pipeline.
+
+Expected inputs by default:
+- Required SDF: <systems_dir>/<MOLNAME>/<MOLNAME>.sdf
+- Optional config overrides: <systems_dir>/<MOLNAME>/config.yml (or config.yaml)
+
+Set SM_MOLNAME to choose the molecule name and optionally set SM_CONFIG_YML
+to point to a specific YAML file.
+"""
+
 from __future__ import annotations
 
 import os
@@ -27,7 +37,6 @@ class SMConfig:
     # Working folders
     # ============================================================================
     systems_dir: Path = Path("examples")
-    # ligands_dir: Path = Path("ligands")
     wdir: Path = systems_dir / molname
     mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
@@ -51,7 +60,7 @@ class SMConfig:
     # ============================================================================
     # CG MD settings (Coarse-Grained Molecular Dynamics)
     # ============================================================================
-    cg_dt: float = 0.020  # Timestep in picoseconds
+    cg_dt: float = 0.010  # Timestep in picoseconds
     cg_total_time_ns: float = 1000.0  # Total simulation time in nanoseconds
     cg_traj_stop: int = 2000  # Trajectory sampling cutoff
     cg_selection: str = "all"
@@ -62,19 +71,20 @@ class SMConfig:
     # Fitting /filtering defaults 
     temperature: float = 300.0
     bond_k_lower: float = 2000.0
-    bond_k_upper: float = 20000.0
-    angle_k_lower: float = 3.0
+    bond_k_upper: float = 50000.0
+    angle_k_lower: float = 5.0
     angle_k_upper: float = 2000.0
     dihedral_k_lower: float = 0.0
     dihedral_k_upper: float = 1000.0
-    ill_defined_angle_cutoff: float = 155.0
-    use_type11_for_linear: bool = True  # Whether to use type 11 dihedrals for linear angles
+    ill_defined_angle_cutoff: float = 160.0
     type9_max_n: int = 6
+    use_type11_for_linear: bool = True  # Whether to use type 11 dihedrals for linear angles
+    scale_by_sin3_for_type11: bool = False  # Whether to scale type 11 dihedrals by sin^3(theta)
     nbins: int = 120
     min_prob: float = 1e-12
     fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
-    alpha_max: float = 0.3
+    alpha_max: float = 0.25
     alpha_min: float = 0.01
 
 

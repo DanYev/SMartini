@@ -500,13 +500,14 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
             phi_grid=phi_grid,
         )
 
-        # theta_ijk_avg = _mean_aa_adjacent_angle(i, j, k)
-        # theta_jkl_avg = _mean_aa_adjacent_angle(j, k, l)
-        # sin_ijk = np.sin(np.deg2rad(theta_ijk_avg))
-        # sin_jkl = np.sin(np.deg2rad(theta_jkl_avg))
-        # scale_cbt = float((sin_ijk ** 3) * (sin_jkl ** 3))
-        # k_phi_new = float(k_phi_new / scale_cbt)
-        # k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower, CFG.dihedral_k_upper))
+        if CFG.scale_by_sin3_for_type11:
+            theta_ijk_avg = _mean_aa_adjacent_angle(i, j, k)
+            theta_jkl_avg = _mean_aa_adjacent_angle(j, k, l)
+            sin_ijk = np.sin(np.deg2rad(theta_ijk_avg))
+            sin_jkl = np.sin(np.deg2rad(theta_jkl_avg))
+            scale_cbt = float((sin_ijk ** 3) * (sin_jkl ** 3))
+            k_phi_new = float(k_phi_new / scale_cbt)
+            k_phi_new = float(np.clip(k_phi_new, CFG.dihedral_k_lower, CFG.dihedral_k_upper))
 
         base = list(terms[0])
         base[5] = k_phi_new
