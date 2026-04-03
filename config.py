@@ -52,8 +52,8 @@ class SMConfig:
     aa_gamma: float = 1.0  # Friction coefficient (1/picosecond)
     aa_pressure_bar: float = 1.0  # Pressure in bar
     aa_timestep_fs: float = 2.0  # Timestep in femtoseconds
-    aa_total_steps: int = int(1e6)  # Total MD steps (1e6 = 2 ns with 2 fs timestep)
-    aa_trj_nout: int = 1000  # Trajectory output frequency (frames every N steps)
+    aa_total_steps: int = int(1e7)  # Total MD steps (1e7 = 20 ns with 2 fs timestep)
+    aa_trj_nout: int = 10000  # Trajectory output frequency (frames every N steps)
     aa_log_nout: int = 10000  # Log output frequency (every N steps)
     aa_chk_nout: int = 100000  # Checkpoint output frequency (every N steps)
 
