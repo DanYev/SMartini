@@ -26,8 +26,8 @@ class SMConfig:
     # ============================================================================
     # Working folders
     # ============================================================================
-    systems_dir: Path = Path("systems")
-    ligands_dir: Path = Path("ligands")
+    systems_dir: Path = Path("examples")
+    # ligands_dir: Path = Path("ligands")
     wdir: Path = systems_dir / molname
     mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
@@ -107,7 +107,7 @@ def _load_overrides(path: Path) -> dict:
 
 
 def _apply_overrides(cfg: SMConfig, overrides: dict) -> SMConfig:
-    path_fields = {"systems_dir", "ligands_dir", "wdir", "mol_dir", "aa_dir", "cg_dir"}
+    path_fields = {"systems_dir", "", "wdir", "mol_dir", "aa_dir", "cg_dir"}
     for key, value in overrides.items():
         if not hasattr(cfg, key):
             raise ValueError(f"Unknown config key in YAML: {key}")
