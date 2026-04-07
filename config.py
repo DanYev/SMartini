@@ -84,8 +84,8 @@ class SMConfig:
     min_prob: float = 1e-12
     fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
-    alpha_max: float = 0.25
-    alpha_min: float = 0.01
+    alpha_max: float = 0.30
+    alpha_min: float = 0.02
 
 
 def _default_config_path(base_cfg: SMConfig) -> Path:
