@@ -1,3 +1,13 @@
+"""Runtime configuration for the ligand fitting pipeline.
+
+Expected inputs by default:
+- Required SDF: <systems_dir>/<MOLNAME>/<MOLNAME>.sdf
+- Optional config overrides: <systems_dir>/<MOLNAME>/config.yml (or config.yaml)
+
+Set SM_MOLNAME to choose the molecule name and optionally set SM_CONFIG_YML
+to point to a specific YAML file.
+"""
+
 from __future__ import annotations
 
 import os
@@ -12,6 +22,7 @@ class SMConfig:
     # Identity, coarse graining and partitioning settings
     # ============================================================================
     molname: str = "UNK"
+    smiles: Optional[str] = None
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
     use_vsites: bool = False
@@ -26,8 +37,7 @@ class SMConfig:
     # ============================================================================
     # Working folders
     # ============================================================================
-    systems_dir: Path = Path("systems")
-    ligands_dir: Path = Path("ligands")
+    systems_dir: Path = Path("examples")
     wdir: Path = systems_dir / molname
     mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
@@ -43,15 +53,15 @@ class SMConfig:
     aa_gamma: float = 1.0  # Friction coefficient (1/picosecond)
     aa_pressure_bar: float = 1.0  # Pressure in bar
     aa_timestep_fs: float = 2.0  # Timestep in femtoseconds
-    aa_total_steps: int = int(1e6)  # Total MD steps (1e6 = 2 ns with 2 fs timestep)
-    aa_trj_nout: int = 1000  # Trajectory output frequency (frames every N steps)
+    aa_total_steps: int = int(1e7)  # Total MD steps (1e7 = 20 ns with 2 fs timestep)
+    aa_trj_nout: int = 10000  # Trajectory output frequency (frames every N steps)
     aa_log_nout: int = 10000  # Log output frequency (every N steps)
     aa_chk_nout: int = 100000  # Checkpoint output frequency (every N steps)
 
     # ============================================================================
     # CG MD settings (Coarse-Grained Molecular Dynamics)
     # ============================================================================
-    cg_dt: float = 0.020  # Timestep in picoseconds
+    cg_dt: float = 0.010  # Timestep in picoseconds
     cg_total_time_ns: float = 1000.0  # Total simulation time in nanoseconds
     cg_traj_stop: int = 2000  # Trajectory sampling cutoff
     cg_selection: str = "all"
@@ -62,20 +72,21 @@ class SMConfig:
     # Fitting /filtering defaults 
     temperature: float = 300.0
     bond_k_lower: float = 2000.0
-    bond_k_upper: float = 20000.0
-    angle_k_lower: float = 3.0
+    bond_k_upper: float = 50000.0
+    angle_k_lower: float = 5.0
     angle_k_upper: float = 2000.0
     dihedral_k_lower: float = 0.0
     dihedral_k_upper: float = 1000.0
-    ill_defined_angle_cutoff: float = 155.0
-    use_type11_for_linear: bool = True  # Whether to use type 11 dihedrals for linear angles
+    ill_defined_angle_cutoff: float = 160.0
     type9_max_n: int = 6
+    use_type11_for_linear: bool = True  # Whether to use type 11 dihedrals for linear angles
+    scale_by_sin3_for_type11: bool = False  # Whether to scale type 11 dihedrals by sin^3(theta)
     nbins: int = 120
     min_prob: float = 1e-12
     fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
-    alpha_max: float = 0.3
-    alpha_min: float = 0.01
+    alpha_max: float = 0.30
+    alpha_min: float = 0.02
 
 
 def _default_config_path(base_cfg: SMConfig) -> Path:
@@ -107,7 +118,7 @@ def _load_overrides(path: Path) -> dict:
 
 
 def _apply_overrides(cfg: SMConfig, overrides: dict) -> SMConfig:
-    path_fields = {"systems_dir", "ligands_dir", "wdir", "mol_dir", "aa_dir", "cg_dir"}
+    path_fields = {"systems_dir", "", "wdir", "mol_dir", "aa_dir", "cg_dir"}
     for key, value in overrides.items():
         if not hasattr(cfg, key):
             raise ValueError(f"Unknown config key in YAML: {key}")
