@@ -396,7 +396,7 @@ class Topology:
                             continue
                         
                         # # Skip if any shortcut bonds exist (not a proper dihedral chain)
-                        if il_bonded:
+                        if (il_bonded):
                             continue
 
                         # Skip if they do not form a chain (i-j-k-l)

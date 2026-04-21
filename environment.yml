@@ -1,24 +1,18 @@
 name: smartini
 channels:
-  - conda-forge
+ - conda-forge
 dependencies:
-  - python=3.12
-  - pip
-  - numpy
-  - matplotlib
-  - scikit-learn
-  - mdanalysis
-  - rdkit
-  - openmm
-  - openmmforcefields
-  - openff-toolkit
-  - openff-interchange
-  - requests
-  - beautifulsoup4
-  - lxml
-  - pyyaml
-  - cython
-  - setuptools
-  - wheel
-  - pip:
-      - -e ./package
+ - python=3.12
+ - openmm
+ - openmmforcefields
+ - openff-toolkit
+ - openff-interchange
+ - numpy
+ - rdkit
+ - mdanalysis
+ - requests
+ - pyyaml
+ - lxml
+ - beautifulsoup4
+#  - matplotlib
+#  - scikit-learn

@@ -21,7 +21,7 @@ class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "UNK"
+    molname: str = "LIB"
     smiles: Optional[str] = None
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
@@ -73,7 +73,7 @@ class SMConfig:
     temperature: float = 300.0
     bond_k_lower: float = 2000.0
     bond_k_upper: float = 50000.0
-    angle_k_lower: float = 5.0
+    angle_k_lower: float = 3.0
     angle_k_upper: float = 2000.0
     dihedral_k_lower: float = 0.0
     dihedral_k_upper: float = 1000.0
@@ -83,9 +83,9 @@ class SMConfig:
     scale_by_sin3_for_type11: bool = False  # Whether to scale type 11 dihedrals by sin^3(theta)
     nbins: int = 120
     min_prob: float = 1e-12
-    fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
+    fc_scale: float = 0.3  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
-    alpha_max: float = 0.30
+    alpha_max: float = 0.20
     alpha_min: float = 0.02
 
 

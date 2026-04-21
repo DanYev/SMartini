@@ -403,7 +403,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         # if len(terms) > 1:
         #     alpha = min(alpha, 0.05)  
         if len(terms) > 1:
-            alpha = min(alpha, 0.02)  # Be more conservative when multiple terms already exist to avoid overfitting
+            alpha = min(alpha, 0.01)  # Be more conservative when multiple terms already exist to avoid overfitting
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = -alpha * kT * np.log(cg_density)
         pmf_pot = -kT * np.log(pot_density)
