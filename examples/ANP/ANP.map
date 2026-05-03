@@ -14,16 +14,35 @@ martini3001
 amber charmm
 
 [ atoms ]
-     1  P1 O1 O2 O3     D01
-     2  P2 O4 O5 O6     Q02
-     3  P3 O7 N1 O8     Q03
-     4   C1 N2     N04
-     5   C2 N3     N05
-     6   N4 C3     N06
-     7   C4 N5     N07
-     8   N6 C5     N08
-     9  C6 C7 O9     P09
-    10  C8 O10     P10
-    11  C9 O11     P11
-    12  C10 O12     P12
+     1      P1     D01
+     2      O1     D01
+     3      O2     D01
+     4      O3     D01
+     5      P2     Q02
+     6      O4     Q02
+     7      O5     Q02
+     8      O6     Q02
+     9      P3     Q03
+    10      O7     Q03
+    11      N1     Q03
+    12      O8     Q03
+    13      C1     N04
+    14      N2     N04
+    15      C2     N05
+    16      N3     N05
+    17      N4     N06
+    18      C3     N06
+    19      C4     N07
+    20      N5     N07
+    21      N6     N08
+    22      C5     N08
+    23      C6     P09
+    24      C7     P09
+    25      O9     P09
+    26      C8     P10
+    27     O10     P10
+    28      C9     P11
+    29     O11     P11
+    30     C10     P12
+    31     O12     P12
 

@@ -21,7 +21,7 @@ class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "LIB"
+    molname: str = "ANP"
     smiles: Optional[str] = None
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
