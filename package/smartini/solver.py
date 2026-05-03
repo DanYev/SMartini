@@ -241,7 +241,7 @@ class Cg_molecule:
                     hbonda=self.hbond_a,
                     hbondd=self.hbond_d,
                 )
-            except:
+            except Exception as e:
                 continue  # If get_bead_types fails for any reason, skip to the next mapping
             logger.info("Assigned bead types: %s", bead_types)
 
@@ -717,10 +717,20 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
     bead_smiles = []
     bead_atomnames = []
     charges = []
-    at_counts = {}
+    
+    # Initialize a dictionary to keep track of the count for each element
+    element_counts = defaultdict(int)
+    atomnames = []
+    for atom in molecule.GetAtoms():
+        symbol = atom.GetSymbol()
+        # Increment the count for this specific element type
+        element_counts[symbol] += 1
+        # Combine the symbol with its specific count
+        atom_name = f"{symbol}{element_counts[symbol]}"
+        atomnames.append(atom_name)
 
     for idx, bead in enumerate(mapping):
-        smi_frag, wc_log_p, charge, atoms_in_smi, converted_smi, real_smi, at_counts = substruct2smi(bead, molecule, at_counts)
+        smi_frag, wc_log_p, charge, converted_smi, real_smi = substruct2smi(bead, molecule)
         if "." in smi_frag:
             logger.info((f"Fragment SMILES contains a dot ('.'), your atoms in bead {bead}: {smi_frag} are disconnected. "
             "Skipping to the next one."))
@@ -741,9 +751,11 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
 
         bead_type = determine_bead_type(alogps, charge, hbond_a_flag, hbond_d_flag, in_ring, smi_frag)
 
+        atomsnames_str = ", ".join(atomnames[idx] for idx in bead)
+
         bead_types.append(bead_type)
         bead_smiles.append(smi_frag)
-        bead_atomnames.append(atoms_in_smi)
+        bead_atomnames.append(atomsnames_str)
         charges.append(charge)
 
     return bead_types, bead_smiles, bead_atomnames, charges
@@ -793,23 +805,13 @@ def substruct2smi(bead, molecule, at_counts={}):
     atoms_in_smi = ""
     converted_smi = False
     real_smi = None
-    for at in range(n_heavy):
-        if at in bead:
-            at_symbol = molecule.GetAtomWithIdx(at).GetSymbol()
-            if at_symbol not in at_counts.keys():
-                at_counts[at_symbol] = 1
-            else:                
-                at_counts[at_symbol] += 1 
-            atom_label = at_symbol + str(at_counts[at_symbol])
-            atoms_in_smi += atom_label + " "
     if "c" in smi or "n" in smi or "s" in smi:
         converted_smi = True
         real_smi = smi
         smi = cyclic_smi_conversion(smi)
     # fragment smi: Nc1ncnn1 ---------> FAILURE! Need to fix this Andrew! For now, just a hackish soln:
     # smi = smi.lower() if smi.islower() else smi.upper()
-    atoms_in_smi = atoms_in_smi
-    return smi, wc_log_p, chg, atoms_in_smi, converted_smi, real_smi, at_counts
+    return smi, wc_log_p, chg, converted_smi, real_smi
 
 
 def letter_occurrences(string):

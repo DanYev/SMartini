@@ -11,18 +11,18 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   D     1   ANP    D01    1    -2.0  72.0   ; P1 O1 O2 O3    ; O=P([O-])[O-]  ;          
-2   Q1    1   ANP    Q02    2    -1.0  72.0   ; P2 O4 O5 O6    ; OP(=O)[O-]     ;          
-3   Q1    1   ANP    Q03    3    -1.0  72.0   ; P3 O7 N1 O8    ; N[P@@](=O)[O-] ;          
-4   TN6a  1   ANP    N04    4    0.0  60.0   ; C1 N2          ; CN             ;          
-5   TN5d  1   ANP    N05    5    0.0  60.0   ; C2 N3          ; CN             ;          
-6   TN6a  1   ANP    N06    6    0.0  0.0   ; N4 C3          ; CN             ;          
-7   TN5   1   ANP    N07    7    0.0  60.0   ; C4 N5          ; CN             ;          
-8   TN6a  1   ANP    N08    8    0.0  0.0   ; N6 C5          ; CN             ;          
-9   SP2a  1   ANP    P09    9    0.0  54.0   ; C6 C7 O9       ; CCO            ;          
-10  TP2d  1   ANP    P10    10   0.0  36.0   ; C8 O10         ; CO             ;          
-11  TP2d  1   ANP    P11    11   0.0  36.0   ; C9 O11         ; CO             ;          
-12  TP2a  1   ANP    P12    12   0.0  36.0   ; C10 O12        ; CO             ;          
+1   D     1   ANP    D01    1    -2.0  72.0   ; P1, O1, O4, O5 ; O=P([O-])[O-]  ;          
+2   Q1    1   ANP    Q02    2    -1.0  72.0   ; P2, O2, O6, O12; OP(=O)[O-]     ;          
+3   Q1    1   ANP    Q03    3    -1.0  72.0   ; P3, O3, N5, O7 ; N[P@@](=O)[O-] ;          
+4   TN6a  1   ANP    N04    4    0.0  60.0   ; C1, N1         ; CN             ;          
+5   TN5d  1   ANP    N05    5    0.0  60.0   ; C2, N4         ; CN             ;          
+6   TN6a  1   ANP    N06    6    0.0  0.0   ; N2, C4         ; CN             ;          
+7   TN5   1   ANP    N07    7    0.0  60.0   ; C3, N6         ; CN             ;          
+8   TN6a  1   ANP    N08    8    0.0  0.0   ; N3, C5         ; CN             ;          
+9   SP2a  1   ANP    P09    9    0.0  54.0   ; C6, C10, O11   ; CCO            ;          
+10  TP2d  1   ANP    P10    10   0.0  36.0   ; C7, O8         ; CO             ;          
+11  TP2d  1   ANP    P11    11   0.0  36.0   ; C8, O9         ; CO             ;          
+12  TP2a  1   ANP    P12    12   0.0  36.0   ; C9, O10        ; CO             ;          
 
 
 [bonds]

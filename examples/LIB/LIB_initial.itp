@@ -11,26 +11,26 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   TN5a  1   LIB    N01    1    0.0  0.0   ; C1 O1          ; C=O            ;          
-2   TN6a  1   LIB    N02    2    0.0  36.0   ; N1 C2          ; CN             ;          
-3   TC6   1   LIB    C03    3    0.0  36.0   ; S1 C3          ; CS             ;          
-4   TN5a  1   LIB    N04    4    0.0  36.0   ; C4 O2          ; C=O            ;          
-5   TN5d  1   LIB    N05    5    0.0  36.0   ; N2 C5          ; CN             ;          
-6   TN5d  1   LIB    N06    6    0.0  72.0   ; N3 C6          ; CN             ;          
-7   TP2d  1   LIB    P07    7    0.0  36.0   ; O3 C7          ; CO             ;          
-8   TN5d  1   LIB    N08    8    0.0  36.0   ; N4 C8          ; CN             ;          
-9   TC5   1   LIB    C09    9    0.0  36.0   ; C9 C10         ; C=C            ;          
-10  TC5   1   LIB    C10    10   0.0  36.0   ; C11 C12        ; C=C            ;          
-11  TC5   1   LIB    C11    11   0.0  36.0   ; C13 C14        ; C=C            ;          
-12  TC5   1   LIB    C12    12   0.0  72.0   ; C15 C16        ; C=C            ;          
-13  TC5   1   LIB    C13    13   0.0  0.0   ; C17 C18        ; C=C            ;          
-14  TC5   1   LIB    C14    14   0.0  36.0   ; C19 C20        ; C=C            ;          
-15  TX1   1   LIB    X15    15   0.0  36.0   ; C21 F1         ; CF             ;          
-16  TC5   1   LIB    C16    16   0.0  72.0   ; C22 C23        ; C-C            ;          
-17  TC4   1   LIB    C17    17   0.0  0.0   ; C24 C25        ; CC             ;          
-18  TC4   1   LIB    C18    18   0.0  36.0   ; C26 C27        ; CC             ;          
-19  TC3   1   LIB    C19    19   0.0  36.0   ; C28 C29        ; CC             ;          
-20  TC3   1   LIB    C20    20   0.0  36.0   ; C30 C31        ; CC             ;          
+1   TN5a  1   LIB    N01    1    0.0  0.0   ; C1, O3         ; C=O            ;          
+2   TN6a  1   LIB    N02    2    0.0  36.0   ; N2, C11        ; CN             ;          
+3   TC6   1   LIB    C03    3    0.0  36.0   ; S4, C13        ; CS             ;          
+4   TN5a  1   LIB    N04    4    0.0  36.0   ; C5, O7         ; C=O            ;          
+5   TN5d  1   LIB    N05    5    0.0  36.0   ; N6, C8         ; CN             ;          
+6   TN5d  1   LIB    N06    6    0.0  72.0   ; N9, C39        ; CN             ;          
+7   TP2d  1   LIB    P07    7    0.0  36.0   ; O10, C25       ; CO             ;          
+8   TN5d  1   LIB    N08    8    0.0  36.0   ; N12, C36       ; CN             ;          
+9   TC5   1   LIB    C09    9    0.0  36.0   ; C14, C15       ; C=C            ;          
+10  TC5   1   LIB    C10    10   0.0  36.0   ; C16, C21       ; C=C            ;          
+11  TC5   1   LIB    C11    11   0.0  36.0   ; C17, C22       ; C=C            ;          
+12  TC5   1   LIB    C12    12   0.0  72.0   ; C18, C20       ; C=C            ;          
+13  TC5   1   LIB    C13    13   0.0  0.0   ; C19, C26       ; C=C            ;          
+14  TC5   1   LIB    C14    14   0.0  36.0   ; C23, C31       ; C=C            ;          
+15  TX1   1   LIB    X15    15   0.0  36.0   ; C24, F40       ; CF             ;          
+16  TC5   1   LIB    C16    16   0.0  72.0   ; C27, C28       ; C-C            ;          
+17  TC4   1   LIB    C17    17   0.0  0.0   ; C29, C32       ; CC             ;          
+18  TC4   1   LIB    C18    18   0.0  36.0   ; C30, C35       ; CC             ;          
+19  TC3   1   LIB    C19    19   0.0  36.0   ; C33, C37       ; CC             ;          
+20  TC3   1   LIB    C20    20   0.0  36.0   ; C34, C38       ; CC             ;          
 
 
 [bonds]
@@ -126,6 +126,7 @@
    8 20 19 18    9    348.8  10.000      1
   10 16  6 12    9    342.7  10.000      1
   10 16  6 14    9    341.3  10.000      1
+  11 16  6 12    9    115.4  10.000      1
   11 16  6 14    9    114.0  10.000      1
   12  6 14 15    9    244.2  10.000      1
   12 16  6 14    9    178.6  10.000      1
