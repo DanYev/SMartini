@@ -626,6 +626,7 @@ def filter_mappings(
         return mappings
 
     if keep_rings_together:
+        print(f"Keeping rings together in the mapping...")
         # Prefer keeping rings together (no mixing ring/non-ring)
         tmp_list = []
         for mapping in mappings:
