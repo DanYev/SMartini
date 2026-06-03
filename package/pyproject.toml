@@ -35,8 +35,7 @@ include = [
   {path = "smartini/optimization.pyx", format = "wheel"},
   {path = "smartini/*.so", format = "wheel"},
 ]
-description = "A tool for automatic MARTINI 3 force field mapping and parametrization of small organic molecules"
-authors = ["Magdalena Szczuka", "Tristan Bereau", "Andrew Abi-Mansour"]
+description = "Automated ligand parametrization for Martini 3 Force Field"
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -44,9 +43,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 readme = "README.md"
-homepage = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
-repository = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
-documentation = "https://github.com/Martini-Force-Field-Initiative/Automartini_M3"
+homepage = "https://github.com/DanYev/SMartini"
 build = "setup.py"
 
 [tool.poetry-dynamic-versioning]
