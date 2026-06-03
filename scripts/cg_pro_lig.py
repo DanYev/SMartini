@@ -3,8 +3,9 @@ import shutil
 import MDAnalysis as mda
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+import smartini
+logger = logging.getLogger("smartini")
+smartini.setup_logging(level=logging.INFO)
 
 logger.info("Importing reforge modules...")
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
@@ -16,6 +17,9 @@ from reforge.forge.topology import Topology
 DT = 0.020  # Time step in picoseconds
 total_time = 1000  # Total simulation time in nanoseconds
 NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
+
+def postprocess_ligand():
+    pass
 
 
 def setup(sysdir, sysname):
@@ -139,10 +143,6 @@ def trjconv(sysdir, sysname, runname, **kwargs):
     clean_dir(mdrun.rundir)
 
 
-
-
 if __name__ == "__main__":
-    from reforge.cli import run_command
-    run_command()
-
+    postprocess_ligand()
     
