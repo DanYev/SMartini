@@ -1,6 +1,5 @@
 ligands/
 output/
-pdf/
 slurm*
 systems/
 tmp/
@@ -9,6 +8,7 @@ tmp/
 *.txt
 *.npy
 *.npz
+*.pdf
 *.pkl
 *.gro
 aa*.png
