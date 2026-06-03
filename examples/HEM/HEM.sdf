@@ -1,7 +1,7 @@
 HEM
-  ModelServer 0.9.12
+  PyMOL3.1          3D                             0
 
- 43 50  0  0  0  0  0  0  0  0  0
+ 42 46  0  0  0  0  0  0  0  0999 V2000
   -15.5600  -19.7210  -10.6460 C   0  0  0  0  0  0  0  0  0  0  0  0
   -16.4520  -22.2960  -14.5150 C   0  0  0  0  0  0  0  0  0  0  0  0
   -16.8140  -26.1480  -11.8200 C   0  0  0  0  0  0  0  0  0  0  0  0
@@ -44,7 +44,6 @@ HEM
   -16.4150  -24.1090  -12.9670 N   0  0  0  0  0  0  0  0  0  0  0  0
   -16.0690  -24.6860  -10.0990 N   0  0  0  0  0  0  0  0  0  0  0  0
   -15.4950  -21.8910   -9.6050 N   0  0  0  0  0  0  0  0  0  0  0  0
-  -15.8460  -23.0320  -11.2930 FE  0  0  0  0  0  0  0  0  0  0  0  0
   1  5  1  0  0  0  0
   1 32  2  0  0  0  0
   2  8  1  0  0  0  0
@@ -91,51 +90,50 @@ HEM
  35 36  1  0  0  0  0
  36 37  2  0  0  0  0
  36 38  1  0  0  0  0
- 39 43  1  0  0  0  0
- 40 43  1  0  0  0  0
- 41 43  1  0  0  0  0
- 42 43  1  0  0  0  0
 M  END
-> <model_server_result.job_id>
+>  <model_server_result.job_id>
 XYrfYgEPbAgGRb-fKH2INg
 
-> <model_server_result.datetime_utc>
+>  <model_server_result.datetime_utc>
 2026-06-03 15:24:47
 
-> <model_server_result.server_version>
+>  <model_server_result.server_version>
 0.9.12
 
-> <model_server_result.query_name>
+>  <model_server_result.query_name>
 ligand
 
-> <model_server_result.source_id>
+>  <model_server_result.source_id>
 pdb-bcif
 
-> <model_server_result.entry_id>
+>  <model_server_result.entry_id>
 1tqn
 
-> <model_server_params.name>
+>  <model_server_params.name>
 atom_site
 
-> <model_server_params.value>
-{"label_asym_id":"B","auth_seq_id":508}
+>  <model_server_params.value>
 
-> <model_server_stats.io_time_ms>
+
+>  <id":"B","auth_seq_id":508}>
+
+
+>  <model_server_stats.io_time_ms>
 21
 
-> <model_server_stats.parse_time_ms>
+>  <model_server_stats.parse_time_ms>
 17
 
-> <model_server_stats.create_model_time_ms>
+>  <model_server_stats.create_model_time_ms>
 31
 
-> <model_server_stats.query_time_ms>
+>  <model_server_stats.query_time_ms>
 1276
 
-> <model_server_stats.encode_time_ms>
+>  <model_server_stats.encode_time_ms>
 3
 
-> <model_server_stats.element_count>
+>  <model_server_stats.element_count>
 43
 
 $$$$
