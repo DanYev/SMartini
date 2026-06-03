@@ -17,14 +17,14 @@ build-backend = "poetry.core.masonry.api"
 name = "smartini"
 version = "0.0.0"
 packages = [
-  { include = "smartini" }
+  { include = "smartini", from = "package" }
 ]
 exclude = [
   "*/tests/"
 ]
 include = [
-  {path = "smartini/optimization.pyx", format = "wheel"},
-  {path = "smartini/*.so", format = "wheel"},
+  {path = "package/smartini/optimization_cy.pyx", format = "wheel"},
+  {path = "package/smartini/*.so", format = "wheel"},
 ]
 description = "Automated ligand parametrization for Martini 3 Force Field"
 classifiers = [
