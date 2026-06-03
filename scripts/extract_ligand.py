@@ -4,10 +4,18 @@ Extract a ligand by residue name from a PDB file and convert it to SDF format.
 """
 
 import logging
+import sys
+
+from pathlib import Path
+
+# Ensure the project root is on sys.path so that 'config' can be found
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 import MDAnalysis as mda
 import smartini
 
-from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 
@@ -86,7 +94,3 @@ if __name__ == "__main__":
     ligand_name = "HEM"
     output_path = Path("examples/1TQN") / ligand_name / f"{ligand_name}.sdf"
     extract_ligand(pdb_path, ligand_name, output_path)
-
-
-if __name__ == "__main__":
-    main()
