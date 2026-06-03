@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=0-04:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
-#SBATCH --partition=htc
-#SBATCH --qos=public
+#SBATCH --partition=general
+#SBATCH --qos=grp_sozkan
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
