@@ -26,7 +26,7 @@ class SMConfig:
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
     use_vsites: bool = False
-    symmetrize_rings: bool = False
+    symmetrize_rings: list[int] = None # list of which rings to symmetrize (from info.txt)
     keep_rings_together: bool = True
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up

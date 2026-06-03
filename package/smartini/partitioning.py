@@ -82,8 +82,8 @@ def split_into_fragments(molecule):
     2. Build ring-centered fragments (ring atoms + nearest heavy neighbors).
     3. Build linear fragments around non-ring branching atoms.
     4. Assign leftover atoms to nearby fragments so every heavy atom is covered.
-    5. Keep overlaps small (ideally one atom per connection) to simplify
-       downstream fragment stitching.
+    5. Fragments must ovelap along the number of connection with exactly 1 atom per connection
+    for consistent stitching during mapping.
 
     Why this decomposition is used
     ------------------------------
@@ -171,7 +171,12 @@ def split_into_fragments(molecule):
         missing_atoms = set(atids) - flat_set(fragments)
         raise ValueError(f"Error in fragment generation: {missing_atoms} atoms are missing from the fragments. Check your fragments. Fragments: {fragments}")
     frag_ranks_list = [[ranks[a] for a in frag] for frag in fragments]
-    return fragments, frag_ranks_list, rings, shared_atoms 
+
+    initial_rings = molecule.GetRingInfo().AtomRings()
+    print(f"Initial rings (before fusion): {initial_rings}")
+    exit()
+
+    return fragments, frag_ranks_list, rings, shared_atoms, initial_rings
 
 #############################################################################
 ### PARTITIONING ###
@@ -276,6 +281,16 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
                 mappings = new_mappings
         return mappings
 
+    def filter_out_non_symmetrizable_mappings(mappings, ring):
+        """Filter out mappings that cannot be symmetrized across the specified ring."""
+        new_mappings = []
+        for mapping in mappings:
+            beads_with_ring_atoms = [bead for bead in mapping if any(atom in ring for atom in bead)]
+            if len(beads_with_ring_atoms) > 1:
+                continue
+            new_mappings.append(mapping)
+        return new_mappings
+
     frag_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
     is_ring = any(atoms[a].IsInRing() for a in fragment)
     # ha_neis = frag_neis
@@ -286,7 +301,10 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
         logger.info(f"Finding combinations for fragment {fragment} with {nbeads} beads...")
         combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
         mappings = find_no_overlap_mappings(combs, fragment)
+        for ring in rings_to_symmetrize:
+            mappings = filter_out_non_symmetrizable_mappings(mappings, ring)
         fragment_mappings.extend(mappings)
+
     return fragment_mappings
 
 
