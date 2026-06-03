@@ -315,7 +315,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
     kB = 0.008314462618  # kJ mol^-1 K^-1
     kT = kB * CFG.temperature
     nbins = int(CFG.nbins)
-    png_dir = Path(__file__).resolve().parent / "png"
+    png_dir = Path(__file__).resolve().parent / "tmp" / "png"
     png_dir.mkdir(parents=True, exist_ok=True)
 
     def _save_pmf_plot(phi_grid, pmf, u_initial, u_updated, title: str, filename: str):
