@@ -5,7 +5,7 @@ import numpy as np
 from rdkit import Chem
 from . import optimization_cy as opcy
 from .utils import timeit, memprofit
-from config import CFG
+from .config import CFG
 
 logger = logging.getLogger(__name__)
 

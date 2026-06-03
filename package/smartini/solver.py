@@ -10,10 +10,10 @@ from bs4 import BeautifulSoup
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, ChemicalFeatures, rdMolDescriptors, rdchem
 
+from .config import CFG
 from . import partitioning, output
 from .sanifix4 import AdjustAromaticNs
 from .topology import Topology, run_bartender
-from config import CFG
 
 logger = logging.getLogger(__name__)
 

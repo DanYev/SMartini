@@ -22,7 +22,7 @@ from smartini.lpmath import (
     wrap_to_180,
 )
 from smartini.plots import plot_internal_coordinates_overlay
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)

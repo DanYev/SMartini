@@ -6,7 +6,7 @@ import smartini
 from pathlib import Path
 from openff.toolkit import Molecule
 from rdkit import Chem
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger("smartini")
 smartini.setup_logging(level=logging.INFO)

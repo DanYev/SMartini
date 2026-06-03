@@ -8,7 +8,7 @@ from openff.toolkit import ForceField, Molecule, Topology
 from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)

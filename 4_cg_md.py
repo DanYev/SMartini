@@ -6,7 +6,7 @@ import smartini
 import MDAnalysis as mda
 from smartini.utils import cd, clean_dir, get_ntomp, gmx
 
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
