@@ -17,7 +17,7 @@ from .topology import Topology, run_bartender
 logger = logging.getLogger(__name__)
 
 
-class Cg_molecule:
+class CG_molecule:
     """Coarse-grain a single small molecule to a Martini 3 bead representation.
 
     Workflow
@@ -281,7 +281,7 @@ class Cg_molecule:
     def extract_features(self):
         """Extract RDKit chemical features (H-bond donors/acceptors) for bead-type assignment."""
         logger.debug("Entering extract_features()")
-        features = Cg_molecule._factory.GetFeaturesForMol(self.molecule)
+        features = CG_molecule._factory.GetFeaturesForMol(self.molecule)
         return features
 
 
