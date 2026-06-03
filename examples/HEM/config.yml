@@ -1,8 +1,8 @@
 molname: HEM
 use_vsites: false
-symmetrize_rings: false
 keep_rings_together: true
+symmetrize_rings: [0]
 specify_beads:
   # - [4, 7, 38]
-  - [23, 26, 27]
-max_mappings_to_keep: 8000
+  # - [23, 26, 27]
+max_mappings_to_keep: 80000
