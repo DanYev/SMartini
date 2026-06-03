@@ -3,15 +3,14 @@ output/
 slurm*
 systems/
 tmp/
-png/
 *.log
 *.tmp
-*.png
 *.txt
 *.npy
 *.npz
 *.pkl
 *.gro
+aa*.png
 
 # ---- Python ----
 __pycache__/
