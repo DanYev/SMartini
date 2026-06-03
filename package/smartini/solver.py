@@ -13,6 +13,7 @@ from rdkit.Chem import AllChem, ChemicalFeatures, rdMolDescriptors, rdchem
 from . import partitioning, output
 from .sanifix4 import AdjustAromaticNs
 from .topology import Topology, run_bartender
+from config import CFG
 
 logger = logging.getLogger(__name__)
 
@@ -429,9 +430,10 @@ class CG_molecule:
 
         molecule = self.molecule
         rings = molecule.GetRingInfo().AtomRings()
+        rings_to_symmetrize = [rings[i] for i in CFG.symmetrize_rings]
         # go thru each ring
         sym_mappings = [mapping]
-        for ring in rings:
+        for ring in rings_to_symmetrize:
             new_mappings = []
             for mapping in sym_mappings:
                 ring_bead_indices = [
@@ -439,8 +441,8 @@ class CG_molecule:
                 ]
                 ring_beads = [mapping[bead_idx] for bead_idx in ring_bead_indices]
                 if flat_set(ring_beads) == set(ring) and len(ring) > 5:
-                    symetrized = symmetrize_ring(mapping, ring, ring_bead_indices)
-                    new_mappings.extend(symetrized)
+                    symmetrized = symmetrize_ring(mapping, ring, ring_bead_indices)
+                    new_mappings.extend(symmetrized)
             sym_mappings = new_mappings if new_mappings else sym_mappings
         # If specify_beads is set, filter sym_mappings to only those that contain all specified atoms in the same bead
         if self.specify_beads:
