@@ -1,9 +1,6 @@
 import logging
-import os
 import shutil
-import numpy as np
 import MDAnalysis as mda
-import mdtraj
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -29,15 +26,10 @@ def setup(sysdir, sysname):
     # mdsys.clean_pdb_mm(input_pdb, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
 
     # Martinizing
-    molname = "protein_0"
-    idr_regions = f"A-282:475 B-282:475"
-    # idr_regions = _get_idr_regions(mdsys.inpdb, min_length=5, idr_start=282, idr_end=475)
-    # idr_regions = " ".join([f"A-{r}" for r in idr_regions.split()]) + " " + " ".join([f"B-{r}" for r in idr_regions.split()])
-    add_command = f"-water-bias -water-bias-eps idr:0.5 -id-regions {idr_regions}" # martinize2 -h for help
     # mdsys.martinize_proteins_en(append=True) # SWITCH APPEND TO TRUE IF ALREADY DONE
     shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")
     mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
-        p="backbone", pf="500",  text=add_command, append=True) 
+        p="backbone", pf="500",  text="", append=True) 
     # shutil.copy(mdsys.topdir / f"{molname}.itp", mdsys.topdir / "tmp.itp") 
     shutil.copy(mdsys.topdir / "tmp.itp", mdsys.topdir / f"{molname}.itp") 
 
@@ -69,28 +61,6 @@ def setup(sysdir, sysname):
     # 1.4. Need index files to make selections with GROMACS. Very annoying but wcyd. Order:
     # 1.System 2.Solute 3.Backbone 4.Solvent 5...chains. Can add custom groups using AtomList.write_to_ndx()
     mdsys.make_system_ndx(backbone_atoms=["BB", "BB2"])
-
-
-
-def _get_idr_regions(input_pdb, min_length=3, idr_start=0, idr_end=1000):
-    struct = mdtraj.load_pdb(input_pdb)
-    dssp = mdtraj.compute_dssp(struct, simplified=False)
-    coil_token = ' '
-    idr_regions = []
-    curr_region = False
-    for i, ss in enumerate(dssp[0][idr_start:idr_end]):
-        if ss == coil_token and not curr_region:  # Coil regions are considered IDRs
-            curr_region = True
-            idr_region_start = idr_start + i + 1
-            continue
-        if curr_region and ss != coil_token:
-            curr_region = False
-            idr_region_end = idr_start + i
-            if idr_region_end - idr_region_start + 1 >= min_length:  # Only consider regions of length >= min_length
-                idr_regions.append(f"{idr_region_start}:{idr_region_end}")
-    idr_regions_str = " ".join(map(str, idr_regions))
-    logger.info(f"Identified IDR regions in {input_pdb}: {idr_regions_str}")
-    return idr_regions_str
 
 
 def _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names) -> None:
