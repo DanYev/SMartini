@@ -1,0 +1,59 @@
+[ molecule ]
+HEM
+
+[ from ]
+amber charmm
+
+[ to ]
+martini3001
+
+[ martini ]
+  C01 C02 C03 C04 C05 C06 N07 N08 C09 N10 C11 C12 C13 N14 C15 C16 N17 N18
+
+[ mapping ]
+amber charmm
+
+[ atoms ]
+     1      C1     C01
+     2      C5     C01
+     3      C2     C02
+     4     C13     C02
+     5      C3     C03
+     6     C20     C03
+     7      C4     C04
+     8     C27     C04
+     9      C6     C05
+    10     C10     C05
+    11     C11     C05
+    12      C7     C06
+    13      C9     C06
+    14      C8     N07
+    15      N1     N07
+    16     C12     N08
+    17      O1     N08
+    18      O2     N08
+    19     C14     C09
+    20     C15     C09
+    21     C17     C09
+    22     C16     N10
+    23      N2     N10
+    24     C18     C11
+    25     C19     C11
+    26     C21     C12
+    27     C24     C12
+    28     C22     C13
+    29     C25     C13
+    30     C26     C13
+    31     C23     N14
+    32      N3     N14
+    33     C28     C15
+    34     C31     C15
+    35     C29     C16
+    36     C32     C16
+    37     C33     C16
+    38     C30     N17
+    39      N4     N17
+    40     C34     N18
+    41      O3     N18
+    42      O4     N18
+
