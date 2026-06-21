@@ -80,7 +80,7 @@ def setup(sysdir, sysname, ligand_src=None):
     ligand_src = ligand_src or LIGAND_SRC
     mdsys = GmxSystem(sysdir, sysname)
     input_pdb = mdsys.root / f"{sysname}.pdb"
-    mdsys.prepare_files(pour_martini=True) # be careful it can overwrite later files
+    # mdsys.prepare_files(pour_martini=True) # be careful it can overwrite later files
     mdsys.clean_pdb_mm(input_pdb, find_missing_residues=False, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
     shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")  # Copy cleaned PDB to prodir for martinizing. This is the file that will be used for martinizing and ligand mapping.
     # shutil.copy(input_pdb, mdsys.inpdb)  # Copy source PDB to inpdb.pdb (bypasses clean_pdb_mm)
@@ -89,7 +89,7 @@ def setup(sysdir, sysname, ligand_src=None):
     _merge_ligand_aa_pdb(mdsys.inpdb, ligand_src / f"{LIGAND_NAME}_aa.pdb")
 
     # Martinizing
-    mdsys.martinize_proteins_en(append=True) # SWITCH APPEND TO TRUE IF ALREADY DONE
+    mdsys.martinize_proteins_en(append=False) # SWITCH APPEND TO TRUE IF ALREADY DONE
     # mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
     #     p="backbone", pf="500",  text="", append=True) 
     # shutil.copy(mdsys.topdir / f"{molname}.itp", mdsys.topdir / "tmp.itp") 
@@ -203,4 +203,7 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 if __name__ == "__main__":
     sysdir = SYSDIR
     sysname = "1TQN"
-    setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
+    runname = "mdrun_1"
+    # setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
+    # md_npt(sysdir, sysname, runname)
+    trjconv(sysdir, sysname, runname)
