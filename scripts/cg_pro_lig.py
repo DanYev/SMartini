@@ -27,23 +27,73 @@ def postprocess_ligand():
     pass
 
 
+def _merge_ligand_aa_pdb(inpdb_path, ligand_aa_pdb_path):
+    """Merge ligand all-atom PDB (HETATM records) into inpdb.pdb.
+    
+    The ligand PDB is appended before the END line, with residue/chain info
+    preserved. This creates a combined PDB that martinize_ligands can use
+    to map the ligand onto the protein structure.
+    
+    Parameters
+    ----------
+    inpdb_path : Path
+        Path to the inpdb.pdb file (protein PDB, modified in-place).
+    ligand_aa_pdb_path : Path
+        Path to the ligand all-atom PDB file (e.g., HEM_aa.pdb).
+    """
+    if not Path(ligand_aa_pdb_path).exists():
+        logger.warning(f"Ligand AA PDB not found: {ligand_aa_pdb_path}, skipping merge")
+        return
+    
+    with open(inpdb_path, "r") as f:
+        inpdb_lines = f.readlines()
+    
+    with open(ligand_aa_pdb_path, "r") as f:
+        ligand_lines = f.readlines()
+    
+    # Collect only ATOM/HETATM lines from ligand PDB
+    ligand_atom_lines = [l for l in ligand_lines if l.startswith(("ATOM", "HETATM"))]
+    
+    if not ligand_atom_lines:
+        logger.warning(f"No ATOM/HETATM records in {ligand_aa_pdb_path}, skipping merge")
+        return
+    
+    # Find the END line and any TER line before it; insert ligand atoms before END
+    new_lines = []
+    for line in inpdb_lines:
+        if line.startswith("END"):
+            # Insert TER then ligand atoms before END
+            new_lines.append("TER\n")
+            new_lines.extend(ligand_atom_lines)
+            new_lines.append("TER\n")
+        new_lines.append(line)
+    
+    with open(inpdb_path, "w") as f:
+        f.writelines(new_lines)
+    
+    logger.info(f"Merged {len(ligand_atom_lines)} ligand atoms from {ligand_aa_pdb_path.name} into {inpdb_path.name}")
+
+
 def setup(sysdir, sysname, ligand_src=None):
     ### FOR CG PROTEIN+/RNA SYSTEMS ###
-    molname = sysname
+    molname = "protein_0"
     ligand_src = ligand_src or LIGAND_SRC
     mdsys = GmxSystem(sysdir, sysname)
     input_pdb = mdsys.root / f"{sysname}.pdb"
     mdsys.prepare_files(pour_martini=True) # be careful it can overwrite later files
-    mdsys.clean_pdb_mm(input_pdb, add_missing_atoms=True, add_hydrogens=False, pH=7.0) # Generates Amber ff names in PDB
+    mdsys.clean_pdb_mm(input_pdb, find_missing_residues=False, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
+    shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")  # Copy cleaned PDB to prodir for martinizing. This is the file that will be used for martinizing and ligand mapping.
     # shutil.copy(input_pdb, mdsys.inpdb)  # Copy source PDB to inpdb.pdb (bypasses clean_pdb_mm)
+
+    # Merge ligand all-atom PDB into inpdb for ligand martinization
+    _merge_ligand_aa_pdb(mdsys.inpdb, ligand_src / f"{LIGAND_NAME}_aa.pdb")
 
     # Martinizing
     mdsys.martinize_proteins_en(append=True) # SWITCH APPEND TO TRUE IF ALREADY DONE
-    # shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")
     # mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
     #     p="backbone", pf="500",  text="", append=True) 
     # shutil.copy(mdsys.topdir / f"{molname}.itp", mdsys.topdir / "tmp.itp") 
-    shutil.copy(mdsys.topdir / "tmp.itp", mdsys.topdir / f"{molname}.itp") 
+    # shutil.copy(mdsys.topdir / "tmp.itp", mdsys.topdir / f"{molname}.itp") 
 
     # LIGANDS 
     # Copy ligand .itp and .map files from source to the system's ligands directory
@@ -53,16 +103,16 @@ def setup(sysdir, sysname, ligand_src=None):
     shutil.copy(ligand_src / f"{LIGAND_NAME}.map", lig_dir / f"{LIGAND_NAME}.map")
     # !!!!!!
     # LIGANDS MUST BE IN ALPHABETICAL ORDER FOR NOW. I'LL FIX THIS LATER
-    mdsys.martinize_ligands(input_pdb=input_pdb, ligands=[LIGAND_NAME], merge_with=molname)
+    mdsys.martinize_ligands(input_pdb=mdsys.inpdb, ligands=[LIGAND_NAME], merge_with=molname)
     # !!!!!!!
     mdsys.make_cg_structure() # CG structure. Returns mdsys.solupdb ("solute.pdb") file
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
     _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"])
     
     # PROTEIN+WATER SYSTEMS:
-    mdsys.make_box(d="5.0", bt="dodecahedron", center="0 0 0")
+    mdsys.make_box(d="1.25", bt="dodecahedron", center="0 0 0")
     solvent = mdsys.root / "water.gro"
-    mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.17") # all kwargs go to gmx solvate command
+    mdsys.solvate(cp=mdsys.solupdb, cs=solvent, radius="0.20") # all kwargs go to gmx solvate command
     mdsys.add_bulk_ions(conc=0.10, pname="NA", nname="CL")
     # CENTERING AND PBC CORRECTIONS
     s = mdsys.sysgro
