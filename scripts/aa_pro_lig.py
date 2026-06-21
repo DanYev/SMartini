@@ -3,6 +3,8 @@ import sys
 import tempfile
 from pathlib import Path
 import shutil
+import pickle
+import hashlib
 
 import numpy as np
 import MDAnalysis as mda
@@ -41,7 +43,7 @@ SYSDIR = Path("protein_systems").resolve()
 PROTEIN = "KDA"
 SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
 LIGAND_RESNAME = "ANP"                   # residue name of the ligand in the PDB
-LIGAND_SDF = Path("examples/HEM/HEM.sdf")  # SDF for OpenFF parameterization
+LIGAND_SDF = Path(f"examples/{LIGAND_RESNAME}/{LIGAND_RESNAME}.sdf")  # SDF for OpenFF parameterization
 RUNNAME = "aa_md"                        # subdirectory for AA MD run
 
 # AA MD settings
@@ -64,6 +66,55 @@ system_pdb = aa_dir / "system.pdb"
 system_xml = aa_dir / "system.xml"
 
 
+# ---------------------------------------------------------------------------
+# Cache helpers for slow OpenFF Interchange computations
+# ---------------------------------------------------------------------------
+
+def _cache_key(ligand_path, openff_version):
+    """Build a deterministic cache key from the SDF/SMILES source and FF version."""
+    raw = f"{ligand_path}:{openff_version}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _cache_dir(work_dir=None):
+    """Return the cache directory, creating it if needed."""
+    if work_dir is not None:
+        d = Path(work_dir) / ".smartini_cache"
+    else:
+        d = Path(tempfile.gettempdir()) / "smartini_cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _save_interchange_cache(ligand_path, openff_version, interchange,
+                            ligand_topology, ligand_positions, work_dir=None):
+    """Pickle Interchange results to disk so they can be reloaded later."""
+    cdir = _cache_dir(work_dir)
+    key = _cache_key(ligand_path, openff_version)
+    cache_file = cdir / f"interchange_{key}.pkl"
+    data = {
+        "interchange": interchange,
+        "ligand_topology": ligand_topology,
+        "ligand_positions": ligand_positions,
+    }
+    with open(cache_file, "wb") as f:
+        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    logger.info("Cached Interchange results to %s", cache_file)
+
+
+def _load_interchange_cache(ligand_path, openff_version, work_dir=None):
+    """Load previously cached Interchange results, or return None on miss."""
+    cdir = _cache_dir(work_dir)
+    key = _cache_key(ligand_path, openff_version)
+    cache_file = cdir / f"interchange_{key}.pkl"
+    if not cache_file.exists():
+        return None
+    logger.info("Loading cached Interchange results from %s", cache_file)
+    with open(cache_file, "rb") as f:
+        data = pickle.load(f)
+    return data["interchange"], data["ligand_topology"], data["ligand_positions"]
+
+
 def process_ligand():
     """Build and solvate the ligand AA system, then write topology artifacts.
 
@@ -84,10 +135,17 @@ def process_ligand():
     forcefield = app.ForceField("amber19-all.xml", "amber19/opc.xml")
     # Ligand FF
     forcefield.registerTemplateGenerator(smirnoff.generator)
-    ff = ForceField("openff-2.1.0.offxml")
-    interchange = Interchange.from_smirnoff(ff, ligand.to_topology())
-    ligand_topology = interchange.to_openmm_topology()
-    ligand_positions = interchange.positions.to_openmm()
+    openff_version = "openff-2.1.0.offxml"
+    cached = _load_interchange_cache(input_file, openff_version, work_dir=aa_dir)
+    if cached is not None:
+        interchange, ligand_topology, ligand_positions = cached
+    else:
+        ff = ForceField(openff_version)
+        interchange = Interchange.from_smirnoff(ff, ligand.to_topology())
+        ligand_topology = interchange.to_openmm_topology()
+        ligand_positions = interchange.positions.to_openmm()
+        _save_interchange_cache(input_file, openff_version, interchange,
+                                ligand_topology, ligand_positions, work_dir=aa_dir)
     model = app.Modeller(ligand_topology, ligand_positions)
     logger.info("Adding solvent and ions")
     model.addSolvent(forcefield, 
@@ -246,10 +304,18 @@ def prepare_protein_ligand_system(
     # This guarantees the atom count matches the SMIRNOFF reference molecule
     # (the raw PDB residue may have a different protonation / H count).
     logger.info("Generating ligand topology from SDF via OpenFF Interchange...")
-    ff = ForceField(openff_version)
-    interchange = Interchange.from_smirnoff(ff, ligand_mol.to_topology())
-    ligand_topology = interchange.to_openmm_topology()
-    ligand_positions = interchange.positions.to_openmm()
+    cached = _load_interchange_cache(ligand_sdf or ligand_smiles or "ligand",
+                                     openff_version, work_dir=output_dir)
+    if cached is not None:
+        interchange, ligand_topology, ligand_positions = cached
+    else:
+        ff = ForceField(openff_version)
+        interchange = Interchange.from_smirnoff(ff, ligand_mol.to_topology())
+        ligand_topology = interchange.to_openmm_topology()
+        ligand_positions = interchange.positions.to_openmm()
+        _save_interchange_cache(ligand_sdf or ligand_smiles or str(temp_dir / "ligand"),
+                                openff_version, interchange,
+                                ligand_topology, ligand_positions, work_dir=output_dir)
 
     # Load fixed protein and combine with ligand
     logger.info("Combining fixed protein with ligand...")
