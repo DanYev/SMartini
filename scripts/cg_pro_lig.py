@@ -1,13 +1,13 @@
 import logging
 import shutil
+import numpy as np
 import MDAnalysis as mda
 from pathlib import Path
 
-import smartini
+from smartini import setup_logging
 logger = logging.getLogger("smartini")
-smartini.setup_logging(level=logging.INFO)
+setup_logging(level=logging.INFO)
 
-logger.info("Importing reforge modules...")
 from reforge.mdsystem.gmxmd import GmxSystem, GmxRun, get_ntomp
 from reforge.utils import clean_dir
 from reforge.forge.topology import Topology
@@ -15,42 +15,49 @@ from reforge.forge.topology import Topology
 
 # Global settings
 DT = 0.020  # Time step in picoseconds
-total_time = 1000  # Total simulation time in nanoseconds
-NSTEPS = int(total_time * 1e3 / DT)  # Number of MD steps for production run
+TOTAL_TIME = 1000  # Total simulation time in nanoseconds
+NSTEPS = int(TOTAL_TIME * 1e3 / DT)  # Number of MD steps for production run
+SYSDIR = Path("protein_systems").resolve()
+WDIR = SYSDIR / "1TQN"
+LIGAND_NAME = "HEM"
+LIGAND_SRC = Path("examples") / LIGAND_NAME  # Source directory for ligand .itp/.map files
+
 
 def postprocess_ligand():
     pass
 
 
-def setup(sysdir, sysname):
+def setup(sysdir, sysname, ligand_src=None):
     ### FOR CG PROTEIN+/RNA SYSTEMS ###
+    molname = sysname
+    ligand_src = ligand_src or LIGAND_SRC
     mdsys = GmxSystem(sysdir, sysname)
-    input_pdb = Path("structures") / f"{sysname}.pdb"
+    input_pdb = mdsys.root / f"{sysname}.pdb"
     mdsys.prepare_files(pour_martini=True) # be careful it can overwrite later files
-    # mdsys.clean_pdb_mm(input_pdb, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
+    mdsys.clean_pdb_mm(input_pdb, add_missing_atoms=True, add_hydrogens=False, pH=7.0) # Generates Amber ff names in PDB
+    # shutil.copy(input_pdb, mdsys.inpdb)  # Copy source PDB to inpdb.pdb (bypasses clean_pdb_mm)
 
     # Martinizing
-    # mdsys.martinize_proteins_en(append=True) # SWITCH APPEND TO TRUE IF ALREADY DONE
-    shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")
-    mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
-        p="backbone", pf="500",  text="", append=True) 
+    mdsys.martinize_proteins_en(append=True) # SWITCH APPEND TO TRUE IF ALREADY DONE
+    # shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")
+    # mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
+    #     p="backbone", pf="500",  text="", append=True) 
     # shutil.copy(mdsys.topdir / f"{molname}.itp", mdsys.topdir / "tmp.itp") 
     shutil.copy(mdsys.topdir / "tmp.itp", mdsys.topdir / f"{molname}.itp") 
 
     # LIGANDS 
-    anp_dir = mdsys.root / "ligands" / "ANP"
-    for x in ["A", "B"]:
-        Path(mdsys.root / "ligands"/ f"AN{x}").mkdir(parents=True, exist_ok=True)
-        shutil.copy(anp_dir / "ANP.itp", mdsys.root / "ligands"/ f"AN{x}"/ f"AN{x}.itp")
-        shutil.copy(anp_dir / "ANP.map", mdsys.root / "ligands"/ f"AN{x}"/ f"AN{x}.map")
+    # Copy ligand .itp and .map files from source to the system's ligands directory
+    lig_dir = mdsys.root / "ligands" / LIGAND_NAME
+    lig_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ligand_src / f"{LIGAND_NAME}.itp", lig_dir / f"{LIGAND_NAME}.itp")
+    shutil.copy(ligand_src / f"{LIGAND_NAME}.map", lig_dir / f"{LIGAND_NAME}.map")
     # !!!!!!
     # LIGANDS MUST BE IN ALPHABETICAL ORDER FOR NOW. I'LL FIX THIS LATER
-    mdsys.martinize_ligands(input_pdb=input_pdb, ligands=["ANA", "ANB", "LIB", "MG",], merge_with=molname)
+    mdsys.martinize_ligands(input_pdb=input_pdb, ligands=[LIGAND_NAME], merge_with=molname)
     # !!!!!!!
-    # mdsys.martinize_ligands(input_pdb=input_pdb, ligands=["ANP", "MG"], merge_with=molname)
     mdsys.make_cg_structure() # CG structure. Returns mdsys.solupdb ("solute.pdb") file
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
-    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N04", "N07", "D01", "MG"])
+    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"])
     
     # PROTEIN+WATER SYSTEMS:
     mdsys.make_box(d="5.0", bt="dodecahedron", center="0 0 0")
@@ -144,5 +151,6 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 
 if __name__ == "__main__":
-    postprocess_ligand()
-    
+    sysdir = SYSDIR
+    sysname = "1TQN"
+    setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
