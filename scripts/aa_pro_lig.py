@@ -1,27 +1,60 @@
 import logging
 import sys
-import smartini
+import tempfile
+from pathlib import Path
+import shutil
+
+import numpy as np
 import MDAnalysis as mda
 import openmm as mm
 from openmm import app, unit
-from openff.toolkit import ForceField, Molecule, Topology 
+from openff.toolkit import ForceField, Molecule
 from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from pdbfixer import PDBFixer
 
+import smartini
 from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
 
-"""Atomistic MD setup and production workflow for a single ligand system.
+"""Atomistic MD setup and production workflow for protein+ligand systems.
 
 Pipeline:
-1. Build solvated OpenMM system from ligand SDF.
-2. Run minimization, heating, equilibration, and production NPT.
-3. Export selected trajectory/topology for downstream CG fitting.
+1. Clean input PDB and separate protein from ligand.
+2. Parameterize protein (AMBER ff) and ligand (OpenFF) separately.
+3. Combine, solvate, and build the full OpenMM system.
+4. Run minimization, heating, equilibration, and production NPT.
+5. Export selected trajectory/topology for downstream analysis.
+
+Also includes standalone ligand workflow (``process_ligand``) inherited
+from the original SMartini pipeline.
 """
 
-# Use configuration from config.py
+# ---------------------------------------------------------------------------
+# Protein + Ligand system configuration
+# ---------------------------------------------------------------------------
+SYSDIR = Path("protein_systems").resolve()
+SYSNAME = "1TQN"                        # system name / PDB basename
+LIGAND_RESNAME = "HEM"                   # residue name of the ligand in the PDB
+LIGAND_SDF = Path("examples/HEM/HEM.sdf")  # SDF for OpenFF parameterization
+RUNNAME = "aa_md"                        # subdirectory for AA MD run
+
+# AA MD settings
+AA_TEMPERATURE = 300.0                   # Kelvin
+AA_PRESSURE = 1.0                        # bar
+AA_GAMMA = 1.0                           # friction coefficient (1/ps)
+AA_TIMESTEP_FS = 2.0                     # femtoseconds
+AA_TOTAL_STEPS = int(5e6)                # 10 ns at 2 fs
+AA_TRJ_NOUT = 10000                      # trajectory output interval
+AA_LOG_NOUT = 10000                      # log output interval
+AA_CHK_NOUT = 50000                      # checkpoint interval
+AA_SELECTION = "all"                     # MDAnalysis selection for trajectory output
+
+# Standalone-ligand globals (from CFG, used by process_ligand)
 ligand_name = CFG.molname
 sysdir = CFG.systems_dir
 wdir = CFG.wdir
@@ -163,7 +196,6 @@ def prepare_protein_ligand_system(
         raise ValueError(f"No ligand found with resname '{ligand_resname}'")
     
     # Save temporary files for protein and ligand
-    import tempfile
     temp_dir = Path(tempfile.mkdtemp())
     protein_pdb = temp_dir / "protein.pdb"
     ligand_pdb = temp_dir / "ligand.pdb"
@@ -208,10 +240,39 @@ def prepare_protein_ligand_system(
                 "ligand_smiles or ligand_sdf parameter."
             )
     
-    # Store original ligand positions from PDB
-    original_ligand_positions = [pdb.positions[atom.index] 
-                                  for atom in pdb.topology.atoms() 
-                                  if atom.residue.name == ligand_resname]
+    # --- Pre-flight check: SMIRNOFF reference molecule vs PDB residue ---
+    # SMIRNOFF does exact graph matching — the number of atoms in the
+    # reference molecule (from SDF/SMILES) must equal the number of atoms
+    # in the PDB residue.  If they differ (e.g. because the PDB was
+    # pre-processed and has extra/missing hydrogens), matching will fail.
+    ref_n_atoms = ligand_mol.n_atoms
+    pdb_lig_n_atoms = len(ligand_atoms)
+    if ref_n_atoms != pdb_lig_n_atoms:
+        msg = (
+            f"Atom count mismatch between SMIRNOFF reference molecule "
+            f"({ref_n_atoms} atoms from SDF/SMILES) and PDB residue "
+            f"'{ligand_resname}' ({pdb_lig_n_atoms} atoms).\n"
+            f"SMIRNOFF requires an exact match.  Possible fixes:\n"
+            f"  1. Use a PDB that has NOT been pre-processed "
+            f"(no added hydrogens, no missing atoms).\n"
+            f"  2. Provide an SDF/SMILES whose protonation state matches "
+            f"the PDB residue exactly.\n"
+            f"  3. Use GAFFTemplateGenerator instead of "
+            f"SMIRNOFFTemplateGenerator (more forgiving)."
+        )
+        logger.error(msg)
+        raise ValueError(msg)
+    logger.info("Pre-flight OK: %d atoms in reference molecule matches PDB residue", ref_n_atoms)
+
+    # Load fixed protein and combine with ligand
+    logger.info("Combining fixed protein with ligand...")
+    fixed_protein = app.PDBFile(str(fixed_protein_pdb))
+    ligand_pdb_obj = app.PDBFile(str(ligand_pdb))
+    modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
+    modeller.add(ligand_pdb_obj.topology, ligand_pdb_obj.positions)
+    with open("temp.pdb", 'w') as f:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, f)
+    exit()
     
     logger.info("Setting up force fields...")
     
@@ -285,77 +346,161 @@ def prepare_protein_ligand_system(
     
     return system, modeller.topology, modeller.positions
 
-    
-def md_npt(): 
-    """Run AA MD in OpenMM: minimize, heat, equilibrate, then produce trajectory."""
-    # Prep
-    logger.info("Loading the PDB file...")
-    pdb = app.PDBFile(str(system_pdb))
-    logger.info("Loading the XML file...")
-    system = _load_system_from_xml(system_xml)
-    # Create simulation object
-    integrator = mm.LangevinMiddleIntegrator(0, CFG.aa_gamma / unit.picosecond, 1*unit.femtosecond)  
-    simulation = app.Simulation(pdb.topology, system, integrator) 
-    simulation.context.setPositions(pdb.positions)
-    reporters = _get_reporters(append=False, prefix='md')
-    # Minimization
-    logger.info("Minimizing energy...")
-    simulation.minimizeEnergy(maxIterations=1000)
-    # Heatup
-    logger.info("Heating up...")
-    n_cycles = 10
-    steps_per_cycle = 1000
-    for i in range(n_cycles):
-        current_temp = (i + 1) * CFG.temperature * unit.kelvin / n_cycles
-        simulation.integrator.setTemperature(current_temp)
-        simulation.step(steps_per_cycle)
-    # Eqilibration
-    logger.info("Equilibrating...")
-    barostat = mm.MonteCarloBarostat(CFG.aa_pressure_bar * unit.bar, CFG.temperature * unit.kelvin)
-    system.addForce(barostat)
-    simulation.integrator.setTemperature(CFG.temperature * unit.kelvin)
-    simulation.context.reinitialize(preserveState=True)
-    simulation.step(10000)
-    # MD
-    logger.info("Production...")
-    # state = simulation.context.getState(getPositions=True, getVelocities=True)
-    simulation.integrator.setStepSize(CFG.aa_timestep_fs * unit.femtoseconds)
-    simulation.context.reinitialize(preserveState=True)
-    simulation.reporters = reporters
-    simulation.step(int(CFG.aa_total_steps))
-    logger.info("Done!")
 
-
-def trjconv(start=0, stop=None, step=1, fit=True):
-    """Post-process AA trajectory and write aligned sampled outputs.
+def run_aa_md(system, topology, positions, output_dir,
+              temperature=AA_TEMPERATURE,
+              pressure=AA_PRESSURE,
+              gamma=AA_GAMMA,
+              timestep_fs=AA_TIMESTEP_FS,
+              total_steps=AA_TOTAL_STEPS,
+              log_nout=AA_LOG_NOUT,
+              trj_nout=AA_TRJ_NOUT,
+              chk_nout=AA_CHK_NOUT):
+    """Run AA MD in OpenMM: minimize, heat, equilibrate, produce trajectory.
 
     Parameters
     ----------
-    start, stop, step : int or None
-        Frame slicing applied to ``md.xtc``.
-    fit : bool
-        If ``True``, perform rotational/translational fitting to the selected
-        atom group before writing.
+    system : openmm.System
+    topology : openmm.app.Topology
+    positions : list of Vec3
+    output_dir : Path
+        Directory for output files (log, xtc, chk, xml checkpoint).
+    temperature, pressure, gamma, timestep_fs, total_steps : float/int
+    log_nout, trj_nout, chk_nout : int
     """
-    top = aa_dir / "md.pdb"
-    traj = aa_dir / "md.xtc"
-    out_top = aa_dir / "topology.pdb"
-    out_traj = aa_dir / "samples.xtc"
-    universe = mda.Universe(str(top), str(traj))
-    atom_group = universe.select_atoms(CFG.aa_selection)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Integrator ---
+    integrator = mm.LangevinMiddleIntegrator(
+        temperature * unit.kelvin,
+        gamma / unit.picosecond,
+        1.0 * unit.femtoseconds,  # small step for minimization/heat-up
+    )
+    simulation = app.Simulation(topology, system, integrator)
+    simulation.context.setPositions(positions)
+
+    # --- Minimization ---
+    logger.info("Minimizing energy...")
+    simulation.minimizeEnergy(maxIterations=10000, tolerance=10 * unit.kilojoule_per_mole)
+    state = simulation.context.getState(getEnergy=True)
+    logger.info(f"  Energy after minimization: {state.getPotentialEnergy()}")
+
+    # --- Heat-up (NVT) ---
+    logger.info("Heating up...")
+    n_cycles = 50
+    steps_per_cycle = 200
+    for i in range(n_cycles):
+        current_temp = (i + 1) * temperature * unit.kelvin / n_cycles
+        simulation.integrator.setTemperature(current_temp)
+        simulation.step(steps_per_cycle)
+
+    # --- Equilibration (NPT) ---
+    logger.info("Equilibrating (NPT)...")
+    barostat = mm.MonteCarloBarostat(pressure * unit.bar, temperature * unit.kelvin)
+    system.addForce(barostat)
+    simulation.context.reinitialize(preserveState=True)
+    simulation.integrator.setTemperature(temperature * unit.kelvin)
+    simulation.step(5000)
+
+    # --- Production ---
+    logger.info("Production MD (%d steps)...", total_steps)
+    simulation.integrator.setStepSize(timestep_fs * unit.femtoseconds)
+    simulation.context.reinitialize(preserveState=True)
+
+    # Reporters
+    log_file = output_dir / "md.log"
+    chk_file = output_dir / "md.chk"
+    xtc_file = output_dir / "md.xtc"
+
+    reporters = [
+        app.StateDataReporter(
+            str(log_file), log_nout,
+            step=True, time=True,
+            potentialEnergy=True, kineticEnergy=True,
+            temperature=True, speed=True,
+            append=False,
+        ),
+        app.StateDataReporter(
+            sys.stderr, log_nout,
+            step=True, time=True,
+            potentialEnergy=True, kineticEnergy=True,
+            temperature=True, speed=True,
+            append=False,
+        ),
+        app.CheckpointReporter(str(chk_file), chk_nout),
+    ]
+
+    # XTC reporter with atom selection
+    if AA_SELECTION == "all":
+        atom_subset = None
+    else:
+        # Use the system.pdb written by prepare_protein_ligand_system
+        system_pdb = output_dir.parent / "system.pdb"
+        u_sel = mda.Universe(str(system_pdb))
+        atom_subset = u_sel.select_atoms(AA_SELECTION).indices.tolist()
+        logger.info("XTC subset: %d atoms", len(atom_subset))
+
+    reporters.append(
+        app.XTCReporter(str(xtc_file), trj_nout,
+                        append=False, atomSubset=atom_subset)
+    )
+
+    simulation.reporters = reporters
+    simulation.step(int(total_steps))
+
+    # Save final state as XML
+    state_xml = output_dir / "md.xml"
+    with open(str(state_xml), "w") as f:
+        f.write(mm.XmlSerializer.serialize(system))
+    logger.info("Production MD complete. Final system saved to %s", state_xml)
+
+    return simulation
+
+
+def trjconv_aa(top_pdb, traj_xtc, output_dir,
+               start=0, stop=None, step=1, fit=True,
+               selection=AA_SELECTION):
+    """Post-process AA trajectory: fit, subsample, and write outputs.
+
+    Parameters
+    ----------
+    top_pdb : Path
+        Reference PDB for topology and fitting.
+    traj_xtc : Path
+        Input trajectory.
+    output_dir : Path
+        Directory for ``topology.pdb`` and ``samples.xtc``.
+    start, stop, step : int or None
+    fit : bool
+    selection : str
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    out_top = output_dir / "topology.pdb"
+    out_traj = output_dir / "samples.xtc"
+
+    universe = mda.Universe(str(top_pdb), str(traj_xtc))
+    atom_group = universe.select_atoms(selection)
+    logger.info("Converting trajectory: %d atoms selected", atom_group.n_atoms)
 
     if fit:
-        ref_universe = mda.Universe(str(top))
-        ref_atoms = ref_universe.select_atoms(CFG.aa_selection)
+        ref_universe = mda.Universe(str(top_pdb))
+        ref_atoms = ref_universe.select_atoms(selection)
         from MDAnalysis.transformations import fit_rot_trans
-        universe.trajectory.add_transformations(fit_rot_trans(atom_group, ref_atoms))
+        universe.trajectory.add_transformations(
+            fit_rot_trans(atom_group, ref_atoms)
+        )
 
     atom_group.write(str(out_top))
     with mda.Writer(str(out_traj), n_atoms=atom_group.n_atoms) as writer:
         for _ in universe.trajectory[start:stop:step]:
             writer.write(atom_group)
-    logger.info("Done!")
+    logger.info("Trajectory conversion complete: %s, %s", out_top, out_traj)
 
+
+# Standalone-ligand workflow helpers (kept for backwards compatibility)
 
 def _save_system_to_xml(system, filename):
     """Serialize an OpenMM ``System`` to XML."""
@@ -372,40 +517,42 @@ def _load_system_from_xml(filename):
     return system
 
 
-def _get_reporters(append=False, prefix="md"):
-    """Get reporters for MD simulation using OpenMM reporters."""
-    # Log reporter (file)
-    log_reporter = app.StateDataReporter(
-        str(aa_dir / f"{prefix}.log"), 
-        CFG.aa_log_nout, step=True, time=True, potentialEnergy=True, kineticEnergy=True,
-        temperature=True, speed=True, append=append)
-    # Error reporter (stderr)
-    err_reporter = app.StateDataReporter(
-        sys.stderr, CFG.aa_log_nout, time=True, step=True, potentialEnergy=True, kineticEnergy=True,
-        temperature=True, speed=True, append=append)
-
-    # Position-only trajectory reporter (XTC) with atom subset
-    if CFG.aa_selection == "all":
-        atom_subset = None
-        logger.info("Setting up XTC reporter for all atoms")
-    else:
-        universe = mda.Universe(str(system_pdb))
-        atom_subset = universe.select_atoms(CFG.aa_selection).indices.tolist()
-        logger.info(
-            "Setting up XTC reporter with selection '%s' (%d atoms)",
-            CFG.aa_selection,
-            len(atom_subset),
-        )
-    traj_reporter = app.XTCReporter(
-        str(aa_dir / f"{prefix}.xtc"),
-        CFG.aa_trj_nout,
-        append=append,
-        atomSubset=atom_subset,
-    )
-    return log_reporter, err_reporter, traj_reporter
-
 
 if __name__ == "__main__":
-    # process_ligand()
-    md_npt()
-    trjconv()
+    # -----------------------------------------------------------------------
+    # Protein + Ligand AA MD workflow for 1TQN with HEM
+    # -----------------------------------------------------------------------
+    pdb_input = SYSDIR / SYSNAME / "inpdb.pdb"
+    aa_out_dir = SYSDIR / SYSNAME / RUNNAME
+
+    logger.info("=" * 60)
+    logger.info("Building protein+ligand system for %s", SYSNAME)
+    logger.info("  PDB: %s", pdb_input)
+    logger.info("  Ligand: %s", LIGAND_RESNAME)
+    logger.info("  Output: %s", aa_out_dir)
+    logger.info("=" * 60)
+
+    # Step 1: Prepare the system
+    system, topol, pos = prepare_protein_ligand_system(
+        pdb_file=pdb_input,
+        ligand_resname=LIGAND_RESNAME,
+        ligand_sdf=LIGAND_SDF,
+        add_solvent=True,
+        box_padding=1.0 * unit.nanometer,
+        ionic_strength=0.10 * unit.molar,
+        output_dir=aa_out_dir,
+    )
+
+    # Step 2: Run AA MD (minimize, heat, equilibrate, production)
+    run_aa_md(
+        system, topol, pos,
+        output_dir=aa_out_dir,
+    )
+
+    # Step 3: Post-process trajectory
+    md_pdb = aa_out_dir / "system.pdb"
+    md_xtc = aa_out_dir / "md.xtc"
+    trjconv_aa(
+        md_pdb, md_xtc, aa_out_dir,
+        start=0, stop=None, step=1, fit=True,
+    )
