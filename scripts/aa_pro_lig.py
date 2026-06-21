@@ -38,8 +38,9 @@ from the original SMartini pipeline.
 # Protein + Ligand system configuration
 # ---------------------------------------------------------------------------
 SYSDIR = Path("protein_systems").resolve()
-SYSNAME = "1TQN"                        # system name / PDB basename
-LIGAND_RESNAME = "HEM"                   # residue name of the ligand in the PDB
+PROTEIN = "KDA"
+SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
+LIGAND_RESNAME = "ANP"                   # residue name of the ligand in the PDB
 LIGAND_SDF = Path("examples/HEM/HEM.sdf")  # SDF for OpenFF parameterization
 RUNNAME = "aa_md"                        # subdirectory for AA MD run
 
@@ -240,16 +241,6 @@ def prepare_protein_ligand_system(
                 "ligand_smiles or ligand_sdf parameter."
             )
     
-    # # Compute original ligand centroid from PDB for alignment
-    # original_lig_pos = np.array([
-    #     [float(p[0]), float(p[1]), float(p[2])]
-    #     for atom in pdb.topology.atoms()
-    #     if atom.residue.name == ligand_resname
-    #     for p in [pdb.positions[atom.index]]
-    # ])
-    # original_centroid = mm.Vec3(*original_lig_pos.mean(axis=0))
-
-    # logger.info("Setting up force fields...")
 
     # Generate ligand topology *from the SDF molecule* via OpenFF Interchange.
     # This guarantees the atom count matches the SMIRNOFF reference molecule
@@ -260,30 +251,10 @@ def prepare_protein_ligand_system(
     ligand_topology = interchange.to_openmm_topology()
     ligand_positions = interchange.positions.to_openmm()
 
-    # Align generated positions to the original PDB binding-site location
-    gen_arr = np.array([[float(p[0]), float(p[1]), float(p[2])] for p in ligand_positions])
-    gen_centroid = mm.Vec3(*gen_arr.mean(axis=0))
-    shift = original_centroid - gen_centroid
-    ligand_positions = [pos + shift for pos in ligand_positions]
-    logger.info("Ligand aligned to binding site (shift = %s nm)", shift)
-
-    # Create SMIRNOFF template generator — now the molecule matches the topology
-    smirnoff_generator = SMIRNOFFTemplateGenerator(molecules=[ligand_mol])
-
-    # Create the main force field with protein parameters
-    forcefield = app.ForceField(protein_ff, water_ff)
-
-    # Register the ligand template generator
-    forcefield.registerTemplateGenerator(smirnoff_generator.generator)
-
     # Load fixed protein and combine with ligand
     logger.info("Combining fixed protein with ligand...")
     fixed_protein = app.PDBFile(str(fixed_protein_pdb))
-
-    # Create modeler with fixed protein
     modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
-
-    # Add ligand using the SDF-generated topology (atom count matches SMIRNOFF)
     modeller.add(ligand_topology, ligand_positions)
     
     # Add solvent if requested
@@ -512,7 +483,7 @@ if __name__ == "__main__":
     # -----------------------------------------------------------------------
     # Protein + Ligand AA MD workflow for 1TQN with HEM
     # -----------------------------------------------------------------------
-    pdb_input = SYSDIR / SYSNAME / "inpdb.pdb"
+    pdb_input = SYSDIR / f"{PROTEIN}.pdb"
     aa_out_dir = SYSDIR / SYSNAME / RUNNAME
 
     logger.info("=" * 60)
