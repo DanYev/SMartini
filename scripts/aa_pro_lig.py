@@ -240,61 +240,51 @@ def prepare_protein_ligand_system(
                 "ligand_smiles or ligand_sdf parameter."
             )
     
-    # --- Pre-flight check: SMIRNOFF reference molecule vs PDB residue ---
-    # SMIRNOFF does exact graph matching — the number of atoms in the
-    # reference molecule (from SDF/SMILES) must equal the number of atoms
-    # in the PDB residue.  If they differ (e.g. because the PDB was
-    # pre-processed and has extra/missing hydrogens), matching will fail.
-    ref_n_atoms = ligand_mol.n_atoms
-    pdb_lig_n_atoms = len(ligand_atoms)
-    if ref_n_atoms != pdb_lig_n_atoms:
-        msg = (
-            f"Atom count mismatch between SMIRNOFF reference molecule "
-            f"({ref_n_atoms} atoms from SDF/SMILES) and PDB residue "
-            f"'{ligand_resname}' ({pdb_lig_n_atoms} atoms).\n"
-            f"SMIRNOFF requires an exact match.  Possible fixes:\n"
-            f"  1. Use a PDB that has NOT been pre-processed "
-            f"(no added hydrogens, no missing atoms).\n"
-            f"  2. Provide an SDF/SMILES whose protonation state matches "
-            f"the PDB residue exactly.\n"
-            f"  3. Use GAFFTemplateGenerator instead of "
-            f"SMIRNOFFTemplateGenerator (more forgiving)."
-        )
-        logger.error(msg)
-        raise ValueError(msg)
-    logger.info("Pre-flight OK: %d atoms in reference molecule matches PDB residue", ref_n_atoms)
+    # # Compute original ligand centroid from PDB for alignment
+    # original_lig_pos = np.array([
+    #     [float(p[0]), float(p[1]), float(p[2])]
+    #     for atom in pdb.topology.atoms()
+    #     if atom.residue.name == ligand_resname
+    #     for p in [pdb.positions[atom.index]]
+    # ])
+    # original_centroid = mm.Vec3(*original_lig_pos.mean(axis=0))
+
+    # logger.info("Setting up force fields...")
+
+    # Generate ligand topology *from the SDF molecule* via OpenFF Interchange.
+    # This guarantees the atom count matches the SMIRNOFF reference molecule
+    # (the raw PDB residue may have a different protonation / H count).
+    logger.info("Generating ligand topology from SDF via OpenFF Interchange...")
+    ff = ForceField(openff_version)
+    interchange = Interchange.from_smirnoff(ff, ligand_mol.to_topology())
+    ligand_topology = interchange.to_openmm_topology()
+    ligand_positions = interchange.positions.to_openmm()
+
+    # Align generated positions to the original PDB binding-site location
+    gen_arr = np.array([[float(p[0]), float(p[1]), float(p[2])] for p in ligand_positions])
+    gen_centroid = mm.Vec3(*gen_arr.mean(axis=0))
+    shift = original_centroid - gen_centroid
+    ligand_positions = [pos + shift for pos in ligand_positions]
+    logger.info("Ligand aligned to binding site (shift = %s nm)", shift)
+
+    # Create SMIRNOFF template generator — now the molecule matches the topology
+    smirnoff_generator = SMIRNOFFTemplateGenerator(molecules=[ligand_mol])
+
+    # Create the main force field with protein parameters
+    forcefield = app.ForceField(protein_ff, water_ff)
+
+    # Register the ligand template generator
+    forcefield.registerTemplateGenerator(smirnoff_generator.generator)
 
     # Load fixed protein and combine with ligand
     logger.info("Combining fixed protein with ligand...")
     fixed_protein = app.PDBFile(str(fixed_protein_pdb))
-    ligand_pdb_obj = app.PDBFile(str(ligand_pdb))
-    modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
-    modeller.add(ligand_pdb_obj.topology, ligand_pdb_obj.positions)
-    with open("temp.pdb", 'w') as f:
-        app.PDBFile.writeFile(modeller.topology, modeller.positions, f)
-    exit()
-    
-    logger.info("Setting up force fields...")
-    
-    # Create SMIRNOFF template generator for the ligand
-    smirnoff_generator = SMIRNOFFTemplateGenerator(molecules=[ligand_mol])
-    
-    # Create the main force field with protein parameters
-    forcefield = app.ForceField(protein_ff, water_ff)
-    
-    # Register the ligand template generator
-    forcefield.registerTemplateGenerator(smirnoff_generator.generator)
-    
-    # Load fixed protein and combine with ligand
-    logger.info("Combining fixed protein with ligand...")
-    fixed_protein = app.PDBFile(str(fixed_protein_pdb))
-    ligand_pdb_obj = app.PDBFile(str(ligand_pdb))
-    
+
     # Create modeler with fixed protein
     modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
-    
-    # Add ligand to the system
-    modeller.add(ligand_pdb_obj.topology, ligand_pdb_obj.positions)
+
+    # Add ligand using the SDF-generated topology (atom count matches SMIRNOFF)
+    modeller.add(ligand_topology, ligand_positions)
     
     # Add solvent if requested
     if add_solvent:
