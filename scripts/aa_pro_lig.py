@@ -275,7 +275,10 @@ def prepare_protein_ligand_system(
     with open(fixed_protein_pdb, 'w') as f:
         app.PDBFile.writeFile(fixer.topology, fixer.positions, f)
     logger.info(f"Fixed protein saved to {fixed_protein_pdb}")
-    
+
+    # Create the AMBER force field for protein + water
+    forcefield = app.ForceField(protein_ff, water_ff)
+
     # Get ligand molecule for OpenFF parameterization
     if ligand_sdf:
         logger.info(f"Loading ligand from SDF file: {ligand_sdf}")
@@ -298,7 +301,11 @@ def prepare_protein_ligand_system(
                 "Could not determine ligand molecule. Please provide either "
                 "ligand_smiles or ligand_sdf parameter."
             )
-    
+
+    # Register the ligand FF template on the AMBER force field so that
+    # forcefield.createSystem() can parameterize the ligand atoms.
+    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand_mol])
+    forcefield.registerTemplateGenerator(smirnoff.generator)
 
     # Generate ligand topology *from the SDF molecule* via OpenFF Interchange.
     # This guarantees the atom count matches the SMIRNOFF reference molecule
@@ -320,8 +327,23 @@ def prepare_protein_ligand_system(
     # Load fixed protein and combine with ligand
     logger.info("Combining fixed protein with ligand...")
     fixed_protein = app.PDBFile(str(fixed_protein_pdb))
+
+    # --- Debug: save fixed protein PDB ---
+    _debug_dir = SYSDIR / SYSNAME
+    _debug_dir.mkdir(parents=True, exist_ok=True)
+    _debug_pdb = _debug_dir / "debug_protein_fixed.pdb"
+    with open(_debug_pdb, "w") as f:
+        app.PDBFile.writeFile(fixed_protein.topology, fixed_protein.positions, f, keepIds=True)
+    logger.info("Debug: fixed protein saved to %s (%d atoms)", _debug_pdb, fixed_protein.topology.getNumAtoms())
+
     modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
     modeller.add(ligand_topology, ligand_positions)
+
+    # --- Debug: save combined protein+ligand PDB (before solvation) ---
+    _debug_comb = _debug_dir / "debug_protein_ligand.pdb"
+    with open(_debug_comb, "w") as f:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, f, keepIds=True)
+    logger.info("Debug: protein+ligand saved to %s (%d atoms)", _debug_comb, modeller.topology.getNumAtoms())
     
     # Add solvent if requested
     if add_solvent:
