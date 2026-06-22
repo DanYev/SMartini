@@ -1,7 +1,8 @@
 """Side-by-side AA/CG visualisation of ligands in examples.
 
-Generates an interactive HTML page per ligand showing the AA and CG
-topology side by side using py3Dmol.
+Generates interactive HTML pages using py3Dmol.
+CG beads are rendered as semi-transparent spheres (SASA-rule radii:
+T* → 0.17, S* → 0.205, else → 0.235 nm) plus sticks from CONECT records.
 
 Usage::
 
@@ -10,9 +11,12 @@ Usage::
     python scripts/visualize.py --open ANP   # generate and open in browser
 """
 
+import json
 import logging
+import re
 import sys
 import webbrowser
+from collections import defaultdict
 from pathlib import Path
 
 import smartini
@@ -26,6 +30,41 @@ smartini.setup_logging(level=logging.INFO)
 # ---------------------------------------------------------------------------
 EXAMPLES_DIR = Path("examples").resolve()
 OUTPUT_DIR = Path("analysis/views").resolve()
+
+
+# ---------------------------------------------------------------------------
+# ITP helpers  (same as analysis.py — self-contained so script runs standalone)
+# ---------------------------------------------------------------------------
+
+def _parse_itp(itp_path: Path) -> tuple[list[list[int]], list[str]]:
+    """Parse ``LIGAND.itp`` → (mapping, bead_types)."""
+    text = itp_path.read_text()
+    m = re.search(r"; Mapping:\s*(\[\[.*?\]\])", text)
+    if not m:
+        raise ValueError(f"No '; Mapping:' found in {itp_path}")
+    mapping = [list(map(int, g.strip("[] ").split(",")))
+               for g in re.findall(r"\[([^\]]+)\]", m.group(1))]
+    in_atoms = False
+    bead_types = []
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            in_atoms = (s == "[ atoms ]" or s == "[atoms]")
+            continue
+        if in_atoms and s and not s.startswith(";") and not s.startswith("#"):
+            parts = s.split()
+            if len(parts) >= 2:
+                bead_types.append(parts[1])
+    return mapping, bead_types
+
+
+def _bead_radius(bead_type: str) -> float:
+    """Martini bead radius (nm): T* → 0.17, S* → 0.205, else → 0.235."""
+    if bead_type.startswith("T"):
+        return 0.17
+    if bead_type.startswith("S"):
+        return 0.205
+    return 0.235
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -58,21 +97,31 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 (function() {{
   var Viewer = $3Dmol.createViewer;
 
+  // --- AA ---
   var aa = Viewer("aa_view", {{ backgroundColor: "0x1a1a2e" }});
   aa.addModel(`{aa_pdb}`, "pdb");
   aa.setStyle({{}}, {{ stick: {{ colorscheme: "cyanCarbon" }} }});
   aa.zoomTo();
   aa.render();
 
+  // --- CG ---
   var cg = Viewer("cg_view", {{ backgroundColor: "0x1a1a2e" }});
+  // sticks from CONECT records
   cg.addModel(`{cg_pdb}`, "pdb");
-  cg.setStyle({{}}, {{ sphere: {{ radius: 0.3, colorscheme: "orangeCarbon" }} }});
-  cg.addModel(`{cg_pdb}`, "pdb");
-  cg.setStyle({{ model: 1 }}, {{ stick: {{ radius: 0.08, colorscheme: "orangeCarbon" }} }});
+  cg.setStyle({{}}, {{ stick: {{ radius: 0.08, colorscheme: "orangeCarbon" }} }});
+  // semi-transparent spheres — one model per bead type (array-based selector)
+  var beadRadii = {bead_radii_json};
+  var beadGroups = {bead_groups_json};
+  for (var bt in beadGroups) {{
+    var r = beadRadii[bt];
+    var atomSel = beadGroups[bt].map(function(i) {{ return i + 1; }}); // 1‑based
+    cg.addModel(`{cg_pdb}`, "pdb");
+    cg.setStyle({{ atom: atomSel }}, {{ sphere: {{ radius: r, opacity: 0.55, colorscheme: "orangeCarbon" }} }});
+  }}
   cg.zoomTo();
   cg.render();
 
-  // Sync rotation between the two viewers
+  // --- Sync rotation ---
   var dragging = false;
   aa.setCallback("ondragstart", function() {{ dragging = true; }});
   aa.setCallback("ondrag", function(rot) {{ cg.setRotation(rot); if (dragging) cg.render(); }});
@@ -88,7 +137,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 # ---------------------------------------------------------------------------
-# Core
+# HTML generation
 # ---------------------------------------------------------------------------
 
 def generate_view(ligand_name: str, out_dir: Path | None = None) -> Path | None:
@@ -97,28 +146,42 @@ def generate_view(ligand_name: str, out_dir: Path | None = None) -> Path | None:
     Returns the path to the generated HTML file, or None if data is missing.
     """
     aa_pdb = EXAMPLES_DIR / ligand_name / "aa_md" / "topology.pdb"
-    cg_pdb = EXAMPLES_DIR / ligand_name / "cg_md" / CFG.cg_runname / "topology.pdb"
+    cg_pdb = EXAMPLES_DIR / ligand_name / f"{ligand_name}.pdb"       # has CONECT
+    cg_top = EXAMPLES_DIR / ligand_name / "cg_md" / CFG.cg_runname / "topology.pdb"
+    itp_path = EXAMPLES_DIR / ligand_name / f"{ligand_name}.itp"
 
     if not aa_pdb.exists():
         logger.warning("[%s] AA topology not found: %s", ligand_name, aa_pdb)
         return None
+    if not cg_top.exists():
+        logger.warning("[%s] CG data not found: %s", ligand_name, cg_top)
+        return None
     if not cg_pdb.exists():
-        logger.warning("[%s] CG topology not found: %s", ligand_name, cg_pdb)
+        logger.warning("[%s] CG PDB (with CONECT) not found: %s", ligand_name, cg_pdb)
         return None
 
     if out_dir is None:
         out_dir = OUTPUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Build bead-type → radius and bead-type → atom-index lists for JS
+    _, bead_types = _parse_itp(itp_path)
+    bead_radii = {bt: _bead_radius(bt) for bt in set(bead_types)}
+    bead_groups = defaultdict(list)
+    for i, bt in enumerate(bead_types):
+        bead_groups[bt].append(i)
+
     html = _HTML_TEMPLATE.format(
         title=f"{ligand_name} &mdash; AA vs CG",
         aa_pdb=aa_pdb.read_text(),
         cg_pdb=cg_pdb.read_text(),
+        bead_radii_json=json.dumps(bead_radii),
+        bead_groups_json=json.dumps(dict(bead_groups)),
     )
 
     out_path = out_dir / f"{ligand_name}.html"
     out_path.write_text(html)
-    logger.info("[%s] View saved → %s", ligand_name, out_path)
+    logger.info("[%s] HTML view saved → %s", ligand_name, out_path)
     return out_path
 
 
@@ -183,7 +246,7 @@ if __name__ == "__main__":
         logger.error("No ligands with AA+CG topology found in examples/")
         sys.exit(1)
 
-    logger.info("Generating views for %d ligand(s): %s", len(names), ", ".join(names))
+    logger.info("Generating HTML views for %d ligand(s): %s", len(names), ", ".join(names))
     for name in sorted(names):
         generate_view(name)
 
