@@ -16,7 +16,6 @@ import logging
 import re
 import sys
 import webbrowser
-from collections import defaultdict
 from pathlib import Path
 
 import smartini
@@ -72,12 +71,12 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <title>{title}</title>
 <style>
-  body {{ font-family: sans-serif; margin: 0; padding: 16px; background: #1a1a2e; color: #eee; }}
-  h1 {{ text-align: center; }}
-  .grid {{ display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }}
+  body {{ font-family: sans-serif; margin: 0; padding: 8px; background: #1a1a2e; color: #eee; }}
+  h1 {{ text-align: center; margin: 0 0 4px 0; font-size: 18px; }}
+  .grid {{ display: flex; gap: 4px; justify-content: center; }}
   .panel {{ flex: 1 1 450px; max-width: 600px; }}
-  .panel h2 {{ text-align: center; margin: 4px 0; }}
-  .viewer {{ width: 100%; height: 450px; position: relative; }}
+  .panel h2 {{ text-align: center; margin: 0 0 2px 0; font-size: 14px; }}
+  .viewer {{ width: 100%; height: 480px; position: relative; }}
 </style>
 </head>
 <body>
@@ -106,29 +105,38 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 
   // --- CG ---
   var cg = Viewer("cg_view", {{ backgroundColor: "0x1a1a2e" }});
-  // sticks from CONECT records
   cg.addModel(`{cg_pdb}`, "pdb");
-  cg.setStyle({{}}, {{ stick: {{ radius: 0.08, colorscheme: "orangeCarbon" }} }});
-  // semi-transparent spheres — one model per bead type (array-based selector)
+  // sticks from CONECT records
+  cg.setStyle({{}}, {{ stick: {{ radius: 0.1, colorscheme: "orangeCarbon" }} }});
+  // semi-transparent spheres via addSphere (per-atom SASA radii)
   var beadRadii = {bead_radii_json};
-  var beadGroups = {bead_groups_json};
-  for (var bt in beadGroups) {{
-    var r = beadRadii[bt];
-    var atomSel = beadGroups[bt].map(function(i) {{ return i + 1; }}); // 1‑based
-    cg.addModel(`{cg_pdb}`, "pdb");
-    cg.setStyle({{ atom: atomSel }}, {{ sphere: {{ radius: r, opacity: 0.55, colorscheme: "orangeCarbon" }} }});
+  var beadTypes = {bead_types_json};        // per-atom, same order as PDB
+  var atoms = cg.selectedAtoms({{}});
+  for (var i = 0; i < atoms.length; i++) {{
+    var a = atoms[i];
+    var r = (beadRadii[beadTypes[i]] || 0.235) * 10;  // nm→Å display scale
+    cg.addSphere({{
+      center: {{ x: a.x, y: a.y, z: a.z }},
+      radius: r,
+      color: "orange",
+      alpha: 0.50
+    }});
   }}
   cg.zoomTo();
   cg.render();
 
-  // --- Sync rotation ---
-  var dragging = false;
-  aa.setCallback("ondragstart", function() {{ dragging = true; }});
-  aa.setCallback("ondrag", function(rot) {{ cg.setRotation(rot); if (dragging) cg.render(); }});
-  aa.setCallback("ondragend", function() {{ dragging = false; }});
-  cg.setCallback("ondragstart", function() {{ dragging = true; }});
-  cg.setCallback("ondrag", function(rot) {{ aa.setRotation(rot); if (dragging) aa.render(); }});
-  cg.setCallback("ondragend", function() {{ dragging = false; }});
+  // --- Bidirectional sync (rotation + zoom) ---
+  function sync(a, b) {{
+    var dragging = false, zooming = false;
+    a.setCallback("ondragstart", function() {{ dragging = true; }});
+    a.setCallback("ondrag", function(rot) {{ b.setRotation(rot); if (dragging) b.render(); }});
+    a.setCallback("ondragend", function() {{ dragging = false; b.render(); }});
+    a.setCallback("onzoomstart", function() {{ zooming = true; }});
+    a.setCallback("onzoom", function(z) {{ if (zooming) b.zoom(z); }});
+    a.setCallback("onzoomend", function() {{ zooming = false; b.render(); }});
+  }}
+  sync(aa, cg);
+  sync(cg, aa);
 }})();
 </script>
 </body>
@@ -164,19 +172,16 @@ def generate_view(ligand_name: str, out_dir: Path | None = None) -> Path | None:
         out_dir = OUTPUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Build bead-type → radius and bead-type → atom-index lists for JS
+    # Per-atom bead types for addSphere radii
     _, bead_types = _parse_itp(itp_path)
     bead_radii = {bt: _bead_radius(bt) for bt in set(bead_types)}
-    bead_groups = defaultdict(list)
-    for i, bt in enumerate(bead_types):
-        bead_groups[bt].append(i)
 
     html = _HTML_TEMPLATE.format(
         title=f"{ligand_name} &mdash; AA vs CG",
         aa_pdb=aa_pdb.read_text(),
         cg_pdb=cg_pdb.read_text(),
         bead_radii_json=json.dumps(bead_radii),
-        bead_groups_json=json.dumps(dict(bead_groups)),
+        bead_types_json=json.dumps(bead_types),
     )
 
     out_path = out_dir / f"{ligand_name}.html"
