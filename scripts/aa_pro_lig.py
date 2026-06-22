@@ -40,8 +40,8 @@ from the original SMartini pipeline.
 # Protein + Ligand system configuration
 # ---------------------------------------------------------------------------
 SYSDIR = Path("protein_systems").resolve()
-PROTEIN = "KDA"
-LIGAND_RESNAME = "ANP"                   # residue name of the ligand in the PDB
+PROTEIN = "1TQN"
+LIGAND_RESNAME = "HEM"                   # residue name of the ligand in the PDB
 SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
 LIGAND_SDF = Path(f"examples/{LIGAND_RESNAME}/{LIGAND_RESNAME}.sdf")  # SDF for OpenFF parameterization
 RUNNAME = "mdrun_1"                        # subdirectory for AA MD run
@@ -520,6 +520,6 @@ def _load_interchange_cache(ligand_path, openff_version, work_dir=None):
 
 
 if __name__ == "__main__":
-    # prepare_protein_ligand_system()
+    prepare_protein_ligand_system()
     run_md()
     trjconv()
