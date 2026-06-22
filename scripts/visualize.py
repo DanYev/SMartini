@@ -32,8 +32,8 @@ OUTPUT_DIR = Path("analysis/views").resolve()
 
 # --- Visual style (tweak for publication) ---
 BG_COLOR           = "0xffffff"   # 3Dmol hex: white
-CG_STICK_COLOR     = "#cc6622"    # orange-brown sticks
-CG_SPHERE_COLOR    = "#ee8833"    # orange spheres
+CG_STICK_COLOR     = "#888888"    # grey sticks
+CG_SPHERE_COLOR    = "#aaaaaa"    # light-grey spheres
 CG_SPHERE_OPACITY  = 0.50         # 0–1
 CG_SPHERE_SCALE    = 10           # nm → Å display multiplier
 CG_X_OFFSET        = 40.0         # Å — shift CG to the right of AA
@@ -90,30 +90,30 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>{title}</title>
+<title>{title} &mdash; v{cache_buster}</title>
 <style>
-  body {{ font-family: sans-serif; margin: 0; padding: 8px; background: #fff; color: #222; }}
-  h1 {{ text-align: center; margin: 0 0 4px 0; font-size: 16px; }}
+  body {{ font-family: sans-serif; margin: 0; background: #fff; color: #222; }}
   .controls {{
-    display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: center;
-    align-items: center; padding: 6px 12px; font-size: 13px;
-    background: #f5f5f5; border-bottom: 1px solid #ccc; margin-bottom: 4px;
+    display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: center;
+    align-items: center; padding: 8px 16px; font-size: 14px; font-weight: 500;
+    background: #e8e8e8; border-bottom: 2px solid #aaa;
+    position: sticky; top: 0; z-index: 100;
   }}
-  .controls label {{ display: flex; align-items: center; gap: 4px; white-space: nowrap; }}
-  .controls input[type="color"] {{ width: 28px; height: 22px; border: 1px solid #999; padding: 0; cursor: pointer; }}
-  .controls input[type="range"] {{ width: 90px; }}
-  .controls .val {{ display: inline-block; width: 32px; text-align: right; }}
-  .viewer {{ width: 100%; height: 520px; }}
+  .controls label {{ display: flex; align-items: center; gap: 5px; white-space: nowrap; }}
+  .controls input[type="color"] {{ width: 30px; height: 24px; border: 1px solid #777; padding: 0; cursor: pointer; border-radius: 3px; }}
+  .controls input[type="range"] {{ width: 100px; accent-color: #cc6622; }}
+  .controls .val {{ display: inline-block; width: 36px; text-align: right; font-variant-numeric: tabular-nums; }}
+  .viewer {{ width: 100%; height: 540px; }}
 </style>
 </head>
 <body>
-<h1>{title}</h1>
 <div class="controls">
+  <strong>&#9881; Controls</strong>
   <label>CG sticks <input type="color" id="cg_stick" value="{cg_stick_color}"></label>
   <label>CG sphere <input type="color" id="cg_sphere" value="{cg_sphere_color}"></label>
-  <label>Sphere &alpha; <input type="range" id="cg_alpha" min="0" max="1" step="0.05" value="{cg_sphere_opacity}"> <span class="val" id="alpha_val">{cg_sphere_opacity}</span></label>
-  <label>Sphere &times; <input type="range" id="cg_scale" min="4" max="20" step="0.5" value="{cg_sphere_scale}"> <span class="val" id="scale_val">{cg_sphere_scale}</span></label>
-  <label>CG offset <input type="range" id="cg_offset" min="10" max="80" step="2" value="{cg_x_offset}"> <span class="val" id="offset_val">{cg_x_offset}</span> &Aring;</label>
+  <label>&alpha; <input type="range" id="cg_alpha" min="0" max="1" step="0.05" value="{cg_sphere_opacity}"> <span class="val" id="alpha_val">{cg_sphere_opacity}</span></label>
+  <label>&times; <input type="range" id="cg_scale" min="4" max="20" step="0.5" value="{cg_sphere_scale}"> <span class="val" id="scale_val">{cg_sphere_scale}</span></label>
+  <label>Offset <input type="range" id="cg_offset" min="10" max="80" step="2" value="{cg_x_offset}"> <span class="val" id="offset_val">{cg_x_offset}</span> &Aring;</label>
 </div>
 <div class="viewer" id="view"></div>
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
@@ -145,14 +145,22 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     document.getElementById("scale_val").textContent  = scale;
     document.getElementById("offset_val").textContent = offset;
 
+    // persist to localStorage so controls survive ligand switches
+    var P = "smartini_viz_";
+    localStorage.setItem(P + "cg_stick",  cgStick);
+    localStorage.setItem(P + "cg_sphere", cgColor);
+    localStorage.setItem(P + "cg_alpha",  alpha);
+    localStorage.setItem(P + "cg_scale",  scale);
+    localStorage.setItem(P + "cg_offset", offset);
+
     v.removeAllModels();
     v.removeAllShapes();
 
     v.addModel(aaPdb, "pdb");
-    v.setStyle({{ model: 0 }}, {{ stick: {{}} }});                // AA default
+    v.setStyle({{ model: 0 }}, {{ stick: {{}} }});
 
     v.addModel(shiftPdb(cgOrig, offset), "pdb");
-    v.setStyle({{ model: 1 }}, {{ stick: {{ color: cgStick }} }}); // same thickness as AA
+    v.setStyle({{ model: 1 }}, {{ stick: {{ color: cgStick }} }});
 
     var atoms = v.getModel(1).selectedAtoms({{}});
     for (var i = 0; i < atoms.length; i++) {{
@@ -163,6 +171,15 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     v.zoomTo();
     v.render();
   }}
+
+  // restore saved values (survive page reloads & ligand switches)
+  var P = "smartini_viz_";
+  var el;
+  if ((el = document.getElementById("cg_stick"))  && localStorage.getItem(P + "cg_stick"))  el.value = localStorage.getItem(P + "cg_stick");
+  if ((el = document.getElementById("cg_sphere")) && localStorage.getItem(P + "cg_sphere")) el.value = localStorage.getItem(P + "cg_sphere");
+  if ((el = document.getElementById("cg_alpha"))  && localStorage.getItem(P + "cg_alpha"))  {{ el.value = localStorage.getItem(P + "cg_alpha");  document.getElementById("alpha_val").textContent  = parseFloat(el.value).toFixed(2); }}
+  if ((el = document.getElementById("cg_scale"))  && localStorage.getItem(P + "cg_scale"))  {{ el.value = localStorage.getItem(P + "cg_scale");  document.getElementById("scale_val").textContent  = el.value; }}
+  if ((el = document.getElementById("cg_offset")) && localStorage.getItem(P + "cg_offset")) {{ el.value = localStorage.getItem(P + "cg_offset"); document.getElementById("offset_val").textContent = el.value; }}
 
   ["cg_stick","cg_sphere","cg_alpha","cg_scale","cg_offset"].forEach(function(id) {{
     document.getElementById(id).addEventListener("input", rebuild);
@@ -208,8 +225,10 @@ def generate_view(ligand_name: str, out_dir: Path | None = None) -> Path | None:
     _, bead_types = _parse_itp(itp_path)
     bead_radii = {bt: _bead_radius(bt) for bt in set(bead_types)}
 
+    import time
     html = _HTML_TEMPLATE.format(
         title=f"{ligand_name} &mdash; AA vs CG",
+        cache_buster=int(time.time()),
         bg_color=BG_COLOR,
         aa_pdb=aa_pdb.read_text(),
         cg_pdb=cg_pdb.read_text(),                       # no offset — JS handles it
