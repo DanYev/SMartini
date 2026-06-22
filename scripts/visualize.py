@@ -55,42 +55,32 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 </div>
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 <script>
-  let $ = $3Dmol.noConflict();
+(function() {{
+  var Viewer = $3Dmol.createViewer;
 
-  function mkViewer(id, pdb, style) {{
-    let v = $(id, {{ backgroundColor: "0x1a1a2e" }});
-    v.addModel(pdb, "pdb");
-    style(v);
-    v.zoomTo();
-    v.render();
-    return v;
-  }}
+  var aa = Viewer("aa_view", {{ backgroundColor: "0x1a1a2e" }});
+  aa.addModel(`{aa_pdb}`, "pdb");
+  aa.setStyle({{}}, {{ stick: {{ colorscheme: "cyanCarbon" }} }});
+  aa.zoomTo();
+  aa.render();
 
-  // Sync rotation & zoom between the two viewers
-  function linkViews(a, c) {{
-    let dragging = false;
-    a.setCallback("ondragstart", () => {{ dragging = true; }});
-    a.setCallback("ondrag", (rot) => {{ c.setRotation(rot); }});
-    a.setCallback("ondragend", () => {{ dragging = false; }});
-    c.setCallback("ondragstart", () => {{ dragging = true; }});
-    c.setCallback("ondrag", (rot) => {{ a.setRotation(rot); }});
-    c.setCallback("ondragend", () => {{ dragging = false; }});
-    let zooming = false;
-    a.setCallback("onzoomstart", () => {{ zooming = true; }});
-    a.setCallback("onzoom", (z) => {{ if (zooming) c.zoom(z); }});
-    a.setCallback("onzoomend", () => {{ zooming = false; }});
-    c.setCallback("onzoomstart", () => {{ zooming = true; }});
-    c.setCallback("onzoom", (z) => {{ if (zooming) a.zoom(z); }});
-    c.setCallback("onzoomend", () => {{ zooming = false; }});
-  }}
+  var cg = Viewer("cg_view", {{ backgroundColor: "0x1a1a2e" }});
+  cg.addModel(`{cg_pdb}`, "pdb");
+  cg.setStyle({{}}, {{ sphere: {{ radius: 0.3, colorscheme: "orangeCarbon" }} }});
+  cg.addModel(`{cg_pdb}`, "pdb");
+  cg.setStyle({{ model: 1 }}, {{ stick: {{ radius: 0.08, colorscheme: "orangeCarbon" }} }});
+  cg.zoomTo();
+  cg.render();
 
-  mkViewer("aa_view", `{aa_pdb}`, v => v.setStyle({{stick: {{colorscheme: "cyanCarbon"}}}}));
-  mkViewer("cg_view", `{cg_pdb}`, v => {{
-    v.setStyle({{sphere: {{radius: 0.3, colorscheme: "orangeCarbon"}}}});
-    v.addModel(`{cg_pdb}`, "pdb");
-    v.setStyle({{model:1}}, {{stick: {{radius: 0.08, colorscheme: "orangeCarbon"}}}});
-  }});
-  linkViews($("#aa_view"), $("#cg_view"));
+  // Sync rotation between the two viewers
+  var dragging = false;
+  aa.setCallback("ondragstart", function() {{ dragging = true; }});
+  aa.setCallback("ondrag", function(rot) {{ cg.setRotation(rot); if (dragging) cg.render(); }});
+  aa.setCallback("ondragend", function() {{ dragging = false; }});
+  cg.setCallback("ondragstart", function() {{ dragging = true; }});
+  cg.setCallback("ondrag", function(rot) {{ aa.setRotation(rot); if (dragging) aa.render(); }});
+  cg.setCallback("ondragend", function() {{ dragging = false; }});
+}})();
 </script>
 </body>
 </html>
