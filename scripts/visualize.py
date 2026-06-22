@@ -30,6 +30,14 @@ smartini.setup_logging(level=logging.INFO)
 EXAMPLES_DIR = Path("examples").resolve()
 OUTPUT_DIR = Path("analysis/views").resolve()
 
+# --- Visual style (tweak for publication) ---
+BG_COLOR           = "0xffffff"   # 3Dmol hex: white
+CG_STICK_COLOR     = "#cc6622"    # orange-brown sticks
+CG_SPHERE_COLOR    = "#ee8833"    # orange spheres
+CG_SPHERE_OPACITY  = 0.50         # 0–1
+CG_SPHERE_SCALE    = 10           # nm → Å display multiplier
+CG_X_OFFSET        = 40.0         # Å — shift CG to the right of AA
+
 
 # ---------------------------------------------------------------------------
 # ITP helpers  (same as analysis.py — self-contained so script runs standalone)
@@ -65,78 +73,102 @@ def _bead_radius(bead_type: str) -> float:
         return 0.205
     return 0.235
 
+
+def _offset_pdb(pdb_text: str, dx: float) -> str:
+    """Shift all ATOM/HETATM X coordinates by *dx* Å; return new PDB string."""
+    lines = []
+    for line in pdb_text.splitlines():
+        if line.startswith(("ATOM", "HETATM")):
+            x = float(line[30:38]) + dx
+            lines.append(f"{line[:30]}{x:8.3f}{line[38:]}")
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 _HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>{title}</title>
 <style>
-  body {{ font-family: sans-serif; margin: 0; padding: 8px; background: #1a1a2e; color: #eee; }}
-  h1 {{ text-align: center; margin: 0 0 4px 0; font-size: 18px; }}
-  .grid {{ display: flex; gap: 4px; justify-content: center; }}
-  .panel {{ flex: 1 1 450px; max-width: 600px; }}
-  .panel h2 {{ text-align: center; margin: 0 0 2px 0; font-size: 14px; }}
-  .viewer {{ width: 100%; height: 480px; position: relative; }}
+  body {{ font-family: sans-serif; margin: 0; padding: 8px; background: #fff; color: #222; }}
+  h1 {{ text-align: center; margin: 0 0 4px 0; font-size: 16px; }}
+  .controls {{
+    display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: center;
+    align-items: center; padding: 6px 12px; font-size: 13px;
+    background: #f5f5f5; border-bottom: 1px solid #ccc; margin-bottom: 4px;
+  }}
+  .controls label {{ display: flex; align-items: center; gap: 4px; white-space: nowrap; }}
+  .controls input[type="color"] {{ width: 28px; height: 22px; border: 1px solid #999; padding: 0; cursor: pointer; }}
+  .controls input[type="range"] {{ width: 90px; }}
+  .controls .val {{ display: inline-block; width: 32px; text-align: right; }}
+  .viewer {{ width: 100%; height: 520px; }}
 </style>
 </head>
 <body>
 <h1>{title}</h1>
-<div class="grid">
-  <div class="panel">
-    <h2 style="color:#88ccff">AA  (atomistic)</h2>
-    <div class="viewer" id="aa_view"></div>
-  </div>
-  <div class="panel">
-    <h2 style="color:#ffaa44">CG  (coarse-grained)</h2>
-    <div class="viewer" id="cg_view"></div>
-  </div>
+<div class="controls">
+  <label>CG sticks <input type="color" id="cg_stick" value="{cg_stick_color}"></label>
+  <label>CG sphere <input type="color" id="cg_sphere" value="{cg_sphere_color}"></label>
+  <label>Sphere &alpha; <input type="range" id="cg_alpha" min="0" max="1" step="0.05" value="{cg_sphere_opacity}"> <span class="val" id="alpha_val">{cg_sphere_opacity}</span></label>
+  <label>Sphere &times; <input type="range" id="cg_scale" min="4" max="20" step="0.5" value="{cg_sphere_scale}"> <span class="val" id="scale_val">{cg_sphere_scale}</span></label>
+  <label>CG offset <input type="range" id="cg_offset" min="10" max="80" step="2" value="{cg_x_offset}"> <span class="val" id="offset_val">{cg_x_offset}</span> &Aring;</label>
 </div>
+<div class="viewer" id="view"></div>
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 <script>
 (function() {{
-  var Viewer = $3Dmol.createViewer;
+  var v = $3Dmol.createViewer("view", {{ backgroundColor: "{bg_color}" }});
 
-  // --- AA ---
-  var aa = Viewer("aa_view", {{ backgroundColor: "0x1a1a2e" }});
-  aa.addModel(`{aa_pdb}`, "pdb");
-  aa.setStyle({{}}, {{ stick: {{ colorscheme: "cyanCarbon" }} }});
-  aa.zoomTo();
-  aa.render();
+  var aaPdb  = `{aa_pdb}`;
+  var cgOrig = `{cg_pdb}`;  // original, no offset
 
-  // --- CG ---
-  var cg = Viewer("cg_view", {{ backgroundColor: "0x1a1a2e" }});
-  cg.addModel(`{cg_pdb}`, "pdb");
-  // sticks from CONECT records
-  cg.setStyle({{}}, {{ stick: {{ radius: 0.1, colorscheme: "orangeCarbon" }} }});
-  // semi-transparent spheres via addSphere (per-atom SASA radii)
   var beadRadii = {bead_radii_json};
-  var beadTypes = {bead_types_json};        // per-atom, same order as PDB
-  var atoms = cg.selectedAtoms({{}});
-  for (var i = 0; i < atoms.length; i++) {{
-    var a = atoms[i];
-    var r = (beadRadii[beadTypes[i]] || 0.235) * 10;  // nm→Å display scale
-    cg.addSphere({{
-      center: {{ x: a.x, y: a.y, z: a.z }},
-      radius: r,
-      color: "orange",
-      alpha: 0.50
-    }});
-  }}
-  cg.zoomTo();
-  cg.render();
+  var beadTypes = {bead_types_json};
 
-  // --- Bidirectional sync (rotation + zoom) ---
-  function sync(a, b) {{
-    var dragging = false, zooming = false;
-    a.setCallback("ondragstart", function() {{ dragging = true; }});
-    a.setCallback("ondrag", function(rot) {{ b.setRotation(rot); if (dragging) b.render(); }});
-    a.setCallback("ondragend", function() {{ dragging = false; b.render(); }});
-    a.setCallback("onzoomstart", function() {{ zooming = true; }});
-    a.setCallback("onzoom", function(z) {{ if (zooming) b.zoom(z); }});
-    a.setCallback("onzoomend", function() {{ zooming = false; b.render(); }});
+  function shiftPdb(pdb, dx) {{
+    return pdb.replace(/^(ATOM  |HETATM)(.{{24}})(.{{8}})/gm,
+      function(m, pre, mid, xStr) {{
+        var x = parseFloat(xStr) + dx;
+        return pre + mid + x.toFixed(3).padStart(8);
+      }});
   }}
-  sync(aa, cg);
-  sync(cg, aa);
+
+  function rebuild() {{
+    var cgStick  = document.getElementById("cg_stick").value;
+    var cgColor  = document.getElementById("cg_sphere").value;
+    var alpha    = parseFloat(document.getElementById("cg_alpha").value);
+    var scale    = parseFloat(document.getElementById("cg_scale").value);
+    var offset   = parseFloat(document.getElementById("cg_offset").value);
+    document.getElementById("alpha_val").textContent  = alpha.toFixed(2);
+    document.getElementById("scale_val").textContent  = scale;
+    document.getElementById("offset_val").textContent = offset;
+
+    v.removeAllModels();
+    v.removeAllShapes();
+
+    v.addModel(aaPdb, "pdb");
+    v.setStyle({{ model: 0 }}, {{ stick: {{}} }});                // AA default
+
+    v.addModel(shiftPdb(cgOrig, offset), "pdb");
+    v.setStyle({{ model: 1 }}, {{ stick: {{ color: cgStick }} }}); // same thickness as AA
+
+    var atoms = v.getModel(1).selectedAtoms({{}});
+    for (var i = 0; i < atoms.length; i++) {{
+      var a = atoms[i];
+      var r = (beadRadii[beadTypes[i]] || 0.235) * scale;
+      v.addSphere({{ center: {{ x: a.x, y: a.y, z: a.z }}, radius: r, color: cgColor, alpha: alpha }});
+    }}
+    v.zoomTo();
+    v.render();
+  }}
+
+  ["cg_stick","cg_sphere","cg_alpha","cg_scale","cg_offset"].forEach(function(id) {{
+    document.getElementById(id).addEventListener("input", rebuild);
+  }});
+
+  rebuild();
 }})();
 </script>
 </body>
@@ -178,8 +210,14 @@ def generate_view(ligand_name: str, out_dir: Path | None = None) -> Path | None:
 
     html = _HTML_TEMPLATE.format(
         title=f"{ligand_name} &mdash; AA vs CG",
+        bg_color=BG_COLOR,
         aa_pdb=aa_pdb.read_text(),
-        cg_pdb=cg_pdb.read_text(),
+        cg_pdb=cg_pdb.read_text(),                       # no offset — JS handles it
+        cg_stick_color=CG_STICK_COLOR,
+        cg_sphere_color=CG_SPHERE_COLOR,
+        cg_sphere_opacity=CG_SPHERE_OPACITY,
+        cg_sphere_scale=CG_SPHERE_SCALE,
+        cg_x_offset=CG_X_OFFSET,
         bead_radii_json=json.dumps(bead_radii),
         bead_types_json=json.dumps(bead_types),
     )
