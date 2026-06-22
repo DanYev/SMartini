@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --time=0-04:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
+#SBATCH --time=0-24:00:00                                                       # upper bound time limit for job to finish d-hh:mm:ss
 #SBATCH --partition=general
 #SBATCH --qos=grp_sozkan
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 #SBATCH --gres=gpu:1
 #SBATCH -o slurm_jobs/output.%A.out

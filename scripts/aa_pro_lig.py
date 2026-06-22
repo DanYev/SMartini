@@ -41,142 +41,32 @@ from the original SMartini pipeline.
 # ---------------------------------------------------------------------------
 SYSDIR = Path("protein_systems").resolve()
 PROTEIN = "KDA"
-SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
 LIGAND_RESNAME = "ANP"                   # residue name of the ligand in the PDB
+SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
 LIGAND_SDF = Path(f"examples/{LIGAND_RESNAME}/{LIGAND_RESNAME}.sdf")  # SDF for OpenFF parameterization
-RUNNAME = "aa_md"                        # subdirectory for AA MD run
+RUNNAME = "mdrun_1"                        # subdirectory for AA MD run
+SYS_OUT_DIR = SYSDIR / SYSNAME                      # system topology & PDB
+MD_OUT_DIR = SYSDIR / SYSNAME / "mdruns" / RUNNAME  # trajectory & logs
+PDB_INPUT = SYSDIR / f"{PROTEIN}.pdb"               # input PDB file
 
-# AA MD settings
-AA_TEMPERATURE = 300.0                   # Kelvin
-AA_PRESSURE = 1.0                        # bar
-AA_GAMMA = 1.0                           # friction coefficient (1/ps)
-AA_TIMESTEP_FS = 2.0                     # femtoseconds
-AA_TOTAL_STEPS = int(5e6)                # 10 ns at 2 fs
-AA_TRJ_NOUT = 10000                      # trajectory output interval
-AA_LOG_NOUT = 10000                      # log output interval
-AA_CHK_NOUT = 50000                      # checkpoint interval
-AA_SELECTION = "all"                     # MDAnalysis selection for trajectory output
+# MD settings
+TEMPERATURE = 300.0                   # Kelvin
+PRESSURE = 1.0                        # bar
+GAMMA = 1.0                           # friction coefficient (1/ps)
+TIMESTEP_FS = 2.0                     # femtoseconds
+TOTAL_STEPS = int(5e7)                # 10 ns at 2 fs for 5e6
+TRJ_NOUT = 10000                      # trajectory output interval
+LOG_NOUT = 10000                      # log output interval
+CHK_NOUT = 50000                      # checkpoint interval
+SELECTION = "all"                     # MDAnalysis selection for trajectory output
 
-# Standalone-ligand globals (from CFG, used by process_ligand)
-ligand_name = CFG.molname
-sysdir = CFG.systems_dir
-wdir = CFG.wdir
-aa_dir = CFG.aa_dir
-system_pdb = aa_dir / "system.pdb"
-system_xml = aa_dir / "system.xml"
-
-
-# ---------------------------------------------------------------------------
-# Cache helpers for slow OpenFF Interchange computations
-# ---------------------------------------------------------------------------
-
-def _cache_key(ligand_path, openff_version):
-    """Build a deterministic cache key from the SDF/SMILES source and FF version."""
-    raw = f"{ligand_path}:{openff_version}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
-
-
-def _cache_dir(work_dir=None):
-    """Return the cache directory, creating it if needed."""
-    if work_dir is not None:
-        d = Path(work_dir) / ".smartini_cache"
-    else:
-        d = Path(tempfile.gettempdir()) / "smartini_cache"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _save_interchange_cache(ligand_path, openff_version, interchange,
-                            ligand_topology, ligand_positions, work_dir=None):
-    """Pickle Interchange results to disk so they can be reloaded later."""
-    cdir = _cache_dir(work_dir)
-    key = _cache_key(ligand_path, openff_version)
-    cache_file = cdir / f"interchange_{key}.pkl"
-    data = {
-        "interchange": interchange,
-        "ligand_topology": ligand_topology,
-        "ligand_positions": ligand_positions,
-    }
-    with open(cache_file, "wb") as f:
-        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-    logger.info("Cached Interchange results to %s", cache_file)
-
-
-def _load_interchange_cache(ligand_path, openff_version, work_dir=None):
-    """Load previously cached Interchange results, or return None on miss."""
-    cdir = _cache_dir(work_dir)
-    key = _cache_key(ligand_path, openff_version)
-    cache_file = cdir / f"interchange_{key}.pkl"
-    if not cache_file.exists():
-        return None
-    logger.info("Loading cached Interchange results from %s", cache_file)
-    with open(cache_file, "rb") as f:
-        data = pickle.load(f)
-    return data["interchange"], data["ligand_topology"], data["ligand_positions"]
-
-
-def process_ligand():
-    """Build and solvate the ligand AA system, then write topology artifacts.
-
-    Writes:
-    - ``system.pdb`` and ``system.xml`` for simulation,
-    - ``md.pdb`` with ``CFG.aa_selection`` for trajectory output reference.
-    """
-    # INPUTS
-    ligand_name = CFG.molname
-    logger.info("Working directory: %s", wdir)
-    logger.info("Processing ligand: %s", ligand_name)
-    # Generate ligand topology and structure using OpenFF Toolkit and Interchange
-    aa_dir.mkdir(parents=True, exist_ok=True)
-    input_file = wdir / f"{ligand_name}.sdf"
-    logger.info("Reading ligand file: %s", input_file)
-    ligand = Molecule.from_file(str(input_file))
-    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
-    forcefield = app.ForceField("amber19-all.xml", "amber19/opc.xml")
-    # Ligand FF
-    forcefield.registerTemplateGenerator(smirnoff.generator)
-    openff_version = "openff-2.1.0.offxml"
-    cached = _load_interchange_cache(input_file, openff_version, work_dir=aa_dir)
-    if cached is not None:
-        interchange, ligand_topology, ligand_positions = cached
-    else:
-        ff = ForceField(openff_version)
-        interchange = Interchange.from_smirnoff(ff, ligand.to_topology())
-        ligand_topology = interchange.to_openmm_topology()
-        ligand_positions = interchange.positions.to_openmm()
-        _save_interchange_cache(input_file, openff_version, interchange,
-                                ligand_topology, ligand_positions, work_dir=aa_dir)
-    model = app.Modeller(ligand_topology, ligand_positions)
-    logger.info("Adding solvent and ions")
-    model.addSolvent(forcefield, 
-        model='opc', 
-        boxShape='dodecahedron', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.2 * unit.nanometer,
-        ionicStrength=0.0 * unit.molar,
-        positiveIon='Na+',
-        negativeIon='Cl-')    
-    with open(system_pdb, "w", encoding="utf-8") as file:
-        app.PDBFile.writeFile(model.topology, model.positions, file, keepIds=True)    
-    logger.info("Generating topology...")
-    system = forcefield.createSystem(
-        model.topology,
-        nonbondedMethod=app.PME,
-        nonbondedCutoff=1.0 * unit.nanometer,
-        constraints=app.HBonds,
-        removeCMMotion=True,     
-        ewaldErrorTolerance=1e-5,
-        rigidWater=True,
-    )
-    _save_system_to_xml(system, system_xml)
-    logger.info(f'Saving reference PDB with selection: {CFG.aa_selection}')
-    mda.Universe(system_pdb).select_atoms(CFG.aa_selection).write(str(aa_dir / "md.pdb"))
 
 
 def prepare_protein_ligand_system(
-    pdb_file,
-    ligand_resname="UNK",
+    pdb_file=PDB_INPUT,
+    ligand_resname=LIGAND_RESNAME,
     ligand_smiles=None,
-    ligand_sdf=None,
+    ligand_sdf=LIGAND_SDF,
     protein_ff="amber14-all.xml",
     water_ff="amber14/tip3pfb.xml",
     openff_version="openff-2.2.1.offxml",
@@ -186,7 +76,8 @@ def prepare_protein_ligand_system(
     nonbonded_method=app.PME,
     nonbonded_cutoff=1.0 * unit.nanometer,
     constraints=app.HBonds,
-    output_dir=None
+    fit_ligand=True,
+    output_dir=SYS_OUT_DIR
 ):
     """
     Prepare an OpenMM system from a protein-ligand complex PDB file.
@@ -224,6 +115,9 @@ def prepare_protein_ligand_system(
         Cutoff distance for nonbonded interactions
     constraints : app constraints, default=app.HBonds
         Constraints to apply (None, HBonds, AllBonds, HAngles)
+    fit_ligand : bool, default=True
+        If True, translate OpenFF ligand centroid to match the original PDB ligand.
+        If False, use OpenFF positions as-is.
     output_dir : str or Path, optional
         Directory to save output files (PDB, XML). If None, returns objects only
         
@@ -270,11 +164,17 @@ def prepare_protein_ligand_system(
     fixer.addMissingAtoms()
     fixer.addMissingHydrogens(7.0)  # pH 7.0
     
-    # Save fixed protein
+    # Save fixed protein (temp copy for internal use)
     fixed_protein_pdb = temp_dir / "protein_fixed.pdb"
     with open(fixed_protein_pdb, 'w') as f:
         app.PDBFile.writeFile(fixer.topology, fixer.positions, f)
-    logger.info(f"Fixed protein saved to {fixed_protein_pdb}")
+    # Save to output dir if requested
+    if output_dir:
+        protein_out = Path(output_dir) / "protein.pdb"
+        protein_out.parent.mkdir(parents=True, exist_ok=True)
+        with open(protein_out, 'w') as f:
+            app.PDBFile.writeFile(fixer.topology, fixer.positions, f, keepIds=True)
+        logger.info(f"Saved fixed protein PDB to {protein_out}")
 
     # Create the AMBER force field for protein + water
     forcefield = app.ForceField(protein_ff, water_ff)
@@ -324,26 +224,29 @@ def prepare_protein_ligand_system(
                                 openff_version, interchange,
                                 ligand_topology, ligand_positions, work_dir=output_dir)
 
+
+    # Save generated ligand PDB to output dir if requested
+    if output_dir:
+        ligand_out = Path(output_dir) / "ligand.pdb"
+        ligand_out.parent.mkdir(parents=True, exist_ok=True)
+        with open(ligand_out, 'w') as f:
+            app.PDBFile.writeFile(ligand_topology, ligand_positions, f, keepIds=True)
+        logger.info(f"Saved generated ligand PDB to {ligand_out}")
+
     # Load fixed protein and combine with ligand
     logger.info("Combining fixed protein with ligand...")
     fixed_protein = app.PDBFile(str(fixed_protein_pdb))
 
-    # --- Debug: save fixed protein PDB ---
-    _debug_dir = SYSDIR / SYSNAME
-    _debug_dir.mkdir(parents=True, exist_ok=True)
-    _debug_pdb = _debug_dir / "debug_protein_fixed.pdb"
-    with open(_debug_pdb, "w") as f:
-        app.PDBFile.writeFile(fixed_protein.topology, fixed_protein.positions, f, keepIds=True)
-    logger.info("Debug: fixed protein saved to %s (%d atoms)", _debug_pdb, fixed_protein.topology.getNumAtoms())
+    modeller = app.Modeller(fixed_protein.topology, fixer.positions)
+    modeller.add(ligand_topology, ligand_atoms.positions * unit.angstrom)
 
-    modeller = app.Modeller(fixed_protein.topology, fixed_protein.positions)
-    modeller.add(ligand_topology, ligand_positions)
-
-    # --- Debug: save combined protein+ligand PDB (before solvation) ---
-    _debug_comb = _debug_dir / "debug_protein_ligand.pdb"
-    with open(_debug_comb, "w") as f:
-        app.PDBFile.writeFile(modeller.topology, modeller.positions, f, keepIds=True)
-    logger.info("Debug: protein+ligand saved to %s (%d atoms)", _debug_comb, modeller.topology.getNumAtoms())
+    # Save combined protein+ligand structure (before solvation)
+    if output_dir:
+        complex_out = Path(output_dir) / "complex.pdb"
+        complex_out.parent.mkdir(parents=True, exist_ok=True)
+        with open(complex_out, 'w') as f:
+            app.PDBFile.writeFile(modeller.topology, modeller.positions, f, keepIds=True)
+        logger.info(f"Saved combined complex PDB to {complex_out}")
     
     # Add solvent if requested
     if add_solvent:
@@ -375,13 +278,13 @@ def prepare_protein_ligand_system(
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Save PDB
+
+        # Save system PDB
         pdb_out = output_dir / "system.pdb"
         with open(pdb_out, 'w') as f:
             app.PDBFile.writeFile(modeller.topology, modeller.positions, f, keepIds=True)
         logger.info(f"Saved system PDB to {pdb_out}")
-        
+
         # Save system XML
         xml_out = output_dir / "system.xml"
         with open(xml_out, 'w') as f:
@@ -392,31 +295,35 @@ def prepare_protein_ligand_system(
     shutil.rmtree(temp_dir)
     
     logger.info("System preparation complete!")
-    
-    return system, modeller.topology, modeller.positions
 
 
-def run_aa_md(system, topology, positions, output_dir,
-              temperature=AA_TEMPERATURE,
-              pressure=AA_PRESSURE,
-              gamma=AA_GAMMA,
-              timestep_fs=AA_TIMESTEP_FS,
-              total_steps=AA_TOTAL_STEPS,
-              log_nout=AA_LOG_NOUT,
-              trj_nout=AA_TRJ_NOUT,
-              chk_nout=AA_CHK_NOUT):
-    """Run AA MD in OpenMM: minimize, heat, equilibrate, produce trajectory.
+def run_md(output_dir=MD_OUT_DIR,
+           temperature=TEMPERATURE,
+           pressure=PRESSURE,
+           gamma=GAMMA,
+           timestep_fs=TIMESTEP_FS,
+           total_steps=TOTAL_STEPS,
+           log_nout=LOG_NOUT,
+           trj_nout=TRJ_NOUT,
+           chk_nout=CHK_NOUT):
+    """Run MD in OpenMM: minimize, heat, equilibrate, produce trajectory.
+
+    Loads ``system.xml`` and ``system.pdb`` from ``SYS_OUT_DIR``.
 
     Parameters
     ----------
-    system : openmm.System
-    topology : openmm.app.Topology
-    positions : list of Vec3
     output_dir : Path
         Directory for output files (log, xtc, chk, xml checkpoint).
     temperature, pressure, gamma, timestep_fs, total_steps : float/int
     log_nout, trj_nout, chk_nout : int
     """
+    xml_path = SYS_OUT_DIR / "system.xml"
+    pdb_path = SYS_OUT_DIR / "system.pdb"
+    logger.info("Loading system from %s", xml_path)
+    with open(str(xml_path), 'r') as f:
+        system = mm.XmlSerializer.deserialize(f.read())
+    pdb = app.PDBFile(str(pdb_path))
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -426,12 +333,12 @@ def run_aa_md(system, topology, positions, output_dir,
         gamma / unit.picosecond,
         1.0 * unit.femtoseconds,  # small step for minimization/heat-up
     )
-    simulation = app.Simulation(topology, system, integrator)
-    simulation.context.setPositions(positions)
+    simulation = app.Simulation(pdb.topology, system, integrator)
+    simulation.context.setPositions(pdb.positions)
 
     # --- Minimization ---
     logger.info("Minimizing energy...")
-    simulation.minimizeEnergy(maxIterations=10000, tolerance=10 * unit.kilojoule_per_mole)
+    simulation.minimizeEnergy(maxIterations=10000, tolerance=10 * unit.kilojoule_per_mole / unit.nanometer)
     state = simulation.context.getState(getEnergy=True)
     logger.info(f"  Energy after minimization: {state.getPotentialEnergy()}")
 
@@ -481,13 +388,11 @@ def run_aa_md(system, topology, positions, output_dir,
     ]
 
     # XTC reporter with atom selection
-    if AA_SELECTION == "all":
+    if SELECTION == "all":
         atom_subset = None
     else:
-        # Use the system.pdb written by prepare_protein_ligand_system
-        system_pdb = output_dir.parent / "system.pdb"
-        u_sel = mda.Universe(str(system_pdb))
-        atom_subset = u_sel.select_atoms(AA_SELECTION).indices.tolist()
+        u_sel = mda.Universe(str(pdb_path))
+        atom_subset = u_sel.select_atoms(SELECTION).indices.tolist()
         logger.info("XTC subset: %d atoms", len(atom_subset))
 
     reporters.append(
@@ -507,10 +412,12 @@ def run_aa_md(system, topology, positions, output_dir,
     return simulation
 
 
-def trjconv_aa(top_pdb, traj_xtc, output_dir,
-               start=0, stop=None, step=1, fit=True,
-               selection=AA_SELECTION):
-    """Post-process AA trajectory: fit, subsample, and write outputs.
+def trjconv(top_pdb=SYS_OUT_DIR / "system.pdb",
+            traj_xtc=MD_OUT_DIR / "md.xtc",
+            output_dir=MD_OUT_DIR,
+            start=0, stop=None, step=1, fit=True,
+            selection=SELECTION):
+    """Post-process trajectory: fit, subsample, and write outputs.
 
     Parameters
     ----------
@@ -548,8 +455,9 @@ def trjconv_aa(top_pdb, traj_xtc, output_dir,
             writer.write(atom_group)
     logger.info("Trajectory conversion complete: %s, %s", out_top, out_traj)
 
-
-# Standalone-ligand workflow helpers (kept for backwards compatibility)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _save_system_to_xml(system, filename):
     """Serialize an OpenMM ``System`` to XML."""
@@ -566,42 +474,52 @@ def _load_system_from_xml(filename):
     return system
 
 
+def _cache_key(ligand_path, openff_version):
+    """Build a deterministic cache key from the SDF/SMILES source and FF version."""
+    raw = f"{ligand_path}:{openff_version}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _cache_dir(work_dir=None):
+    """Return the cache directory, creating it if needed."""
+    if work_dir is not None:
+        d = Path(work_dir) / ".smartini_cache"
+    else:
+        d = Path(tempfile.gettempdir()) / "smartini_cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _save_interchange_cache(ligand_path, openff_version, interchange,
+                            ligand_topology, ligand_positions, work_dir=None):
+    """Pickle Interchange results to disk so they can be reloaded later."""
+    cdir = _cache_dir(work_dir)
+    key = _cache_key(ligand_path, openff_version)
+    cache_file = cdir / f"interchange_{key}.pkl"
+    data = {
+        "interchange": interchange,
+        "ligand_topology": ligand_topology,
+        "ligand_positions": ligand_positions,
+    }
+    with open(cache_file, "wb") as f:
+        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    logger.info("Cached Interchange results to %s", cache_file)
+
+
+def _load_interchange_cache(ligand_path, openff_version, work_dir=None):
+    """Load previously cached Interchange results, or return None on miss."""
+    cdir = _cache_dir(work_dir)
+    key = _cache_key(ligand_path, openff_version)
+    cache_file = cdir / f"interchange_{key}.pkl"
+    if not cache_file.exists():
+        return None
+    logger.info("Loading cached Interchange results from %s", cache_file)
+    with open(cache_file, "rb") as f:
+        data = pickle.load(f)
+    return data["interchange"], data["ligand_topology"], data["ligand_positions"]
+
 
 if __name__ == "__main__":
-    # -----------------------------------------------------------------------
-    # Protein + Ligand AA MD workflow for 1TQN with HEM
-    # -----------------------------------------------------------------------
-    pdb_input = SYSDIR / f"{PROTEIN}.pdb"
-    aa_out_dir = SYSDIR / SYSNAME / RUNNAME
-
-    logger.info("=" * 60)
-    logger.info("Building protein+ligand system for %s", SYSNAME)
-    logger.info("  PDB: %s", pdb_input)
-    logger.info("  Ligand: %s", LIGAND_RESNAME)
-    logger.info("  Output: %s", aa_out_dir)
-    logger.info("=" * 60)
-
-    # Step 1: Prepare the system
-    system, topol, pos = prepare_protein_ligand_system(
-        pdb_file=pdb_input,
-        ligand_resname=LIGAND_RESNAME,
-        ligand_sdf=LIGAND_SDF,
-        add_solvent=True,
-        box_padding=1.0 * unit.nanometer,
-        ionic_strength=0.10 * unit.molar,
-        output_dir=aa_out_dir,
-    )
-
-    # Step 2: Run AA MD (minimize, heat, equilibrate, production)
-    run_aa_md(
-        system, topol, pos,
-        output_dir=aa_out_dir,
-    )
-
-    # Step 3: Post-process trajectory
-    md_pdb = aa_out_dir / "system.pdb"
-    md_xtc = aa_out_dir / "md.xtc"
-    trjconv_aa(
-        md_pdb, md_xtc, aa_out_dir,
-        start=0, stop=None, step=1, fit=True,
-    )
+    # prepare_protein_ligand_system()
+    run_md()
+    trjconv()
