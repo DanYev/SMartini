@@ -203,7 +203,7 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 if __name__ == "__main__":
     sysdir = SYSDIR
     sysname = "1TQN"
-    runname = "mdrun_1"
+    runname = "mdrun_2"
     # setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
     # md_npt(sysdir, sysname, runname)
     trjconv(sysdir, sysname, runname)

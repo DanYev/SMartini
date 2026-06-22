@@ -41,7 +41,7 @@ from the original SMartini pipeline.
 # ---------------------------------------------------------------------------
 SYSDIR = Path("protein_systems").resolve()
 PROTEIN = "1TQN"
-LIGAND_RESNAME = "HEM"                   # residue name of the ligand in the PDB
+LIGAND_RESNAME = "ANP"                   # residue name of the ligand in the PDB
 SYSNAME = f"{PROTEIN}_aa"                   # system name / PDB basename
 LIGAND_SDF = Path(f"examples/{LIGAND_RESNAME}/{LIGAND_RESNAME}.sdf")  # SDF for OpenFF parameterization
 RUNNAME = "mdrun_1"                        # subdirectory for AA MD run
@@ -58,7 +58,8 @@ TOTAL_STEPS = int(5e7)                # 10 ns at 2 fs for 5e6
 TRJ_NOUT = 10000                      # trajectory output interval
 LOG_NOUT = 10000                      # log output interval
 CHK_NOUT = 50000                      # checkpoint interval
-SELECTION = "all"                     # MDAnalysis selection for trajectory output
+SELECTION_OUT = "protein or resname UNK"                 # MDAnalysis selection for trajectory output
+SELECTION_CONV = "not (resname HOH or resname NA or resname CL)"    # Selection for conversion
 
 
 
@@ -415,8 +416,8 @@ def run_md(output_dir=MD_OUT_DIR,
 def trjconv(top_pdb=SYS_OUT_DIR / "system.pdb",
             traj_xtc=MD_OUT_DIR / "md.xtc",
             output_dir=MD_OUT_DIR,
-            start=0, stop=None, step=1, fit=True,
-            selection=SELECTION):
+            start=0, stop=None, step=10, fit=True,
+            selection=SELECTION_CONV):
     """Post-process trajectory: fit, subsample, and write outputs.
 
     Parameters
@@ -437,23 +438,43 @@ def trjconv(top_pdb=SYS_OUT_DIR / "system.pdb",
     out_top = output_dir / "topology.pdb"
     out_traj = output_dir / "samples.xtc"
 
+    logger.info("Loading topology: %s", top_pdb)
+    logger.info("Loading trajectory: %s", traj_xtc)
+    logger.info("Selection: %s", selection)
+    logger.info("Frame range: start=%s, stop=%s, step=%s", start, stop, step)
+    logger.info("Fitting: %s", fit)
+
     universe = mda.Universe(str(top_pdb), str(traj_xtc))
+    n_frames = len(universe.trajectory)
+    logger.info("Loaded universe: %d frames, %d total atoms",
+                n_frames, universe.atoms.n_atoms)
+
     atom_group = universe.select_atoms(selection)
-    logger.info("Converting trajectory: %d atoms selected", atom_group.n_atoms)
+    logger.info("Selection matched %d atoms", atom_group.n_atoms)
 
     if fit:
+        logger.info("Setting up rotational/translational fitting...")
         ref_universe = mda.Universe(str(top_pdb))
         ref_atoms = ref_universe.select_atoms(selection)
         from MDAnalysis.transformations import fit_rot_trans
         universe.trajectory.add_transformations(
             fit_rot_trans(atom_group, ref_atoms)
         )
+        logger.info("Fitting transformation added")
 
+    logger.info("Writing topology: %s", out_top)
     atom_group.write(str(out_top))
+    logger.info("Writing subsampled trajectory: %s", out_traj)
+    frames_written = 0
     with mda.Writer(str(out_traj), n_atoms=atom_group.n_atoms) as writer:
-        for _ in universe.trajectory[start:stop:step]:
+        for ts in universe.trajectory[start:stop:step]:
             writer.write(atom_group)
-    logger.info("Trajectory conversion complete: %s, %s", out_top, out_traj)
+            frames_written += 1
+            if frames_written % 100 == 0:
+                logger.info("  ... %d frames written (t=%.1f ps)",
+                            frames_written, ts.time)
+    logger.info("Trajectory conversion complete: %d frames → %s, %s",
+                frames_written, out_top, out_traj)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -520,6 +541,6 @@ def _load_interchange_cache(ligand_path, openff_version, work_dir=None):
 
 
 if __name__ == "__main__":
-    prepare_protein_ligand_system()
-    run_md()
+    # prepare_protein_ligand_system()
+    # run_md()
     trjconv()
