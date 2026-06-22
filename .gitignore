@@ -1,6 +1,7 @@
 ligands/
 output/
 protein_systems/
+analysis/
 slurm*
 systems/
 tmp/
