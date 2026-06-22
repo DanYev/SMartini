@@ -10,6 +10,7 @@ Usage::
 """
 
 import logging
+import re
 from pathlib import Path
 
 import numpy as np
@@ -27,35 +28,157 @@ smartini.setup_logging(level=logging.INFO)
 EXAMPLES_DIR = Path("examples").resolve()
 OUTPUT_DIR = Path("analysis").resolve()
 
-# Martini bead radii for SASA (nm) — mapped by element symbol in CG PDB.
-# P-beads ~0.26, Q-beads ~0.24, N-beads ~0.22, C-beads ~0.23, D (dummy) ~0.26.
-CG_RADII_MAP = {"P": 0.26, "VS": 0.24, "N": 0.22, "C": 0.23, "D": 0.26}
+# Shrake-Rupley sphere points (Fibonacci lattice, 960 points)
+_SR_N = 960
+_SR_PHI = (1 + np.sqrt(5)) / 2
+_SR_POINTS = np.empty((_SR_N, 3))
+for _i in range(_SR_N):
+    _y = 1 - (_i / (_SR_N - 1)) * 2
+    _r = np.sqrt(1 - _y * _y)
+    _theta = 2 * np.pi * _i / _SR_PHI
+    _SR_POINTS[_i] = [np.cos(_theta) * _r, _y, np.sin(_theta) * _r]
 
 
 # ---------------------------------------------------------------------------
-# SASA  –  mdtraj.shrake_rupley  (element radii for AA, custom for CG)
+# ITP parsing
 # ---------------------------------------------------------------------------
 
-def compute_sasa(pdb_path: Path, xtc_path: Path, is_cg: bool = False) -> np.ndarray:
-    """Per-frame total SASA (nm²) via MDTraj Shrake-Rupley."""
-    traj = md.load(str(xtc_path), top=str(pdb_path))
+def _parse_itp(itp_path: Path) -> tuple[list[list[int]], list[str]]:
+    """Parse ``LIGAND.itp`` → (mapping, bead_types).
+
+    mapping : list of lists of 0-based AA atom indices per bead.
+    bead_types : list of Martini bead type strings (e.g. ``'TN6a'``).
+    """
+    text = itp_path.read_text()
+
+    # --- mapping from header comment ---
+    m = re.search(r"; Mapping:\s*(\[\[.*?\]\])", text)
+    if not m:
+        raise ValueError(f"No '; Mapping:' found in {itp_path}")
+    mapping_raw = m.group(1)
+    mapping = [list(map(int, grp.strip("[] ").split(",")))
+               for grp in re.findall(r"\[([^\]]+)\]", mapping_raw)]
+
+    # --- bead types from [ atoms ] section ---
+    in_atoms = False
+    bead_types = []
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            in_atoms = (s == "[ atoms ]" or s == "[atoms]")
+            continue
+        if in_atoms and s and not s.startswith(";") and not s.startswith("#"):
+            parts = s.split()
+            if len(parts) >= 2:
+                bead_types.append(parts[1])  # column 2 = bead type
+    return mapping, bead_types
+
+
+def _bead_radius(bead_type: str) -> float:
+    """Martini bead radius (nm): T* → 0.17, S* → 0.205, else → 0.235."""
+    if bead_type.startswith("T"):
+        return 0.17
+    if bead_type.startswith("S"):
+        return 0.205
+    return 0.235
+
+
+# ---------------------------------------------------------------------------
+# SASA
+# ---------------------------------------------------------------------------
+
+def compute_sasa(pdb_path: Path, xtc_path: Path,
+                 is_cg: bool = False, bead_types: list[str] | None = None) -> np.ndarray:
+    """Per-frame total SASA (nm²).  AA uses MDTraj element radii;
+    CG uses a custom Shrake-Rupley with bead-type-based radii."""
     if is_cg:
-        sasa_per_atom = md.shrake_rupley(traj, mode="atom",
-                                         change_radii=CG_RADII_MAP)
+        if bead_types is None:
+            raise ValueError("bead_types required for CG SASA")
+        traj = md.load(str(xtc_path), top=str(pdb_path))
+        radii = np.array([_bead_radius(bt) for bt in bead_types])
+        return _sr_sasa(traj.xyz, radii)
     else:
+        traj = md.load(str(xtc_path), top=str(pdb_path))
         sasa_per_atom = md.shrake_rupley(traj, mode="atom")
-    return sasa_per_atom.sum(axis=1)  # (n_frames, n_atoms) → (n_frames,)
+        return sasa_per_atom.sum(axis=1)
+
+
+def _sr_sasa(xyz: np.ndarray, radii: np.ndarray, probe: float = 0.14) -> np.ndarray:
+    """Shrake-Rupley SASA for CG: per-frame total SASA (nm²).
+
+    Parameters
+    ----------
+    xyz : (n_frames, n_atoms, 3)
+    radii : (n_atoms,)  bead radii in nm
+    probe : float  probe radius in nm
+    """
+    n_frames, n_atoms = xyz.shape[:2]
+    effective = radii + probe  # (n_atoms,)
+    points = _SR_POINTS       # (N, 3)
+
+    sasa_total = np.empty(n_frames)
+    for f in range(n_frames):
+        pos = xyz[f]  # (n_atoms, 3)
+        total = 0.0
+        for i in range(n_atoms):
+            pi = pos[i] + effective[i] * points  # (N, 3)
+            exposed = np.ones(_SR_N, dtype=bool)
+            for j in range(n_atoms):
+                if i == j:
+                    continue
+                d2 = np.sum((pi - pos[j]) ** 2, axis=1)
+                exposed &= d2 > effective[j] ** 2
+            total += 4 * np.pi * effective[i] ** 2 * exposed.mean()
+        sasa_total[f] = total
+    return sasa_total
 
 
 # ---------------------------------------------------------------------------
-# RMSD  –  mdtraj.rmsd  (auto-aligns to frame 0)
+# RMSD
 # ---------------------------------------------------------------------------
 
-def compute_rmsd(pdb_path: Path, xtc_path: Path) -> np.ndarray:
-    """Per-frame RMSD (nm) vs frame 0, after superposition."""
+def compute_cg_rmsd(pdb_path: Path, xtc_path: Path) -> np.ndarray:
+    """Per-frame CG RMSD (nm) vs frame 0, after superposition."""
     traj = md.load(str(xtc_path), top=str(pdb_path))
     traj.superpose(reference=traj, frame=0)
-    return md.rmsd(traj, traj, frame=0)  # (n_frames,)
+    return md.rmsd(traj, traj, frame=0)
+
+
+def compute_aa_cog_rmsd(pdb_path: Path, xtc_path: Path,
+                        mapping: list[list[int]]) -> np.ndarray:
+    """AA RMSD using center-of-geometry of bead-mapped groups.
+
+    Groups AA atoms by their CG bead assignment, computes COG per group,
+    then RMSD of those COGs vs frame 0 after optimal superposition.
+    """
+    traj = md.load(str(xtc_path), top=str(pdb_path))
+    n_frames = traj.n_frames
+    n_beads = len(mapping)
+
+    # COG per frame per bead group
+    cog = np.empty((n_frames, n_beads, 3))
+    for f in range(n_frames):
+        xyz = traj.xyz[f]
+        for b, indices in enumerate(mapping):
+            cog[f, b] = xyz[indices].mean(axis=0)
+
+    # Superpose COG to frame 0 via Kabsch
+    ref = cog[0].copy()
+    ref_cm = ref.mean(axis=0)
+    ref_centered = ref - ref_cm
+    for f in range(1, n_frames):
+        cm = cog[f].mean(axis=0)
+        centered = cog[f] - cm
+        H = centered.T @ ref_centered
+        U, S, Vt = np.linalg.svd(H)
+        R = Vt.T @ U.T
+        if np.linalg.det(R) < 0:
+            Vt[-1] *= -1
+            R = Vt.T @ U.T
+        cog[f] = centered @ R + ref_cm
+
+    diff = cog - ref
+    return np.sqrt((diff ** 2).sum(axis=(1, 2)) / n_beads)
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +192,7 @@ def analyze_ligand(ligand_name: str) -> dict | None:
     """
     aa_dir = EXAMPLES_DIR / ligand_name / "aa_md"
     cg_dir = EXAMPLES_DIR / ligand_name / "cg_md" / CFG.cg_runname
+    itp_path = EXAMPLES_DIR / ligand_name / f"{ligand_name}.itp"
 
     aa_top = aa_dir / "topology.pdb"
     aa_trj = aa_dir / "samples.xtc"
@@ -76,6 +200,11 @@ def analyze_ligand(ligand_name: str) -> dict | None:
     cg_trj = cg_dir / "samples.xtc"
 
     results = {"ligand": ligand_name}
+
+    # Parse ITP for bead mapping and bead types
+    mapping, bead_types = _parse_itp(itp_path)
+    logger.info("[%s] %d beads, types: %s", ligand_name, len(bead_types),
+                ", ".join(bead_types))
 
     # --- AA ---
     if aa_top.exists() and aa_trj.exists():
@@ -88,7 +217,7 @@ def analyze_ligand(ligand_name: str) -> dict | None:
         results["aa_sasa_mean"] = float(np.mean(sasa_aa))
         results["aa_sasa_std"] = float(np.std(sasa_aa))
 
-        rmsd_aa = compute_rmsd(aa_top, aa_trj)
+        rmsd_aa = compute_aa_cog_rmsd(aa_top, aa_trj, mapping)
         results["aa_rmsd_mean"] = float(np.mean(rmsd_aa))
         results["aa_rmsd_std"] = float(np.std(rmsd_aa))
     else:
@@ -101,11 +230,11 @@ def analyze_ligand(ligand_name: str) -> dict | None:
         results["cg_n_frames"] = traj.n_frames
         results["cg_n_beads"] = traj.n_atoms
 
-        sasa_cg = compute_sasa(cg_top, cg_trj, is_cg=True)
+        sasa_cg = compute_sasa(cg_top, cg_trj, is_cg=True, bead_types=bead_types)
         results["cg_sasa_mean"] = float(np.mean(sasa_cg))
         results["cg_sasa_std"] = float(np.std(sasa_cg))
 
-        rmsd_cg = compute_rmsd(cg_top, cg_trj)
+        rmsd_cg = compute_cg_rmsd(cg_top, cg_trj)
         results["cg_rmsd_mean"] = float(np.mean(rmsd_cg))
         results["cg_rmsd_std"] = float(np.std(rmsd_cg))
     else:
