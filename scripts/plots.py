@@ -52,6 +52,16 @@ PALETTE = {
 }
 
 
+def _or_zero(v):
+    """Return *v* if not None, else 0."""
+    return v if v is not None else 0
+
+
+def _or_nan(v):
+    """Return *v* if not None, else ``float('nan')``."""
+    return v if v is not None else float("nan")
+
+
 # ---------------------------------------------------------------------------
 # SASA / RMSD grouped bar chart
 # ---------------------------------------------------------------------------
@@ -111,10 +121,10 @@ def plot_sasa_rmsd(
     n = len(ligands)
     x = np.arange(n)
 
-    aa_sasa = [r.get("aa_sasa_mean", 0) for r in all_results]
-    cg_sasa = [r.get("cg_sasa_mean", 0) for r in all_results]
-    aa_rmsd = [r.get("aa_rmsd_mean", 0) for r in all_results]
-    cg_rmsd = [r.get("cg_rmsd_mean", 0) for r in all_results]
+    aa_sasa = [_or_zero(r.get("aa_sasa_mean")) for r in all_results]
+    cg_sasa = [_or_zero(r.get("cg_sasa_mean")) for r in all_results]
+    aa_rmsd = [_or_zero(r.get("aa_rmsd_mean")) for r in all_results]
+    cg_rmsd = [_or_zero(r.get("cg_rmsd_mean")) for r in all_results]
 
     with plt.rc_context(DEFAULT_STYLE):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize, **kwargs)
@@ -210,9 +220,9 @@ def plot_wasserstein(
     n = len(ligands)
     x = np.arange(n)
 
-    bond_vals = [r.get("bond_wass_mean", float("nan")) for r in all_results]
-    angle_vals = [r.get("angle_wass_mean", float("nan")) for r in all_results]
-    dihedral_vals = [r.get("dihedral_wass_mean", float("nan")) for r in all_results]
+    bond_vals = [_or_nan(r.get("bond_wass_mean")) for r in all_results]
+    angle_vals = [_or_nan(r.get("angle_wass_mean")) for r in all_results]
+    dihedral_vals = [_or_nan(r.get("dihedral_wass_mean")) for r in all_results]
 
     if all(np.isnan(v) for v in bond_vals + angle_vals + dihedral_vals):
         logger.info("No Wasserstein data to plot; skipping chart.")
@@ -246,3 +256,70 @@ def plot_wasserstein(
 
     logger.info("Wasserstein chart saved to %s", png_path)
     return png_path
+
+
+# ---------------------------------------------------------------------------
+# CLI  (python scripts/plots.py [csv_path] [out_dir])
+# ---------------------------------------------------------------------------
+
+def _load_results(csv_path: str | Path) -> list[dict]:
+    """Parse the summary CSV into a list of dicts with typed values."""
+    import csv
+
+    csv_path = Path(csv_path)
+    rows: list[dict] = []
+    with csv_path.open(newline="") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            r: dict = {"ligand": row["ligand"]}
+            for key, converter in _CSV_CONVERTERS.items():
+                raw = row.get(key, "")
+                if raw == "" or raw is None:
+                    r[key] = None
+                else:
+                    try:
+                        r[key] = converter(raw)
+                    except (ValueError, TypeError):
+                        r[key] = None
+            rows.append(r)
+    return rows
+
+
+_CSV_CONVERTERS: dict[str, callable] = {
+    "aa_n_frames": int,
+    "aa_n_atoms": int,
+    "aa_sasa_mean": float,
+    "aa_sasa_std": float,
+    "aa_rmsd_mean": float,
+    "aa_rmsd_std": float,
+    "cg_n_frames": int,
+    "cg_n_beads": int,
+    "cg_sasa_mean": float,
+    "cg_sasa_std": float,
+    "cg_rmsd_mean": float,
+    "cg_rmsd_std": float,
+    "bond_wass_mean": float,
+    "angle_wass_mean": float,
+    "dihedral_wass_mean": float,
+}
+
+
+if __name__ == "__main__":
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
+
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "analysis/sasa_rmsd_summary.csv"
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else "analysis"
+
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        logger.error("CSV not found: %s", csv_path)
+        sys.exit(1)
+
+    results = _load_results(csv_path)
+    logger.info("Loaded %d ligand(s) from %s", len(results), csv_path)
+
+    plot_sasa_rmsd(results, out_dir)
+    plot_wasserstein(results, out_dir)
+    logger.info("All plots saved to %s/", out_dir)
