@@ -10,6 +10,7 @@ Usage::
 """
 
 import logging
+import pickle
 import re
 from pathlib import Path
 
@@ -18,6 +19,12 @@ import mdtraj as md
 
 import smartini
 from smartini.config import CFG
+from smartini.lpmath import (
+    read_cg_trajectory,
+    calculate_internal_coordinates,
+    circular_mean,
+    wrap_to_180,
+)
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
@@ -182,6 +189,130 @@ def compute_aa_cog_rmsd(pdb_path: Path, xtc_path: Path,
 
 
 # ---------------------------------------------------------------------------
+# Internal-coordinate AA/CG overlap
+# ---------------------------------------------------------------------------
+
+def _histogram_overlap(aa_vals: np.ndarray, cg_vals: np.ndarray,
+                       value_type: str = "bond", nbins: int = 60) -> float:
+    """Compute histogram density overlap between AA and CG distributions.
+
+    Parameters
+    ----------
+    aa_vals, cg_vals : ndarray
+        Sampled internal coordinate values.
+    value_type : str
+        ``"bond"``, ``"constraint"``, ``"angle"``, or ``"dihedral"``.
+        Dihedrals receive circular centering before histogramming.
+    nbins : int
+        Number of histogram bins.
+
+    Returns
+    -------
+    float
+        Overlap coefficient ``sum(aa_density * cg_density)`` in [0, 1].
+    """
+    aa_vals = np.asarray(aa_vals, dtype=float)
+    cg_vals = np.asarray(cg_vals, dtype=float)
+
+    if value_type == "dihedral":
+        # Center both around the AA circular mean
+        shift = float(circular_mean(aa_vals))
+        aa_centered = wrap_to_180(aa_vals - shift)
+        cg_centered = wrap_to_180(cg_vals - shift)
+        bins = np.linspace(-180.0, 180.0, nbins + 1)
+    elif value_type == "angle":
+        bins = np.linspace(0.0, 180.0, nbins + 1)
+        aa_centered = aa_vals
+        cg_centered = cg_vals
+    else:
+        # bond / constraint: use combined data range
+        vmin = min(aa_vals.min(), cg_vals.min())
+        vmax = max(aa_vals.max(), cg_vals.max())
+        if vmax - vmin < 1e-9:
+            return 1.0  # degenerate → perfect overlap
+        bins = np.linspace(vmin, vmax, nbins + 1)
+        aa_centered = aa_vals
+        cg_centered = cg_vals
+
+    aa_density, _ = np.histogram(aa_centered, bins=bins, density=True)
+    cg_density, _ = np.histogram(cg_centered, bins=bins, density=True)
+
+    # Normalise to probability mass functions
+    aa_density = aa_density / aa_density.sum()
+    cg_density = cg_density / cg_density.sum()
+
+    return float(np.sum(aa_density * cg_density))
+
+
+def compute_internal_overlaps(aa_internal: dict, cg_internal: dict,
+                              topo) -> dict:
+    """Compute per-term and aggregate AA/CG histogram overlap scores.
+
+    Parameters
+    ----------
+    aa_internal : dict
+        AA internal coordinates (from ``internal_coords.pkl``).
+    cg_internal : dict
+        CG internal coordinates (from ``calculate_internal_coordinates``).
+    topo : object
+        Topology with ``bonds``, ``constraints``, ``angles``, ``dihedrals``.
+
+    Returns
+    -------
+    dict
+        Keys: ``"bond_overlaps"``, ``"constraint_overlaps"``,
+        ``"angle_overlaps"``, ``"dihedral_overlaps"`` (lists of per-term
+        overlaps), plus ``"bond_mean"``, ``"angle_mean"``,
+        ``"dihedral_mean"`` (aggregate means).
+    """
+    result: dict = {
+        "bond_overlaps": [],
+        "constraint_overlaps": [],
+        "angle_overlaps": [],
+        "dihedral_overlaps": [],
+    }
+
+    for bond in topo.bonds:
+        i, j = int(bond[0]), int(bond[1])
+        aa_vals = aa_internal.get((i, j, "constraint"))
+        cg_vals = cg_internal.get((i, j, "bond"))
+        if aa_vals is not None and cg_vals is not None:
+            result["bond_overlaps"].append(
+                _histogram_overlap(aa_vals, cg_vals, "bond"))
+
+    for constraint in topo.constraints:
+        i, j = int(constraint[0]), int(constraint[1])
+        aa_vals = aa_internal.get((i, j, "constraint"))
+        cg_vals = cg_internal.get((i, j, "constraint"))
+        if aa_vals is not None and cg_vals is not None:
+            result["constraint_overlaps"].append(
+                _histogram_overlap(aa_vals, cg_vals, "constraint"))
+
+    for angle in topo.angles:
+        i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
+        aa_vals = aa_internal.get((i, j, k, "angle"))
+        cg_vals = cg_internal.get((i, j, k, "angle"))
+        if aa_vals is not None and cg_vals is not None:
+            result["angle_overlaps"].append(
+                _histogram_overlap(aa_vals, cg_vals, "angle"))
+
+    for dihedral in topo.dihedrals:
+        i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
+        aa_vals = aa_internal.get((i, j, k, l, "dihedral"))
+        cg_vals = cg_internal.get((i, j, k, l, "dihedral"))
+        if aa_vals is not None and cg_vals is not None:
+            result["dihedral_overlaps"].append(
+                _histogram_overlap(aa_vals, cg_vals, "dihedral"))
+
+    # Aggregate means
+    result["bond_mean"] = float(np.mean(result["bond_overlaps"])) if result["bond_overlaps"] else float("nan")
+    result["angle_mean"] = float(np.mean(result["angle_overlaps"])) if result["angle_overlaps"] else float("nan")
+    result["dihedral_mean"] = float(np.mean(result["dihedral_overlaps"])) if result["dihedral_overlaps"] else float("nan")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Per-ligand analysis
 # ---------------------------------------------------------------------------
 
@@ -240,12 +371,96 @@ def analyze_ligand(ligand_name: str) -> dict | None:
     else:
         logger.warning("[%s] CG data missing, skipping CG analysis.", ligand_name)
 
+    # --- AA/CG internal-coordinate overlap ---
+    pkl_path = EXAMPLES_DIR / ligand_name / "internal_coords.pkl"
+    if pkl_path.exists() and cg_top.exists() and cg_trj.exists() and itp_path.exists():
+        logger.info("[%s] Computing AA/CG internal coordinate overlap", ligand_name)
+        try:
+            with open(pkl_path, "rb") as f:
+                aa_internal = pickle.load(f)
+
+            topo = smartini.topology.read_itp(str(itp_path))
+
+            cg_traj = read_cg_trajectory(cg_top, cg_trj, start=0, stop=None, step=1)
+            cg_internal = calculate_internal_coordinates(cg_traj, topo)
+
+            overlaps = compute_internal_overlaps(aa_internal, cg_internal, topo)
+            results["bond_overlap_mean"] = overlaps["bond_mean"]
+            results["angle_overlap_mean"] = overlaps["angle_mean"]
+            results["dihedral_overlap_mean"] = overlaps["dihedral_mean"]
+
+            # Save per-term overlap arrays as pkl
+            overlap_pkl = OUTPUT_DIR / f"{ligand_name}_overlaps.pkl"
+            overlap_pkl.parent.mkdir(parents=True, exist_ok=True)
+            with open(overlap_pkl, "wb") as f:
+                pickle.dump(overlaps, f, protocol=pickle.HIGHEST_PROTOCOL)
+            logger.info("[%s] Overlap pkl saved to %s", ligand_name, overlap_pkl)
+
+            logger.info(
+                "[%s] Mean overlaps — bonds: %.3f  angles: %.3f  dihedrals: %.3f",
+                ligand_name,
+                overlaps["bond_mean"],
+                overlaps["angle_mean"],
+                overlaps["dihedral_mean"],
+            )
+        except Exception:
+            logger.warning("[%s] Internal-coordinate overlap failed, skipping.", ligand_name, exc_info=True)
+    else:
+        logger.warning(
+            "[%s] Missing data for internal-coordinate overlap "
+            "(pkl=%s, cg_top=%s, cg_trj=%s, itp=%s)",
+            ligand_name,
+            pkl_path.exists(),
+            cg_top.exists(),
+            cg_trj.exists(),
+            itp_path.exists(),
+        )
+
     return results
 
 
 # ---------------------------------------------------------------------------
 # Summary & plotting
 # ---------------------------------------------------------------------------
+
+def _save_overlap_chart(all_results: list[dict], out_dir: Path):
+    """Save histogram comparing mean AA/CG overlap for bonds, angles, dihedrals."""
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return
+
+    ligands = [r["ligand"] for r in all_results]
+    n = len(ligands)
+    x = np.arange(n)
+    w = 0.25
+
+    bond_vals = [r.get("bond_overlap_mean", float("nan")) for r in all_results]
+    angle_vals = [r.get("angle_overlap_mean", float("nan")) for r in all_results]
+    dihedral_vals = [r.get("dihedral_overlap_mean", float("nan")) for r in all_results]
+
+    if all(np.isnan(v) for v in bond_vals + angle_vals + dihedral_vals):
+        logger.info("No overlap data to plot; skipping overlap chart.")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(x - w, bond_vals, w, label="Bonds/Constraints", color="tab:green")
+    ax.bar(x, angle_vals, w, label="Angles", color="tab:red")
+    ax.bar(x + w, dihedral_vals, w, label="Dihedrals", color="tab:purple")
+    ax.set_xticks(x)
+    ax.set_xticklabels(ligands)
+    ax.set_ylabel("Histogram overlap")
+    ax.set_ylim(0, 1)
+    ax.set_title("AA/CG Internal-Coordinate Overlap")
+    ax.legend(frameon=False)
+    ax.grid(axis="y", alpha=0.25)
+
+    fig.tight_layout()
+    png_path = out_dir / "internal_overlap_bars.png"
+    fig.savefig(png_path, dpi=150)
+    logger.info("Overlap chart saved to %s", png_path)
+    plt.close(fig)
+
 
 def save_results(all_results: list[dict], out_dir: Path):
     """Save a summary CSV and a bar-chart PNG."""
@@ -262,6 +477,7 @@ def save_results(all_results: list[dict], out_dir: Path):
         "cg_n_frames", "cg_n_beads",
         "cg_sasa_mean", "cg_sasa_std",
         "cg_rmsd_mean", "cg_rmsd_std",
+        "bond_overlap_mean", "angle_overlap_mean", "dihedral_overlap_mean",
     ]
     with open(csv_path, "w") as f:
         f.write(",".join(columns) + "\n")
@@ -309,6 +525,9 @@ def save_results(all_results: list[dict], out_dir: Path):
     fig.savefig(png_path, dpi=150)
     logger.info("Bar chart saved to %s", png_path)
     plt.close(fig)
+
+    # --- AA/CG overlap histogram ---
+    _save_overlap_chart(all_results, out_dir)
 
 
 # ---------------------------------------------------------------------------
