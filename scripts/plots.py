@@ -505,32 +505,45 @@ def plot_Q_time_series(
 
         # --- inset: mini contact maps (bottom-right, side-by-side CG | AA) ---
         panels = []
+        labels = []
         if inset_freq_cg is not None:
             panels.append(inset_freq_cg)
+            labels.append("CG")
         if inset_freq_aa is not None:
             panels.append(inset_freq_aa)
+            labels.append("AA")
         if panels:
             from mpl_toolkits.axes_grid1.inset_locator import inset_axes
             from matplotlib.colors import Normalize as Norm
             n_panels = len(panels)
-            # make inset wider if two panels
             inset_w = "30%" if n_panels == 1 else "40%"
             iax = inset_axes(ax, width=inset_w, height="38%",
                              loc="lower right",
                              bbox_to_anchor=(0.0, 0.02, 1, 1),
                              bbox_transform=ax.transAxes)
-            # stack panels horizontally with a 2-pixel gap
-            combined = np.hstack(panels) if n_panels == 2 else panels[0]
+
+            if n_panels == 2:
+                # insert a white gap column between the two maps
+                n_lig, n_prot = panels[0].shape
+                gap_cols = max(2, n_prot // 8)  # ~proportional gap
+                gap = np.full((n_lig, gap_cols), np.nan)
+                combined = np.hstack([panels[0], gap, panels[1]])
+            else:
+                combined = panels[0]
+
             iax.imshow(combined, aspect="auto", origin="upper",
                        cmap=inset_cmap, norm=Norm(0, 1), interpolation="nearest")
-            # draw a thin white separator between CG and AA
-            if n_panels == 2:
-                mid = panels[0].shape[1] - 0.5
-                iax.axvline(mid, color="white", linewidth=1.5)
             iax.set_xticks([])
             iax.set_yticks([])
             iax.set_xlabel("Protein residues", fontsize=6, labelpad=1)
-            iax.set_ylabel("Ligand beads", fontsize=6, labelpad=1)
+            if n_panels == 2:
+                # left edge: "CG"  —  right edge: "AA"
+                iax.text(-0.02, 0.5, "CG ligand beads", transform=iax.transAxes,
+                         fontsize=6, rotation=90, va="center", ha="center")
+                iax.text(0.5, 0.5, "AA ligand beads", transform=iax.transAxes,
+                         fontsize=6, rotation=90, va="center", ha="center")
+            else:
+                iax.set_ylabel("Ligand beads", fontsize=6, labelpad=1)
             for spine in iax.spines.values():
                 spine.set_linewidth(0.5)
 
