@@ -213,6 +213,39 @@ def compute_aa_cog_rmsd(pdb_path: Path, xtc_path: Path,
 
 
 # ---------------------------------------------------------------------------
+# Radius of Gyration
+# ---------------------------------------------------------------------------
+
+def compute_cg_rg(pdb_path: Path, xtc_path: Path) -> np.ndarray:
+    """Per-frame CG radius of gyration (nm)."""
+    traj = md.load(str(xtc_path), top=str(pdb_path))
+    xyz = traj.xyz  # (n_frames, n_atoms, 3)
+    cog = xyz.mean(axis=1, keepdims=True)  # (n_frames, 1, 3)
+    return np.sqrt(((xyz - cog) ** 2).sum(axis=(1, 2)) / xyz.shape[1])
+
+
+def compute_aa_cog_rg(pdb_path: Path, xtc_path: Path,
+                       mapping: list[list[int]]) -> np.ndarray:
+    """AA radius of gyration using center-of-geometry of bead-mapped groups.
+
+    Groups AA atoms by CG bead assignment, computes COG per group,
+    then Rg of those COGs.
+    """
+    traj = md.load(str(xtc_path), top=str(pdb_path))
+    n_frames = traj.n_frames
+    n_beads = len(mapping)
+
+    cog = np.empty((n_frames, n_beads, 3))
+    for f in range(n_frames):
+        xyz = traj.xyz[f]
+        for b, indices in enumerate(mapping):
+            cog[f, b] = xyz[indices].mean(axis=0)
+
+    center = cog.mean(axis=1, keepdims=True)  # (n_frames, 1, 3)
+    return np.sqrt(((cog - center) ** 2).sum(axis=(1, 2)) / n_beads)
+
+
+# ---------------------------------------------------------------------------
 # Internal-coordinate AA/CG overlap
 # ---------------------------------------------------------------------------
 
@@ -340,9 +373,10 @@ def analyze_ligand(ligand_name: str, modes: set[str] | None = None) -> dict | No
     Returns a dict of results, or None if data is missing.
     """
     if modes is None:
-        modes = {"sasa", "rmsd", "wass"}
+        modes = {"sasa", "rmsd", "rg", "wass"}
     do_sasa = "sasa" in modes
     do_rmsd = "rmsd" in modes
+    do_rg = "rg" in modes
     do_wass = "wass" in modes
     aa_dir = EXAMPLES_DIR / ligand_name / "aa_md"
     cg_dir = EXAMPLES_DIR / ligand_name / "cg_md" / CFG.cg_runname
@@ -381,6 +415,14 @@ def analyze_ligand(ligand_name: str, modes: set[str] | None = None) -> dict | No
             results["aa_rmsd_mean"] = mean
             results["aa_rmsd_ci_lo"] = lo
             results["aa_rmsd_ci_hi"] = hi
+
+        if do_rg:
+            logger.info("[%s] AA Rg: %s", ligand_name, aa_trj)
+            rg_aa = compute_aa_cog_rg(aa_top, aa_trj, mapping)
+            mean, lo, hi = _bootstrap_ci(rg_aa)
+            results["aa_rg_mean"] = mean
+            results["aa_rg_ci_lo"] = lo
+            results["aa_rg_ci_hi"] = hi
     else:
         logger.warning("[%s] AA data missing, skipping AA analysis.", ligand_name)
 
@@ -405,6 +447,14 @@ def analyze_ligand(ligand_name: str, modes: set[str] | None = None) -> dict | No
             results["cg_rmsd_mean"] = mean
             results["cg_rmsd_ci_lo"] = lo
             results["cg_rmsd_ci_hi"] = hi
+
+        if do_rg:
+            logger.info("[%s] CG Rg: %s", ligand_name, cg_trj)
+            rg_cg = compute_cg_rg(cg_top, cg_trj)
+            mean, lo, hi = _bootstrap_ci(rg_cg)
+            results["cg_rg_mean"] = mean
+            results["cg_rg_ci_lo"] = lo
+            results["cg_rg_ci_hi"] = hi
     else:
         logger.warning("[%s] CG data missing, skipping CG analysis.", ligand_name)
 
@@ -480,9 +530,11 @@ def save_results(all_results: list[dict], out_dir: Path):
         "aa_n_frames", "aa_n_atoms",
         "aa_sasa_mean", "aa_sasa_ci_lo", "aa_sasa_ci_hi",
         "aa_rmsd_mean", "aa_rmsd_ci_lo", "aa_rmsd_ci_hi",
+        "aa_rg_mean", "aa_rg_ci_lo", "aa_rg_ci_hi",
         "cg_n_frames", "cg_n_beads",
         "cg_sasa_mean", "cg_sasa_ci_lo", "cg_sasa_ci_hi",
         "cg_rmsd_mean", "cg_rmsd_ci_lo", "cg_rmsd_ci_hi",
+        "cg_rg_mean", "cg_rg_ci_lo", "cg_rg_ci_hi",
         "bond_wass_mean", "angle_wass_mean", "dihedral_wass_mean",
     ]
 
@@ -545,18 +597,21 @@ if __name__ == "__main__":
     parser.add_argument("ligands", nargs="*", help="Ligand names (default: all with AA+CG data)")
     parser.add_argument("--sasa", action="store_true", help="Compute SASA")
     parser.add_argument("--rmsd", action="store_true", help="Compute RMSD")
+    parser.add_argument("--rg", action="store_true", help="Compute radius of gyration")
     parser.add_argument("--wass", action="store_true", help="Compute Wasserstein distances")
     args = parser.parse_args()
 
     # If no flags are given, run all analyses
-    if not (args.sasa or args.rmsd or args.wass):
-        args.sasa = args.rmsd = args.wass = True
+    if not (args.sasa or args.rmsd or args.rg or args.wass):
+        args.sasa = args.rmsd = args.rg = args.wass = True
 
     modes = set()
     if args.sasa:
         modes.add("sasa")
     if args.rmsd:
         modes.add("rmsd")
+    if args.rg:
+        modes.add("rg")
     if args.wass:
         modes.add("wass")
 
