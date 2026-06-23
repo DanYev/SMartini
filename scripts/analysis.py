@@ -192,84 +192,72 @@ def compute_aa_cog_rmsd(pdb_path: Path, xtc_path: Path,
 # Internal-coordinate AA/CG overlap
 # ---------------------------------------------------------------------------
 
-def _histogram_overlap(aa_vals: np.ndarray, cg_vals: np.ndarray,
-                       value_type: str = "bond", nbins: int = 60) -> float:
-    """Compute histogram density overlap between AA and CG distributions.
+def _wasserstein_1d(u_values: np.ndarray, v_values: np.ndarray) -> float:
+    """Compute 1D Wasserstein (Earth Mover's) distance between two samples.
 
-    Parameters
-    ----------
-    aa_vals, cg_vals : ndarray
-        Sampled internal coordinate values.
-    value_type : str
-        ``"bond"``, ``"constraint"``, ``"angle"``, or ``"dihedral"``.
-        Dihedrals receive circular centering before histogramming.
-    nbins : int
-        Number of histogram bins.
+    Uses the CDF formulation: :math:`W_1 = \\int |F_U(x) - F_V(x)|\\,dx`.
+    """
+    u = np.sort(np.asarray(u_values, dtype=float))
+    v = np.sort(np.asarray(v_values, dtype=float))
 
-    Returns
-    -------
-    float
-        Overlap coefficient ``sum(aa_density * cg_density)`` in [0, 1].
+    # Combine all breakpoints where either CDF changes
+    all_vals = np.sort(np.concatenate([u, v]))
+
+    u_cdf = np.searchsorted(u, all_vals, side='right').astype(float) / len(u)
+    v_cdf = np.searchsorted(v, all_vals, side='right').astype(float) / len(v)
+
+    dx = np.diff(all_vals)
+    cdf_diff = np.abs(u_cdf[:-1] - v_cdf[:-1])
+
+    return float(np.sum(cdf_diff * dx))
+
+
+def _wasserstein_distance(aa_vals: np.ndarray, cg_vals: np.ndarray,
+                          value_type: str = "bond") -> float:
+    """Compute normalised Wasserstein distance (W₁ / range) between AA and CG.
+
+    All return values lie in [0, 1].  For dihedrals the samples are circularly
+    centred on the AA mean first.
     """
     aa_vals = np.asarray(aa_vals, dtype=float)
     cg_vals = np.asarray(cg_vals, dtype=float)
 
     if value_type == "dihedral":
-        # Center both around the AA circular mean
         shift = float(circular_mean(aa_vals))
-        aa_centered = wrap_to_180(aa_vals - shift)
-        cg_centered = wrap_to_180(cg_vals - shift)
-        bins = np.linspace(-180.0, 180.0, nbins + 1)
-    elif value_type == "angle":
-        bins = np.linspace(0.0, 180.0, nbins + 1)
-        aa_centered = aa_vals
-        cg_centered = cg_vals
-    else:
-        # bond / constraint: use combined data range
-        vmin = min(aa_vals.min(), cg_vals.min())
-        vmax = max(aa_vals.max(), cg_vals.max())
-        if vmax - vmin < 1e-9:
-            return 1.0  # degenerate → perfect overlap
-        bins = np.linspace(vmin, vmax, nbins + 1)
-        aa_centered = aa_vals
-        cg_centered = cg_vals
+        aa_vals = wrap_to_180(aa_vals - shift)
+        cg_vals = wrap_to_180(cg_vals - shift)
+        w = _wasserstein_1d(aa_vals, cg_vals)
+        return w / 180.0  # range = 360°, but centred so effective range ≈ 180°
 
-    aa_density, _ = np.histogram(aa_centered, bins=bins, density=True)
-    cg_density, _ = np.histogram(cg_centered, bins=bins, density=True)
+    if value_type == "angle":
+        w = _wasserstein_1d(aa_vals, cg_vals)
+        return w / 180.0
 
-    # Normalise to probability mass functions
-    aa_density = aa_density / aa_density.sum()
-    cg_density = cg_density / cg_density.sum()
-
-    return float(np.sum(aa_density * cg_density))
+    # bond / constraint: normalise by combined data range
+    w = _wasserstein_1d(aa_vals, cg_vals)
+    data_range = float(max(aa_vals.max(), cg_vals.max()) - min(aa_vals.min(), cg_vals.min()))
+    if data_range > 1e-9:
+        return w / data_range
+    return 0.0
 
 
-def compute_internal_overlaps(aa_internal: dict, cg_internal: dict,
-                              topo) -> dict:
-    """Compute per-term and aggregate AA/CG histogram overlap scores.
-
-    Parameters
-    ----------
-    aa_internal : dict
-        AA internal coordinates (from ``internal_coords.pkl``).
-    cg_internal : dict
-        CG internal coordinates (from ``calculate_internal_coordinates``).
-    topo : object
-        Topology with ``bonds``, ``constraints``, ``angles``, ``dihedrals``.
+def compute_internal_wasserstein(aa_internal: dict, cg_internal: dict,
+                                 topo) -> dict:
+    """Compute per-term and aggregate AA/CG Wasserstein distances.
 
     Returns
     -------
     dict
-        Keys: ``"bond_overlaps"``, ``"constraint_overlaps"``,
-        ``"angle_overlaps"``, ``"dihedral_overlaps"`` (lists of per-term
-        overlaps), plus ``"bond_mean"``, ``"angle_mean"``,
-        ``"dihedral_mean"`` (aggregate means).
+        Keys: ``"bond_dists"``, ``"constraint_dists"``, ``"angle_dists"``,
+        ``"dihedral_dists"`` (lists of per-term distances), plus
+        ``"bond_mean"``, ``"angle_mean"``, ``"dihedral_mean"`` (aggregate
+        means; lower = better).
     """
     result: dict = {
-        "bond_overlaps": [],
-        "constraint_overlaps": [],
-        "angle_overlaps": [],
-        "dihedral_overlaps": [],
+        "bond_dists": [],
+        "constraint_dists": [],
+        "angle_dists": [],
+        "dihedral_dists": [],
     }
 
     for bond in topo.bonds:
@@ -277,37 +265,37 @@ def compute_internal_overlaps(aa_internal: dict, cg_internal: dict,
         aa_vals = aa_internal.get((i, j, "constraint"))
         cg_vals = cg_internal.get((i, j, "bond"))
         if aa_vals is not None and cg_vals is not None:
-            result["bond_overlaps"].append(
-                _histogram_overlap(aa_vals, cg_vals, "bond"))
+            result["bond_dists"].append(
+                _wasserstein_distance(aa_vals, cg_vals, "bond"))
 
     for constraint in topo.constraints:
         i, j = int(constraint[0]), int(constraint[1])
         aa_vals = aa_internal.get((i, j, "constraint"))
         cg_vals = cg_internal.get((i, j, "constraint"))
         if aa_vals is not None and cg_vals is not None:
-            result["constraint_overlaps"].append(
-                _histogram_overlap(aa_vals, cg_vals, "constraint"))
+            result["constraint_dists"].append(
+                _wasserstein_distance(aa_vals, cg_vals, "constraint"))
 
     for angle in topo.angles:
         i, j, k = int(angle[0]), int(angle[1]), int(angle[2])
         aa_vals = aa_internal.get((i, j, k, "angle"))
         cg_vals = cg_internal.get((i, j, k, "angle"))
         if aa_vals is not None and cg_vals is not None:
-            result["angle_overlaps"].append(
-                _histogram_overlap(aa_vals, cg_vals, "angle"))
+            result["angle_dists"].append(
+                _wasserstein_distance(aa_vals, cg_vals, "angle"))
 
     for dihedral in topo.dihedrals:
         i, j, k, l = int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3])
         aa_vals = aa_internal.get((i, j, k, l, "dihedral"))
         cg_vals = cg_internal.get((i, j, k, l, "dihedral"))
         if aa_vals is not None and cg_vals is not None:
-            result["dihedral_overlaps"].append(
-                _histogram_overlap(aa_vals, cg_vals, "dihedral"))
+            result["dihedral_dists"].append(
+                _wasserstein_distance(aa_vals, cg_vals, "dihedral"))
 
-    # Aggregate means
-    result["bond_mean"] = float(np.mean(result["bond_overlaps"])) if result["bond_overlaps"] else float("nan")
-    result["angle_mean"] = float(np.mean(result["angle_overlaps"])) if result["angle_overlaps"] else float("nan")
-    result["dihedral_mean"] = float(np.mean(result["dihedral_overlaps"])) if result["dihedral_overlaps"] else float("nan")
+    # Aggregate means (lower = better match)
+    result["bond_mean"] = float(np.mean(result["bond_dists"])) if result["bond_dists"] else float("nan")
+    result["angle_mean"] = float(np.mean(result["angle_dists"])) if result["angle_dists"] else float("nan")
+    result["dihedral_mean"] = float(np.mean(result["dihedral_dists"])) if result["dihedral_dists"] else float("nan")
 
     return result
 
@@ -371,10 +359,10 @@ def analyze_ligand(ligand_name: str) -> dict | None:
     else:
         logger.warning("[%s] CG data missing, skipping CG analysis.", ligand_name)
 
-    # --- AA/CG internal-coordinate overlap ---
+    # --- AA/CG internal-coordinate Wasserstein distances ---
     pkl_path = EXAMPLES_DIR / ligand_name / "internal_coords.pkl"
     if pkl_path.exists() and cg_top.exists() and cg_trj.exists() and itp_path.exists():
-        logger.info("[%s] Computing AA/CG internal coordinate overlap", ligand_name)
+        logger.info("[%s] Computing AA/CG Wasserstein distances", ligand_name)
         try:
             with open(pkl_path, "rb") as f:
                 aa_internal = pickle.load(f)
@@ -384,30 +372,30 @@ def analyze_ligand(ligand_name: str) -> dict | None:
             cg_traj = read_cg_trajectory(cg_top, cg_trj, start=0, stop=None, step=1)
             cg_internal = calculate_internal_coordinates(cg_traj, topo)
 
-            overlaps = compute_internal_overlaps(aa_internal, cg_internal, topo)
-            results["bond_overlap_mean"] = overlaps["bond_mean"]
-            results["angle_overlap_mean"] = overlaps["angle_mean"]
-            results["dihedral_overlap_mean"] = overlaps["dihedral_mean"]
+            dists = compute_internal_wasserstein(aa_internal, cg_internal, topo)
+            results["bond_wass_mean"] = dists["bond_mean"]
+            results["angle_wass_mean"] = dists["angle_mean"]
+            results["dihedral_wass_mean"] = dists["dihedral_mean"]
 
-            # Save per-term overlap arrays as pkl
-            overlap_pkl = OUTPUT_DIR / f"{ligand_name}_overlaps.pkl"
-            overlap_pkl.parent.mkdir(parents=True, exist_ok=True)
-            with open(overlap_pkl, "wb") as f:
-                pickle.dump(overlaps, f, protocol=pickle.HIGHEST_PROTOCOL)
-            logger.info("[%s] Overlap pkl saved to %s", ligand_name, overlap_pkl)
+            # Save per-term distance arrays as pkl
+            dist_pkl = OUTPUT_DIR / f"{ligand_name}_wasserstein.pkl"
+            dist_pkl.parent.mkdir(parents=True, exist_ok=True)
+            with open(dist_pkl, "wb") as f:
+                pickle.dump(dists, f, protocol=pickle.HIGHEST_PROTOCOL)
+            logger.info("[%s] Wasserstein pkl saved to %s", ligand_name, dist_pkl)
 
             logger.info(
-                "[%s] Mean overlaps — bonds: %.3f  angles: %.3f  dihedrals: %.3f",
+                "[%s] Mean Wasserstein — bonds: %.4f  angles: %.4f  dihedrals: %.4f",
                 ligand_name,
-                overlaps["bond_mean"],
-                overlaps["angle_mean"],
-                overlaps["dihedral_mean"],
+                dists["bond_mean"],
+                dists["angle_mean"],
+                dists["dihedral_mean"],
             )
         except Exception:
-            logger.warning("[%s] Internal-coordinate overlap failed, skipping.", ligand_name, exc_info=True)
+            logger.warning("[%s] Wasserstein computation failed, skipping.", ligand_name, exc_info=True)
     else:
         logger.warning(
-            "[%s] Missing data for internal-coordinate overlap "
+            "[%s] Missing data for Wasserstein "
             "(pkl=%s, cg_top=%s, cg_trj=%s, itp=%s)",
             ligand_name,
             pkl_path.exists(),
@@ -423,8 +411,8 @@ def analyze_ligand(ligand_name: str) -> dict | None:
 # Summary & plotting
 # ---------------------------------------------------------------------------
 
-def _save_overlap_chart(all_results: list[dict], out_dir: Path):
-    """Save histogram comparing mean AA/CG overlap for bonds, angles, dihedrals."""
+def _save_wasserstein_chart(all_results: list[dict], out_dir: Path):
+    """Save bar chart of mean Wasserstein distances (lower = better)."""
     try:
         import matplotlib.pyplot as plt
     except ImportError:
@@ -435,30 +423,29 @@ def _save_overlap_chart(all_results: list[dict], out_dir: Path):
     x = np.arange(n)
     w = 0.25
 
-    bond_vals = [r.get("bond_overlap_mean", float("nan")) for r in all_results]
-    angle_vals = [r.get("angle_overlap_mean", float("nan")) for r in all_results]
-    dihedral_vals = [r.get("dihedral_overlap_mean", float("nan")) for r in all_results]
+    bond_vals = [r.get("bond_wass_mean", float("nan")) for r in all_results]
+    angle_vals = [r.get("angle_wass_mean", float("nan")) for r in all_results]
+    dihedral_vals = [r.get("dihedral_wass_mean", float("nan")) for r in all_results]
 
     if all(np.isnan(v) for v in bond_vals + angle_vals + dihedral_vals):
-        logger.info("No overlap data to plot; skipping overlap chart.")
+        logger.info("No Wasserstein data to plot; skipping chart.")
         return
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(x - w, bond_vals, w, label="Bonds/Constraints", color="tab:green")
-    ax.bar(x, angle_vals, w, label="Angles", color="tab:red")
-    ax.bar(x + w, dihedral_vals, w, label="Dihedrals", color="tab:purple")
+    ax.bar(x - w, bond_vals, w, label="Bonds/Constraints  (W₁ / range)", color="tab:green")
+    ax.bar(x, angle_vals, w, label="Angles  (W₁ / 180°)", color="tab:red")
+    ax.bar(x + w, dihedral_vals, w, label="Dihedrals  (W₁ / 180°)", color="tab:purple")
     ax.set_xticks(x)
     ax.set_xticklabels(ligands)
-    ax.set_ylabel("Histogram overlap")
-    ax.set_ylim(0, 1)
-    ax.set_title("AA/CG Internal-Coordinate Overlap")
+    ax.set_ylabel("Normalised Wasserstein distance  (0–1, lower = better)")
+    ax.set_title("AA/CG Internal-Coordinate Wasserstein Distance")
     ax.legend(frameon=False)
     ax.grid(axis="y", alpha=0.25)
 
     fig.tight_layout()
-    png_path = out_dir / "internal_overlap_bars.png"
+    png_path = out_dir / "internal_wasserstein_bars.png"
     fig.savefig(png_path, dpi=150)
-    logger.info("Overlap chart saved to %s", png_path)
+    logger.info("Wasserstein chart saved to %s", png_path)
     plt.close(fig)
 
 
@@ -477,7 +464,7 @@ def save_results(all_results: list[dict], out_dir: Path):
         "cg_n_frames", "cg_n_beads",
         "cg_sasa_mean", "cg_sasa_std",
         "cg_rmsd_mean", "cg_rmsd_std",
-        "bond_overlap_mean", "angle_overlap_mean", "dihedral_overlap_mean",
+        "bond_wass_mean", "angle_wass_mean", "dihedral_wass_mean",
     ]
     with open(csv_path, "w") as f:
         f.write(",".join(columns) + "\n")
@@ -526,8 +513,8 @@ def save_results(all_results: list[dict], out_dir: Path):
     logger.info("Bar chart saved to %s", png_path)
     plt.close(fig)
 
-    # --- AA/CG overlap histogram ---
-    _save_overlap_chart(all_results, out_dir)
+    # --- AA/CG Wasserstein histogram ---
+    _save_wasserstein_chart(all_results, out_dir)
 
 
 # ---------------------------------------------------------------------------
