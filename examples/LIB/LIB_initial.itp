@@ -11,26 +11,26 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   TN5a  1   LIB    N01    1    0.0  0.0   ; C1 O1          ; C=O            ;          
-2   TN6a  1   LIB    N02    2    0.0  36.0   ; N1 C2          ; CN             ;          
-3   TC6   1   LIB    C03    3    0.0  36.0   ; S1 C3          ; CS             ;          
-4   TN5a  1   LIB    N04    4    0.0  36.0   ; C4 O2          ; C=O            ;          
-5   TN5d  1   LIB    N05    5    0.0  36.0   ; N2 C5          ; CN             ;          
-6   TN5d  1   LIB    N06    6    0.0  72.0   ; N3 C6          ; CN             ;          
-7   TP2d  1   LIB    P07    7    0.0  36.0   ; O3 C7          ; CO             ;          
-8   TN5d  1   LIB    N08    8    0.0  36.0   ; N4 C8          ; CN             ;          
-9   TC5   1   LIB    C09    9    0.0  36.0   ; C9 C10         ; C=C            ;          
-10  TC5   1   LIB    C10    10   0.0  36.0   ; C11 C12        ; C=C            ;          
-11  TC5   1   LIB    C11    11   0.0  36.0   ; C13 C14        ; C=C            ;          
-12  TC5   1   LIB    C12    12   0.0  72.0   ; C15 C16        ; C=C            ;          
-13  TC5   1   LIB    C13    13   0.0  0.0   ; C17 C18        ; C=C            ;          
-14  TC5   1   LIB    C14    14   0.0  36.0   ; C19 C20        ; C=C            ;          
-15  TX1   1   LIB    X15    15   0.0  36.0   ; C21 F1         ; CF             ;          
-16  TC5   1   LIB    C16    16   0.0  72.0   ; C22 C23        ; C-C            ;          
-17  TC4   1   LIB    C17    17   0.0  0.0   ; C24 C25        ; CC             ;          
-18  TC4   1   LIB    C18    18   0.0  36.0   ; C26 C27        ; CC             ;          
-19  TC3   1   LIB    C19    19   0.0  36.0   ; C28 C29        ; CC             ;          
-20  TC3   1   LIB    C20    20   0.0  36.0   ; C30 C31        ; CC             ;          
+1   TN5a  1   LIB    N01    1    0.0  0.0   ; C1, O1         ; C=O            ;          
+2   TN6a  1   LIB    N02    2    0.0  36.0   ; N1, C4         ; CN             ;          
+3   TC6   1   LIB    C03    3    0.0  36.0   ; S1, C5         ; CS             ;          
+4   TN5a  1   LIB    N04    4    0.0  36.0   ; C2, O2         ; C=O            ;          
+5   TN5d  1   LIB    N05    5    0.0  36.0   ; N2, C3         ; CN             ;          
+6   TN5d  1   LIB    N06    6    0.0  72.0   ; N3, C31        ; CN             ;          
+7   TP2d  1   LIB    P07    7    0.0  36.0   ; O3, C17        ; CO             ;          
+8   TN5d  1   LIB    N08    8    0.0  36.0   ; N4, C28        ; CN             ;          
+9   TC5   1   LIB    C09    9    0.0  36.0   ; C6, C7         ; C=C            ;          
+10  TC5   1   LIB    C10    10   0.0  36.0   ; C8, C13        ; C=C            ;          
+11  TC5   1   LIB    C11    11   0.0  36.0   ; C9, C14        ; C=C            ;          
+12  TC5   1   LIB    C12    12   0.0  72.0   ; C10, C12       ; C=C            ;          
+13  TC5   1   LIB    C13    13   0.0  0.0   ; C11, C18       ; C=C            ;          
+14  TC5   1   LIB    C14    14   0.0  36.0   ; C15, C23       ; C=C            ;          
+15  TX1   1   LIB    X15    15   0.0  36.0   ; C16, F1        ; CF             ;          
+16  TC5   1   LIB    C16    16   0.0  72.0   ; C19, C20       ; C-C            ;          
+17  TC4   1   LIB    C17    17   0.0  0.0   ; C21, C24       ; CC             ;          
+18  TC4   1   LIB    C18    18   0.0  36.0   ; C22, C27       ; CC             ;          
+19  TC3   1   LIB    C19    19   0.0  36.0   ; C25, C29       ; CC             ;          
+20  TC3   1   LIB    C20    20   0.0  36.0   ; C26, C30       ; CC             ;          
 
 
 [bonds]

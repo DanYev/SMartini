@@ -21,12 +21,12 @@ class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "UNK"
+    molname: str = "HEM"
     smiles: Optional[str] = None
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
     use_vsites: bool = False
-    symmetrize_rings: bool = False
+    symmetrize_rings: list[int] = None # list of which rings to symmetrize (from info.txt)
     keep_rings_together: bool = True
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
@@ -73,7 +73,7 @@ class SMConfig:
     temperature: float = 300.0
     bond_k_lower: float = 2000.0
     bond_k_upper: float = 50000.0
-    angle_k_lower: float = 5.0
+    angle_k_lower: float = 3.0
     angle_k_upper: float = 2000.0
     dihedral_k_lower: float = 0.0
     dihedral_k_upper: float = 1000.0
@@ -83,9 +83,9 @@ class SMConfig:
     scale_by_sin3_for_type11: bool = False  # Whether to scale type 11 dihedrals by sin^3(theta)
     nbins: int = 120
     min_prob: float = 1e-12
-    fc_scale: float = 0.5  # Scaling factor for initial force constants to roughly account for coupling of the potentials
+    fc_scale: float = 0.3  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
-    alpha_max: float = 0.30
+    alpha_max: float = 0.20
     alpha_min: float = 0.02
 
 
@@ -144,5 +144,3 @@ def load_config() -> SMConfig:
 
 
 CFG = load_config()
-
-

@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import logging
 from sys import exit
 
@@ -164,15 +165,17 @@ def output_map(topology, map_file: str, to_ff: str = "martini3001"):
     out += "[ atoms ]\n"
     num = 1
     for bead in bead_order:
-        atom_names_str = bead_atomnames.get(bead, "")
-        # atomnames can be a string like 'C1, C2, C3'
-        if isinstance(atom_names_str, str):
-            atom_list = [name.strip() for name in atom_names_str.split(',') if name.strip()]
+        atomnames = bead_atomnames.get(bead, "")
+
+        if isinstance(atomnames, str):
+            atom_list = [name for name in re.split(r"[\s,]+", atomnames.strip()) if name]
+        elif isinstance(atomnames, (list, tuple)):
+            atom_list = [str(name).strip() for name in atomnames if str(name).strip()]
         else:
             atom_list = []
 
         for atom in atom_list:
-            out += f"{num:>6d}  {atom:>6s}  {bead:>6s}\n"
+            out += f"{num:>6d}{atom:>8s}{bead:>8s}\n"
             num += 1
     
     # Chiral information is not directly available in the same way.

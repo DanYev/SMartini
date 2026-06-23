@@ -8,7 +8,7 @@ from openff.toolkit import ForceField, Molecule, Topology
 from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
@@ -47,7 +47,7 @@ def process_ligand():
     logger.info("Reading ligand file: %s", input_file)
     ligand = Molecule.from_file(str(input_file))
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
-    forcefield = app.ForceField("amber19-all.xml", "amber19/tip3pfb.xml")
+    forcefield = app.ForceField("amber19-all.xml", "amber19/opc.xml")
     # Ligand FF
     forcefield.registerTemplateGenerator(smirnoff.generator)
     ff = ForceField("openff-2.1.0.offxml")
@@ -57,7 +57,7 @@ def process_ligand():
     model = app.Modeller(ligand_topology, ligand_positions)
     logger.info("Adding solvent and ions")
     model.addSolvent(forcefield, 
-        model='tip3p', 
+        model='opc', 
         boxShape='dodecahedron', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
         padding=1.2 * unit.nanometer,
         ionicStrength=0.0 * unit.molar,
@@ -72,7 +72,8 @@ def process_ligand():
         nonbondedCutoff=1.0 * unit.nanometer,
         constraints=app.HBonds,
         removeCMMotion=True,     
-        ewaldErrorTolerance=1e-5
+        ewaldErrorTolerance=1e-5,
+        rigidWater=True,
     )
     _save_system_to_xml(system, system_xml)
     logger.info(f'Saving reference PDB with selection: {CFG.aa_selection}')

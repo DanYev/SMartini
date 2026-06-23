@@ -6,7 +6,7 @@ import smartini
 from pathlib import Path
 from openff.toolkit import Molecule
 from rdkit import Chem
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger("smartini")
 smartini.setup_logging(level=logging.INFO)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     
     # Generate the CG molecule
-    cg_mol = smartini.solver.Cg_molecule(mol, smiles, molname, 
+    cg_mol = smartini.solver.CG_molecule(mol, smiles, molname, 
         specify_beads=CFG.specify_beads,
         use_vsites=CFG.use_vsites,
         symmetrize_rings=CFG.symmetrize_rings,

@@ -5,7 +5,7 @@ import numpy as np
 from rdkit import Chem
 from . import optimization_cy as opcy
 from .utils import timeit, memprofit
-from config import CFG
+from .config import CFG
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ def split_into_fragments(molecule):
     2. Build ring-centered fragments (ring atoms + nearest heavy neighbors).
     3. Build linear fragments around non-ring branching atoms.
     4. Assign leftover atoms to nearby fragments so every heavy atom is covered.
-    5. Keep overlaps small (ideally one atom per connection) to simplify
-       downstream fragment stitching.
+    5. Fragments must ovelap along the number of connection with exactly 1 atom per connection
+    for consistent stitching during mapping.
 
     Why this decomposition is used
     ------------------------------
@@ -171,14 +171,18 @@ def split_into_fragments(molecule):
         missing_atoms = set(atids) - flat_set(fragments)
         raise ValueError(f"Error in fragment generation: {missing_atoms} atoms are missing from the fragments. Check your fragments. Fragments: {fragments}")
     frag_ranks_list = [[ranks[a] for a in frag] for frag in fragments]
-    return fragments, frag_ranks_list, rings, shared_atoms 
+
+    initial_rings = molecule.GetRingInfo().AtomRings()
+    print(f"Initial rings (before fusion): {initial_rings}")
+
+    return fragments, frag_ranks_list, rings, shared_atoms, initial_rings
 
 #############################################################################
 ### PARTITIONING ###
 #############################################################################
 
 @timeit(level=logging.DEBUG)
-def map_fragment(fragment, atoms, bonds, dtype=np.int32):
+def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     """Enumerate feasible bead mappings for a single fragment.
 
     Logic overview
@@ -276,16 +280,35 @@ def map_fragment(fragment, atoms, bonds, dtype=np.int32):
                 mappings = new_mappings
         return mappings
 
+    def filter_out_non_symmetrizable_mappings(mappings, ring):
+        """Filter out mappings that cannot be symmetrized across the specified ring."""
+        new_mappings = []
+        for mapping in mappings:
+            # For each bead: if any atom is in the ring, ALL atoms must be in the ring
+            valid = True
+            for bead in mapping:
+                bead_in_ring = [atom in ring for atom in bead]
+                if any(bead_in_ring) and not all(bead_in_ring):
+                    valid = False
+                    break
+            if not valid:
+                continue
+            new_mappings.append(mapping)
+        return new_mappings
+
     frag_neis = [[n.GetIdx() for n in a.GetNeighbors()] for a in atoms]
     is_ring = any(atoms[a].IsInRing() for a in fragment)
     # ha_neis = frag_neis
     ha_neis = [[n for n in nei if n in fragment] for nei in frag_neis] # only consider neighbors in the fragment, since we will map each fragment separately and then merge the mappings.
     fragment_mappings = []
     min_fragment_beads, max_fragment_beads = get_min_max_beads(fragment, atoms)
+    rings_to_symmetrize = [initial_rings[i] for i in CFG.symmetrize_rings]
     for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
         logger.info(f"Finding combinations for fragment {fragment} with {nbeads} beads...")
         combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
         mappings = find_no_overlap_mappings(combs, fragment)
+        for ring in rings_to_symmetrize:
+            mappings = filter_out_non_symmetrizable_mappings(mappings, ring)
         fragment_mappings.extend(mappings)
     return fragment_mappings
 
@@ -420,7 +443,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     logger.info("Extracting heavy-atom graph...")
     atoms, bonds = _get_ha_graph(molecule)
     logger.info("Splitting molecule into fragments...")
-    fragments, top_ranks_list, fused_rings, shared_atoms = split_into_fragments(molecule)
+    fragments, top_ranks_list, fused_rings, shared_atoms, initial_rings = split_into_fragments(molecule)
     frag_is_symmetric = [len(set(ranks)) < len(ranks) for ranks in top_ranks_list]
     logger.info(f"Total Number of Fragments: {len(fragments)}, Number of Rings: {len(fused_rings)}")
     bonds = _remove_shared_atoms_from_bonds(bonds, shared_atoms)
@@ -440,7 +463,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     # We intentionally solve small local mapping problems first.
     all_mappings = []
     for fragment in fragments:
-        fragment_mappings = map_fragment(fragment, atoms, bonds)
+        fragment_mappings = map_fragment(fragment, atoms, bonds, initial_rings)
         all_mappings.append(fragment_mappings)
     logger.info(f"Number of combinations for fragment mappings. Sizes: {[len(r) for r in all_mappings]}")
 
@@ -626,6 +649,7 @@ def filter_mappings(
         return mappings
 
     if keep_rings_together:
+        print(f"Keeping rings together in the mapping...")
         # Prefer keeping rings together (no mixing ring/non-ring)
         tmp_list = []
         for mapping in mappings:

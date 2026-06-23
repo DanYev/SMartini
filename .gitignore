@@ -1,17 +1,19 @@
 ligands/
 output/
+protein_systems/
+analysis/
 slurm*
 systems/
 tmp/
-png/
 *.log
 *.tmp
-*.png
 *.txt
 *.npy
 *.npz
+*.pdf
 *.pkl
 *.gro
+aa*.png
 
 # ---- Python ----
 __pycache__/

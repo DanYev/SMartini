@@ -22,7 +22,7 @@ from smartini.lpmath import (
     wrap_to_180,
 )
 from smartini.plots import plot_internal_coordinates_overlay
-from config import CFG
+from smartini.config import CFG
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
@@ -315,7 +315,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
     kB = 0.008314462618  # kJ mol^-1 K^-1
     kT = kB * CFG.temperature
     nbins = int(CFG.nbins)
-    png_dir = Path(__file__).resolve().parent / "png"
+    png_dir = Path(__file__).resolve().parent / "tmp" / "png"
     png_dir.mkdir(parents=True, exist_ok=True)
 
     def _save_pmf_plot(phi_grid, pmf, u_initial, u_updated, title: str, filename: str):
@@ -403,7 +403,7 @@ def update_dihedrals(topo, aa_internal: InternalCoords, cg_internal: InternalCoo
         # if len(terms) > 1:
         #     alpha = min(alpha, 0.05)  
         if len(terms) > 1:
-            alpha = min(alpha, 0.02)  # Be more conservative when multiple terms already exist to avoid overfitting
+            alpha = min(alpha, 0.01)  # Be more conservative when multiple terms already exist to avoid overfitting
         pmf_aa = -alpha * kT * np.log(aa_density)
         pmf_cg = -alpha * kT * np.log(cg_density)
         pmf_pot = -kT * np.log(pot_density)

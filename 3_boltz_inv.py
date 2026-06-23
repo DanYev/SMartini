@@ -8,7 +8,7 @@ import smartini
 import numpy as np
 
 from pathlib import Path
-from config import CFG
+from smartini.config import CFG
 from smartini.lpmath import (
     read_cog_trajectory,
     calculate_internal_coordinates,
