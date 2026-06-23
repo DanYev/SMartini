@@ -408,52 +408,13 @@ def analyze_ligand(ligand_name: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Summary & plotting
+# Summary
 # ---------------------------------------------------------------------------
 
-def _save_wasserstein_chart(all_results: list[dict], out_dir: Path):
-    """Save bar chart of mean Wasserstein distances (lower = better)."""
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        return
-
-    ligands = [r["ligand"] for r in all_results]
-    n = len(ligands)
-    x = np.arange(n)
-    w = 0.25
-
-    bond_vals = [r.get("bond_wass_mean", float("nan")) for r in all_results]
-    angle_vals = [r.get("angle_wass_mean", float("nan")) for r in all_results]
-    dihedral_vals = [r.get("dihedral_wass_mean", float("nan")) for r in all_results]
-
-    if all(np.isnan(v) for v in bond_vals + angle_vals + dihedral_vals):
-        logger.info("No Wasserstein data to plot; skipping chart.")
-        return
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(x - w, bond_vals, w, label="Bonds/Constraints  (W₁ / range)", color="tab:green")
-    ax.bar(x, angle_vals, w, label="Angles  (W₁ / 180°)", color="tab:red")
-    ax.bar(x + w, dihedral_vals, w, label="Dihedrals  (W₁ / 180°)", color="tab:purple")
-    ax.set_xticks(x)
-    ax.set_xticklabels(ligands)
-    ax.set_ylabel("Normalised Wasserstein distance  (0–1, lower = better)")
-    ax.set_title("AA/CG Internal-Coordinate Wasserstein Distance")
-    ax.legend(frameon=False)
-    ax.grid(axis="y", alpha=0.25)
-
-    fig.tight_layout()
-    png_path = out_dir / "internal_wasserstein_bars.png"
-    fig.savefig(png_path, dpi=150)
-    logger.info("Wasserstein chart saved to %s", png_path)
-    plt.close(fig)
-
-
 def save_results(all_results: list[dict], out_dir: Path):
-    """Save a summary CSV and a bar-chart PNG."""
+    """Save a summary CSV, then delegate plotting to :mod:`scripts.plots`."""
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "sasa_rmsd_summary.csv"
-    png_path = out_dir / "sasa_rmsd_bars.png"
 
     # --- CSV ---
     columns = [
@@ -472,49 +433,11 @@ def save_results(all_results: list[dict], out_dir: Path):
             f.write(",".join(str(r.get(c, "")) for c in columns) + "\n")
     logger.info("CSV summary saved to %s", csv_path)
 
-    # --- Bar chart ---
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        logger.warning("matplotlib not available, skipping bar chart.")
-        return
+    # --- Plots (delegated to scripts/plots.py) ---
+    from scripts.plots import plot_sasa_rmsd, plot_wasserstein
 
-    ligands = [r["ligand"] for r in all_results]
-    n = len(ligands)
-    x = np.arange(n)
-    w = 0.35
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-    # SASA bars
-    aa_sasa = [r.get("aa_sasa_mean", 0) for r in all_results]
-    cg_sasa = [r.get("cg_sasa_mean", 0) for r in all_results]
-    ax1.bar(x - w / 2, aa_sasa, w, label="AA", color="tab:blue")
-    ax1.bar(x + w / 2, cg_sasa, w, label="CG", color="tab:orange")
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(ligands)
-    ax1.set_ylabel("SASA (nm²)")
-    ax1.set_title("Mean SASA")
-    ax1.legend()
-
-    # RMSD bars
-    aa_rmsd = [r.get("aa_rmsd_mean", 0) for r in all_results]
-    cg_rmsd = [r.get("cg_rmsd_mean", 0) for r in all_results]
-    ax2.bar(x - w / 2, aa_rmsd, w, label="AA", color="tab:blue")
-    ax2.bar(x + w / 2, cg_rmsd, w, label="CG", color="tab:orange")
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(ligands)
-    ax2.set_ylabel("RMSD (nm)")
-    ax2.set_title("Mean RMSD")
-    ax2.legend()
-
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=150)
-    logger.info("Bar chart saved to %s", png_path)
-    plt.close(fig)
-
-    # --- AA/CG Wasserstein histogram ---
-    _save_wasserstein_chart(all_results, out_dir)
+    plot_sasa_rmsd(all_results, out_dir)
+    plot_wasserstein(all_results, out_dir)
 
 
 # ---------------------------------------------------------------------------
