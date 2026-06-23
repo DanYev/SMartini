@@ -528,6 +528,9 @@ def plot_Q_time_series(
                 gap_cols = max(2, n_prot // 8)  # ~proportional gap
                 gap = np.full((n_lig, gap_cols), np.nan)
                 combined = np.hstack([panels[0], gap, panels[1]])
+                # vertical separator line at centre of gap
+                sep_x = panels[0].shape[1] + gap_cols / 2 + 1.5
+                iax.axvline(sep_x, color="black", linewidth=0.5)
             else:
                 combined = panels[0]
 
