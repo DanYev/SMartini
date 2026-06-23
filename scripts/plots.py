@@ -213,7 +213,7 @@ def plot_wasserstein(
     all_results: list[dict],
     out_dir: str | Path,
     *,
-    figsize: tuple[float, float] = (10.0, 4.0),
+    figsize: tuple[float, float] = (8.0, 4.0),
     dpi: int = 300,
     palette: dict | None = None,
     bond_label: str = "Bonds / Constraints",
