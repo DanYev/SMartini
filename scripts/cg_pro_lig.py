@@ -107,7 +107,7 @@ def setup(sysdir, sysname, ligand_src=None):
     # !!!!!!!
     mdsys.make_cg_structure() # CG structure. Returns mdsys.solupdb ("solute.pdb") file
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
-    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"])
+    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"]) # FOR 1TQN HEM
     
     # PROTEIN+WATER SYSTEMS:
     mdsys.make_box(d="1.25", bt="dodecahedron", center="0 0 0")
@@ -202,8 +202,8 @@ def trjconv(sysdir, sysname, runname, **kwargs):
 
 if __name__ == "__main__":
     sysdir = SYSDIR
-    sysname = "1TQN"
+    sysname = "KDA"
     runname = "mdrun_2"
-    # setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
-    # md_npt(sysdir, sysname, runname)
+    setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
+    md_npt(sysdir, sysname, runname)
     trjconv(sysdir, sysname, runname)
