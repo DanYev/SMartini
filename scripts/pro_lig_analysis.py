@@ -775,21 +775,29 @@ if __name__ == "__main__":
             args.out_dir,
             lig_labels=results.get("lig_bead_names"),
             prot_labels=results.get("unified_prot_labels"),
-            title=f"{args.sysname} — Ligand–Protein Contact Frequency",
             png_name=f"{args.sysname}_contact_freq_comparison.png",
         )
 
-    # --- Q(t) combined plot ---
+    # --- Q(t) combined plot (with inset contact map) ---
     Q_data = {}
     for mode in modes:
         Q = results.get(f"{mode}_Q")
         if Q is not None:
             Q_data[mode.upper()] = Q
     if Q_data:
+        # Build unified contact freq for inset
+        inset = None
+        if freq_cg is not None and freq_aa is not None:
+            inset = (freq_cg + freq_aa) / 2.0
+        elif freq_cg is not None:
+            inset = freq_cg
+        elif freq_aa is not None:
+            inset = freq_aa
+
         plot_Q_time_series(
             Q_data,
             args.out_dir,
-            title=f"{args.sysname} — Fraction of Native Contacts",
+            inset_freq=inset,
             png_name=f"{args.sysname}_Q_vs_time.png",
         )
 

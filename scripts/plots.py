@@ -176,7 +176,6 @@ def plot_sasa_rmsd(
         ax1.set_xticks(x)
         ax1.set_xticklabels(ligands)
         ax1.set_ylabel(sasa_ylabel)
-        ax1.set_title("Mean SASA  (95% CI)")
         ax1.legend(frameon=False, loc="upper right")
         ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
 
@@ -192,7 +191,6 @@ def plot_sasa_rmsd(
         ax2.set_xticks(x)
         ax2.set_xticklabels(ligands)
         ax2.set_ylabel(rmsd_ylabel)
-        ax2.set_title("Mean RMSD  (95% CI)")
         ax2.legend(frameon=False, loc="upper right")
         ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
 
@@ -284,7 +282,6 @@ def plot_wasserstein(
         ax.set_xticks(x)
         ax.set_xticklabels(ligands)
         ax.set_ylabel(ylabel)
-        ax.set_title("AA / CG Internal-Coordinate Wasserstein Distance")
         ax.legend(frameon=False, loc="upper left", ncol=3)
         ax.yaxis.set_major_locator(plt.MaxNLocator(6))
 
@@ -313,12 +310,13 @@ def plot_contact_frequency_comparison(
     lig_labels: list[str] | None = None,
     prot_labels: list[str] | None = None,
     title: str = "Ligand–Protein Contact Frequency",
-    cmap: str = "viridis",
+    cmap: str = "YlOrRd",
     figsize: tuple[float, float] = (12.0, 5.5),
     dpi: int = 300,
     label_fontsize: int = 7,
     cbar_label: str = "Contact frequency",
     png_name: str = "contact_freq_comparison.png",
+    add_suptitle: bool = False,
     **kwargs,
 ) -> Path | None:
     """Side-by-side contact-frequency heatmaps for CG and AA with identical axes.
@@ -402,7 +400,8 @@ def plot_contact_frequency_comparison(
                             label=cbar_label)
         cbar.ax.tick_params(labelsize=8)
 
-        fig.suptitle(title, fontsize=10, y=1.01)
+        if add_suptitle:
+            fig.suptitle(title, fontsize=10, y=1.01)
         png_path = out_dir / png_name
         fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
@@ -426,7 +425,11 @@ def plot_Q_time_series(
     palette: dict | None = None,
     xlabel: str = "Time / ns",
     ylabel: str = "$Q(t)$",
+    ylim: tuple[float, float] = (0.55, 1.05),
     png_name: str = "Q_vs_time.png",
+    inset_freq: np.ndarray | None = None,
+    inset_labels: dict | None = None,
+    add_title: bool = False,
     **kwargs,
 ) -> Path | None:
     """Plot Q(t) for one or more trajectory types on the same axes.
@@ -479,7 +482,7 @@ def plot_Q_time_series(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with plt.rc_context(DEFAULT_STYLE):
-        fig, ax = plt.subplots(figsize=figsize, **kwargs)
+        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True, **kwargs)
 
         for label, Q in Q_data.items():
             if Q is None:
@@ -496,12 +499,30 @@ def plot_Q_time_series(
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
-        ax.set_ylim(-0.02, 1.05)
-        ax.set_title(title)
+        ax.set_xlim(left=0)
+        ax.set_ylim(*ylim)
+
+        # --- inset: contact frequency thumbnail (bottom-right) ---
+        if inset_freq is not None:
+            from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+            iax = inset_axes(ax, width="28%", height="40%",
+                             loc="lower right",
+                             bbox_to_anchor=(0.0, 0.02, 1, 1),
+                             bbox_transform=ax.transAxes)
+            from matplotlib.colors import Normalize as Norm
+            iax.imshow(inset_freq, aspect="auto", origin="upper",
+                       cmap="YlOrRd", norm=Norm(0, 1), interpolation="nearest")
+            iax.set_xticks([])
+            iax.set_yticks([])
+            # thin border
+            for spine in iax.spines.values():
+                spine.set_linewidth(0.5)
+
+        if add_title:
+            ax.set_title(title)
         if len(Q_data) > 1:
             ax.legend(frameon=False)
 
-        fig.tight_layout()
         png_path = out_dir / png_name
         fig.savefig(png_path, dpi=dpi)
         plt.close(fig)
@@ -553,11 +574,14 @@ _CSV_CONVERTERS: dict[str, callable] = {
 
 if __name__ == "__main__":
     import sys
+    import pickle
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
+    # --- Paths ---
     csv_path = sys.argv[1] if len(sys.argv) > 1 else "analysis/sasa_rmsd_summary.csv"
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else "../media"
+    mda_dir  = sys.argv[2] if len(sys.argv) > 2 else "../media"
+    sysname  = sys.argv[3] if len(sys.argv) > 3 else "1TQN"
 
     csv_path = Path(csv_path)
     if not csv_path.exists():
@@ -567,6 +591,53 @@ if __name__ == "__main__":
     results = _load_results(csv_path)
     logger.info("Loaded %d ligand(s) from %s", len(results), csv_path)
 
-    plot_sasa_rmsd(results, out_dir)
-    plot_wasserstein(results, out_dir)
-    logger.info("All plots saved to %s/", out_dir)
+    # ── Per-ligand summary plots ──────────────────────────────────────
+    plot_sasa_rmsd(results, mda_dir)
+    plot_wasserstein(results, mda_dir)
+
+    # ── Protein–ligand contact analysis ───────────────────────────────
+    contacts_pkl = Path(f"analysis/{sysname}_contacts.pkl")
+    if contacts_pkl.exists():
+        with open(contacts_pkl, "rb") as f:
+            cr = pickle.load(f)
+        logger.info("Loaded contact data from %s", contacts_pkl)
+
+        freq_cg = cr.get("cg_contact_freq")
+        freq_aa = cr.get("aa_contact_freq")
+        if freq_cg is not None or freq_aa is not None:
+            plot_contact_frequency_comparison(
+                freq_cg, freq_aa,
+                mda_dir,
+                lig_labels  = cr.get("lig_bead_names"),
+                prot_labels = cr.get("unified_prot_labels"),
+                png_name    = f"{sysname}_contact_freq_comparison.png",
+                # cmap     = "YlOrRd",
+                # figsize  = (12.0, 5.5),
+                # add_suptitle = True,
+            )
+
+        Q_data = {}
+        for mode in ("cg", "aa"):
+            Q = cr.get(f"{mode}_Q")
+            if Q is not None:
+                Q_data[mode.upper()] = Q
+        if Q_data:
+            # Build unified contact freq for inset (average CG + AA if both present)
+            inset = None
+            if freq_cg is not None and freq_aa is not None:
+                inset = (freq_cg + freq_aa) / 2.0
+            elif freq_cg is not None:
+                inset = freq_cg
+            elif freq_aa is not None:
+                inset = freq_aa
+
+            plot_Q_time_series(
+                Q_data,
+                mda_dir,
+                png_name    = f"{sysname}_Q_vs_time.png",
+                inset_freq  = inset,
+                # ylim      = (0.55, 1.05),
+                # add_title = True,
+            )
+
+    logger.info("All plots saved to %s/", mda_dir)
