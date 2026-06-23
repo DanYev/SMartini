@@ -519,7 +519,7 @@ def plot_Q_time_series(
             inset_w = "30%" if n_panels == 1 else "40%"
             iax = inset_axes(ax, width=inset_w, height="38%",
                              loc="lower right",
-                             bbox_to_anchor=(0.0, 0.02, 1, 1),
+                             bbox_to_anchor=(0.0, 0.02, 0.965, 1),
                              bbox_transform=ax.transAxes)
 
             if n_panels == 2:
@@ -661,7 +661,7 @@ if __name__ == "__main__":
                 inset_freq_cg  = freq_cg,
                 inset_freq_aa  = freq_aa,
                 inset_cmap     = "Greys",
-                ylim      = (0.50, 0.9),
+                ylim      = (0.55, 0.90),
                 # add_title = True,
             )
 
