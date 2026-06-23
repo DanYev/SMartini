@@ -18,8 +18,8 @@ DT = 0.020  # Time step in picoseconds
 TOTAL_TIME = 1000  # Total simulation time in nanoseconds
 NSTEPS = int(TOTAL_TIME * 1e3 / DT)  # Number of MD steps for production run
 SYSDIR = Path("protein_systems").resolve()
-WDIR = SYSDIR / "1TQN"
-LIGAND_NAME = "HEM"
+WDIR = SYSDIR / "KDA" # 1TQN
+LIGAND_NAME = "ANP" # HEM
 LIGAND_SRC = Path("examples") / LIGAND_NAME  # Source directory for ligand .itp/.map files
 
 
@@ -107,7 +107,8 @@ def setup(sysdir, sysname, ligand_src=None):
     # !!!!!!!
     mdsys.make_cg_structure() # CG structure. Returns mdsys.solupdb ("solute.pdb") file
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
-    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"]) # FOR 1TQN HEM
+    # _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"]) # FOR 1TQN HEM
+    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N04", "N07", "D01", "MG"]) # ANP
     
     # PROTEIN+WATER SYSTEMS:
     mdsys.make_box(d="1.25", bt="dodecahedron", center="0 0 0")
