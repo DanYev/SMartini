@@ -302,8 +302,212 @@ def plot_wasserstein(
 
 
 # ---------------------------------------------------------------------------
-# CLI  (python scripts/plots.py [csv_path] [out_dir])
+# Contact Frequency Comparison  (CG / AA side-by-side heatmaps)
 # ---------------------------------------------------------------------------
+
+def plot_contact_frequency_comparison(
+    freq_cg: np.ndarray | None,
+    freq_aa: np.ndarray | None,
+    out_dir: str | Path,
+    *,
+    lig_labels: list[str] | None = None,
+    prot_labels: list[str] | None = None,
+    title: str = "Ligand–Protein Contact Frequency",
+    cmap: str = "viridis",
+    figsize: tuple[float, float] = (12.0, 5.5),
+    dpi: int = 300,
+    label_fontsize: int = 7,
+    cbar_label: str = "Contact frequency",
+    png_name: str = "contact_freq_comparison.png",
+    **kwargs,
+) -> Path | None:
+    """Side-by-side contact-frequency heatmaps for CG and AA with identical axes.
+
+    The y-axis (ligand beads) and x-axis (protein residues) are shared
+    between the two panels so that the binding interface can be compared
+    directly between representations.
+
+    Parameters
+    ----------
+    freq_cg : (n_lig, n_prot) or None
+        CG contact frequency matrix ∈ [0, 1].
+    freq_aa : (n_lig, n_prot) or None
+        AA contact frequency matrix ∈ [0, 1].
+    out_dir : str or Path
+        Directory in which the PNG is saved.
+    lig_labels : list of str, optional
+        Labels for ligand beads (y-axis).
+    prot_labels : list of str, optional
+        Labels for protein residues (x-axis).
+    title : str
+        Suptitle for the figure.
+    cmap : str
+        Matplotlib colormap name (default: ``"viridis"``).
+    figsize : (float, float)
+        Figure size in inches.
+    dpi : int
+        Output resolution.
+    label_fontsize : int
+        Font size for axis tick labels.
+    cbar_label : str
+        Label for the shared colour bar.
+    png_name : str
+        Output filename.
+    **kwargs
+        Passed through to :func:`matplotlib.pyplot.subplots`.
+
+    Returns
+    -------
+    Path or None
+        Absolute path to the saved PNG, or *None* if neither matrix was given.
+    """
+    from matplotlib.colors import Normalize
+
+    panels = []
+    if freq_cg is not None:
+        panels.append(("CG", freq_cg))
+    if freq_aa is not None:
+        panels.append(("AA", freq_aa))
+    if not panels:
+        return None
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    n_panels = len(panels)
+
+    with plt.rc_context(DEFAULT_STYLE):
+        fig, axes = plt.subplots(1, n_panels, figsize=figsize, squeeze=False,
+                                 constrained_layout=True, **kwargs)
+        axes = axes[0]
+
+        for ax, (label, freq) in zip(axes, panels):
+            n_lig, n_prot = freq.shape
+            im = ax.imshow(freq, aspect="auto", origin="upper",
+                           cmap=cmap, norm=Normalize(0, 1),
+                           interpolation="nearest")
+            ax.set_title(f"{label}\n({n_lig} beads × {n_prot} residues)")
+            ax.set_xlabel("Protein residues")
+            if ax is axes[0]:
+                ax.set_ylabel("Ligand beads")
+            if prot_labels is not None and n_prot <= 40:
+                ax.set_xticks(range(n_prot))
+                ax.set_xticklabels(prot_labels, rotation=90,
+                                   fontsize=label_fontsize)
+            if lig_labels is not None and n_lig <= 30:
+                ax.set_yticks(range(n_lig))
+                ax.set_yticklabels(lig_labels, fontsize=label_fontsize)
+
+        cbar = fig.colorbar(im, ax=axes.tolist(), shrink=0.85,
+                            label=cbar_label)
+        cbar.ax.tick_params(labelsize=8)
+
+        fig.suptitle(title, fontsize=10, y=1.01)
+        png_path = out_dir / png_name
+        fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+
+    logger.info("Contact frequency comparison saved to %s", png_path)
+    return png_path
+
+
+# ---------------------------------------------------------------------------
+# Fraction of Native Contacts Q(t)
+# ---------------------------------------------------------------------------
+
+def plot_Q_time_series(
+    Q_data: dict[str, np.ndarray | None],
+    out_dir: str | Path,
+    *,
+    dt_ps: float = 200.0,
+    title: str = "Fraction of Native Contacts  $Q(t)$",
+    figsize: tuple[float, float] = (7.0, 3.5),
+    dpi: int = 300,
+    palette: dict | None = None,
+    xlabel: str = "Time / ns",
+    ylabel: str = "$Q(t)$",
+    png_name: str = "Q_vs_time.png",
+    **kwargs,
+) -> Path | None:
+    """Plot Q(t) for one or more trajectory types on the same axes.
+
+    All series are truncated to the length of the shortest one, so that
+    the time axes are aligned.
+
+    Parameters
+    ----------
+    Q_data : dict
+        Mapping ``{label: Q_array}``, e.g. ``{"CG": Q_cg, "AA": Q_aa}``.
+        Values may be *None* (skipped).
+    out_dir : str or Path
+        Directory in which the PNG is saved.
+    dt_ps : float
+        Time step between consecutive frames in ps.
+    title : str
+        Plot title.
+    figsize : (float, float)
+        Figure size in inches.
+    dpi : int
+        Output resolution.
+    palette : dict or None
+        Colour overrides.  Keys: ``"AA"``, ``"CG"``.
+    xlabel, ylabel : str
+        Axis labels.
+    png_name : str
+        Output filename.
+    **kwargs
+        Passed through to :func:`matplotlib.pyplot.subplots`.
+
+    Returns
+    -------
+    Path or None
+        Absolute path to the saved PNG, or *None* if there was no data.
+    """
+    colors = {**PALETTE, **(palette or {})}
+
+    # Map standard keys to palette keys (lowercase)
+    palette_map = {"AA": "aa", "CG": "cg"}
+
+    # Truncate all series to the shortest length so axes align
+    q_arrays = [Q for Q in Q_data.values() if Q is not None]
+    if not q_arrays:
+        logger.info("No Q data to plot; skipping.")
+        return None
+    min_len = min(len(q) for q in q_arrays)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with plt.rc_context(DEFAULT_STYLE):
+        fig, ax = plt.subplots(figsize=figsize, **kwargs)
+
+        for label, Q in Q_data.items():
+            if Q is None:
+                continue
+            Q = Q[:min_len]
+            n = len(Q)
+            time_ns = np.arange(n) * dt_ps / 1000.0
+            color_key = palette_map.get(label, label.lower())
+            ax.plot(time_ns, Q, linewidth=1.0, alpha=0.9,
+                    color=colors.get(color_key, None), label=label)
+            mean_q = float(np.mean(Q))
+            ax.axhline(mean_q, color=colors.get(color_key, "#888888"),
+                       linestyle="--", linewidth=0.8, alpha=0.6)
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(-0.02, 1.05)
+        ax.set_title(title)
+        if len(Q_data) > 1:
+            ax.legend(frameon=False)
+
+        fig.tight_layout()
+        png_path = out_dir / png_name
+        fig.savefig(png_path, dpi=dpi)
+        plt.close(fig)
+
+    logger.info("Q(t) plot saved to %s", png_path)
+    return png_path
 
 def _load_results(csv_path: str | Path) -> list[dict]:
     """Parse the summary CSV into a list of dicts with typed values."""

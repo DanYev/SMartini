@@ -50,11 +50,8 @@ DEFAULT_SYSNAME = "1TQN"
 DEFAULT_LIGAND_RESNAME = "HEM"
 
 # Contact cutoff (nm) – same for CG and AA since both are at bead/residue-COG level
-CONTACT_CUTOFF = 0.6
-
-# Proximity filter: only keep residues whose COG is within this distance
-# of any ligand bead in the reference frame.
-PROXIMITY_CUTOFF = 1.0  # nm
+CONTACT_CUTOFF = 0.8
+PROXIMITY_CUTOFF = 0.8  # nm
 
 
 # ---------------------------------------------------------------------------
@@ -676,123 +673,6 @@ def _build_labels(n: int, prefix: str = "L") -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Plotting
-# ---------------------------------------------------------------------------
-
-def plot_contact_frequency_comparison(
-    freq_cg: np.ndarray | None,
-    freq_aa: np.ndarray | None,
-    out_path: Path,
-    *,
-    lig_labels: list[str] | None = None,
-    prot_labels: list[str] | None = None,
-    title: str = "Contact Frequency",
-    cmap: str = "YlOrRd",
-    figsize: tuple[float, float] = (12.0, 5.5),
-    dpi: int = 300,
-    label_fontsize: int = 7,
-) -> None:
-    """Side-by-side contact-frequency heatmaps for CG and AA with identical axes.
-
-    Parameters
-    ----------
-    freq_cg : (n_lig, n_prot) or None
-    freq_aa : (n_lig, n_prot) or None
-    out_path : Path
-    lig_labels : list[str]  y-axis labels.
-    prot_labels : list[str]  x-axis labels.
-    """
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import Normalize
-
-    panels = []
-    if freq_cg is not None:
-        panels.append(("CG", freq_cg))
-    if freq_aa is not None:
-        panels.append(("AA", freq_aa))
-    if not panels:
-        return
-
-    n_panels = len(panels)
-    fig, axes = plt.subplots(1, n_panels, figsize=figsize, squeeze=False)
-    axes = axes[0]
-
-    for ax, (label, freq) in zip(axes, panels):
-        n_lig, n_prot = freq.shape
-        im = ax.imshow(freq, aspect="auto", origin="upper",
-                       cmap=cmap, norm=Normalize(0, 1), interpolation="nearest")
-        ax.set_title(f"{label}\n({n_lig} beads × {n_prot} residues)")
-        ax.set_xlabel("Protein residues")
-        if ax is axes[0]:
-            ax.set_ylabel("Ligand beads")
-        if prot_labels is not None and n_prot <= 40:
-            ax.set_xticks(range(n_prot))
-            ax.set_xticklabels(prot_labels, rotation=90, fontsize=label_fontsize)
-        if lig_labels is not None and n_lig <= 30:
-            ax.set_yticks(range(n_lig))
-            ax.set_yticklabels(lig_labels, fontsize=label_fontsize)
-
-    cbar = plt.colorbar(im, ax=axes.tolist(), shrink=0.85, label="Contact frequency")
-    cbar.ax.tick_params(labelsize=8)
-
-    fig.suptitle(title, fontsize=11, y=1.01)
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
-    plt.close(fig)
-    logger.info("Contact frequency comparison saved to %s", out_path)
-
-
-def plot_Q_time_series(
-    Q_data: dict[str, np.ndarray | None],
-    out_path: Path,
-    *,
-    dt_ps: float = 200.0,
-    title: str = "Fraction of Native Contacts Q(t)",
-    figsize: tuple[float, float] = (7.0, 3.5),
-    dpi: int = 300,
-    colors: dict[str, str] | None = None,
-) -> None:
-    """Plot Q(t) for one or more trajectory types on the same axes.
-
-    Parameters
-    ----------
-    Q_data : dict  ``{label: Q_array}``, e.g. ``{"CG": Q_cg, "AA": Q_aa}``.
-    out_path : Path
-    dt_ps : float  Time between frames in ps.
-    """
-    import matplotlib.pyplot as plt
-
-    if colors is None:
-        colors = {"AA": "#4C72B0", "CG": "#DD8452"}
-
-    fig, ax = plt.subplots(figsize=figsize)
-    for label, Q in Q_data.items():
-        if Q is None:
-            continue
-        n = len(Q)
-        time_ns = np.arange(n) * dt_ps / 1000.0
-        ax.plot(time_ns, Q, linewidth=1.0, alpha=0.9,
-                color=colors.get(label, None), label=label)
-        mean_q = float(np.mean(Q))
-        ax.axhline(mean_q, color=colors.get(label, "#888888"),
-                   linestyle="--", linewidth=0.8, alpha=0.6)
-
-    ax.set_xlabel("Time / ns")
-    ax.set_ylabel("Q(t)")
-    ax.set_ylim(-0.02, 1.05)
-    ax.set_title(title)
-    if len(Q_data) > 1:
-        ax.legend()
-
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=dpi)
-    plt.close(fig)
-    logger.info("Q(t) plot saved to %s", out_path)
-
-
-# ---------------------------------------------------------------------------
 # Save / load results
 # ---------------------------------------------------------------------------
 
@@ -858,7 +738,7 @@ if __name__ == "__main__":
     parser.add_argument("--ref-frame", type=int, default=0,
                         help="Reference frame for native contacts (default: 0)")
     parser.add_argument("--cg-runname", default=None,
-                        help="CG run directory name (default: mdrun_2)")
+                        help="CG run directory name (default: mdrun_1)")
     parser.add_argument("--aa-runname", default="mdrun_1",
                         help="AA run directory name (default: mdrun_1)")
     args = parser.parse_args()
@@ -881,16 +761,22 @@ if __name__ == "__main__":
 
     save_results(results, args.out_dir, args.sysname)
 
+    # --- Plots (delegated to scripts/plots.py) ---
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from scripts.plots import plot_contact_frequency_comparison, plot_Q_time_series
+
     # --- Contact frequency comparison plot (CG + AA side-by-side, same axes) ---
     freq_cg = results.get("cg_contact_freq")
     freq_aa = results.get("aa_contact_freq")
     if freq_cg is not None or freq_aa is not None:
         plot_contact_frequency_comparison(
             freq_cg, freq_aa,
-            args.out_dir / f"{args.sysname}_contact_freq_comparison.png",
+            args.out_dir,
             lig_labels=results.get("lig_bead_names"),
             prot_labels=results.get("unified_prot_labels"),
             title=f"{args.sysname} — Ligand–Protein Contact Frequency",
+            png_name=f"{args.sysname}_contact_freq_comparison.png",
         )
 
     # --- Q(t) combined plot ---
@@ -902,8 +788,9 @@ if __name__ == "__main__":
     if Q_data:
         plot_Q_time_series(
             Q_data,
-            args.out_dir / f"{args.sysname}_Q_vs_time.png",
+            args.out_dir,
             title=f"{args.sysname} — Fraction of Native Contacts",
+            png_name=f"{args.sysname}_Q_vs_time.png",
         )
 
     logger.info("Done.")
