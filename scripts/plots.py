@@ -66,6 +66,12 @@ def _or_nan(v):
 # SASA / RMSD grouped bar chart
 # ---------------------------------------------------------------------------
 
+def _draw_err(ax, x, y, yerr_lo, yerr_hi, kw):
+    """Draw error bars on *ax* with high zorder so they sit above bars."""
+    ax.errorbar(x, y, yerr=[yerr_lo, yerr_hi],
+                fmt="none", **kw)
+
+
 def plot_sasa_rmsd(
     all_results: list[dict],
     out_dir: str | Path,
@@ -76,12 +82,15 @@ def plot_sasa_rmsd(
     aa_label: str = "AA",
     cg_label: str = "CG",
     sasa_ylabel: str = "SASA / nm²",
-    rmsd_ylabel: str = "RMSD / nm",
+    rmsd_ylabel: str = "RMSD / Å",
     bar_width: float = 0.35,
+    err_capsize: float = 3.0,
     png_name: str = "sasa_rmsd_bars.png",
     **kwargs,
 ) -> Path:
     """Grouped bar chart comparing per-ligand mean SASA and RMSD (AA vs CG).
+
+    Draws 95% bootstrap confidence intervals as error bars when available.
 
     Parameters
     ----------
@@ -89,6 +98,7 @@ def plot_sasa_rmsd(
         Each dict must contain at least ``"ligand"``.  Optional keys:
         ``"aa_sasa_mean"``, ``"cg_sasa_mean"``, ``"aa_rmsd_mean"``,
         ``"cg_rmsd_mean"``.
+        Bootstrap CI keys: ``"aa_sasa_ci_lo"``, ``"aa_sasa_ci_hi"``, etc.
     out_dir : str or Path
         Directory in which the PNG is saved.
     figsize : (float, float)
@@ -103,6 +113,8 @@ def plot_sasa_rmsd(
         Axis labels.
     bar_width : float
         Width of each bar in data units.
+    err_capsize : float
+        Cap size for error bars in points.
     png_name : str
         Output filename.
     **kwargs
@@ -121,35 +133,66 @@ def plot_sasa_rmsd(
     n = len(ligands)
     x = np.arange(n)
 
+    # --- data ---
     aa_sasa = [_or_zero(r.get("aa_sasa_mean")) for r in all_results]
     cg_sasa = [_or_zero(r.get("cg_sasa_mean")) for r in all_results]
-    aa_rmsd = [_or_zero(r.get("aa_rmsd_mean")) for r in all_results]
-    cg_rmsd = [_or_zero(r.get("cg_rmsd_mean")) for r in all_results]
+    aa_rmsd = [_or_zero(r.get("aa_rmsd_mean")) * 10 for r in all_results]
+    cg_rmsd = [_or_zero(r.get("cg_rmsd_mean")) * 10 for r in all_results]
+
+    # --- error bars (bootstrap CI) ---
+    def _err_lo_hi(results, prefix):
+        """Build (n, 2) error arrays: [mean - lo, hi - mean]."""
+        means = np.array([_or_zero(r.get(f"{prefix}_mean")) for r in results])
+        los = np.array([_or_nan(r.get(f"{prefix}_ci_lo")) for r in results])
+        his = np.array([_or_nan(r.get(f"{prefix}_ci_hi")) for r in results])
+        # replace NaN with mean (zero-height error bar)
+        los = np.where(np.isnan(los), means, los)
+        his = np.where(np.isnan(his), means, his)
+        return np.abs(means - los), np.abs(his - means)
+
+    aa_sasa_lo, aa_sasa_hi = _err_lo_hi(all_results, "aa_sasa")
+    cg_sasa_lo, cg_sasa_hi = _err_lo_hi(all_results, "cg_sasa")
+    aa_rmsd_lo, aa_rmsd_hi = _err_lo_hi(all_results, "aa_rmsd")
+    cg_rmsd_lo, cg_rmsd_hi = _err_lo_hi(all_results, "cg_rmsd")
+    # Scale RMSD error bars nm → Å
+    aa_rmsd_lo *= 10; aa_rmsd_hi *= 10
+    cg_rmsd_lo *= 10; cg_rmsd_hi *= 10
+
+    err_kw = dict(elinewidth=0.8, capsize=err_capsize, capthick=0.8,
+                  ecolor="dimgray", zorder=10)
 
     with plt.rc_context(DEFAULT_STYLE):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize, **kwargs)
 
         # -- SASA --
-        ax1.bar(x - bar_width / 2, aa_sasa, bar_width,
-                label=aa_label, color=colors["aa"], edgecolor="white", linewidth=0.3)
-        ax1.bar(x + bar_width / 2, cg_sasa, bar_width,
-                label=cg_label, color=colors["cg"], edgecolor="white", linewidth=0.3)
+        b1 = ax1.bar(x - bar_width / 2, aa_sasa, bar_width,
+                     label=aa_label, color=colors["aa"], edgecolor="white",
+                     linewidth=0.3, zorder=1)
+        b2 = ax1.bar(x + bar_width / 2, cg_sasa, bar_width,
+                     label=cg_label, color=colors["cg"], edgecolor="white",
+                     linewidth=0.3, zorder=1)
+        _draw_err(ax1, x - bar_width / 2, aa_sasa, aa_sasa_lo, aa_sasa_hi, err_kw)
+        _draw_err(ax1, x + bar_width / 2, cg_sasa, cg_sasa_lo, cg_sasa_hi, err_kw)
         ax1.set_xticks(x)
         ax1.set_xticklabels(ligands)
         ax1.set_ylabel(sasa_ylabel)
-        ax1.set_title("Mean SASA")
+        ax1.set_title("Mean SASA  (95% CI)")
         ax1.legend(frameon=False, loc="upper right")
         ax1.yaxis.set_major_locator(plt.MaxNLocator(5))
 
         # -- RMSD --
-        ax2.bar(x - bar_width / 2, aa_rmsd, bar_width,
-                label=aa_label, color=colors["aa"], edgecolor="white", linewidth=0.3)
-        ax2.bar(x + bar_width / 2, cg_rmsd, bar_width,
-                label=cg_label, color=colors["cg"], edgecolor="white", linewidth=0.3)
+        b3 = ax2.bar(x - bar_width / 2, aa_rmsd, bar_width,
+                     label=aa_label, color=colors["aa"], edgecolor="white",
+                     linewidth=0.3, zorder=1)
+        b4 = ax2.bar(x + bar_width / 2, cg_rmsd, bar_width,
+                     label=cg_label, color=colors["cg"], edgecolor="white",
+                     linewidth=0.3, zorder=1)
+        _draw_err(ax2, x - bar_width / 2, aa_rmsd, aa_rmsd_lo, aa_rmsd_hi, err_kw)
+        _draw_err(ax2, x + bar_width / 2, cg_rmsd, cg_rmsd_lo, cg_rmsd_hi, err_kw)
         ax2.set_xticks(x)
         ax2.set_xticklabels(ligands)
         ax2.set_ylabel(rmsd_ylabel)
-        ax2.set_title("Mean RMSD")
+        ax2.set_title("Mean RMSD  (95% CI)")
         ax2.legend(frameon=False, loc="upper right")
         ax2.yaxis.set_major_locator(plt.MaxNLocator(5))
 
@@ -242,7 +285,7 @@ def plot_wasserstein(
         ax.set_xticklabels(ligands)
         ax.set_ylabel(ylabel)
         ax.set_title("AA / CG Internal-Coordinate Wasserstein Distance")
-        ax.legend(frameon=False, loc="upper right", ncol=3)
+        ax.legend(frameon=False, loc="upper left", ncol=3)
         ax.yaxis.set_major_locator(plt.MaxNLocator(6))
 
         # Light horizontal grid
@@ -310,7 +353,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
     csv_path = sys.argv[1] if len(sys.argv) > 1 else "analysis/sasa_rmsd_summary.csv"
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else "analysis"
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else "../media"
 
     csv_path = Path(csv_path)
     if not csv_path.exists():

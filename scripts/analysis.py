@@ -45,6 +45,30 @@ for _i in range(_SR_N):
     _theta = 2 * np.pi * _i / _SR_PHI
     _SR_POINTS[_i] = [np.cos(_theta) * _r, _y, np.sin(_theta) * _r]
 
+# Bootstrap defaults
+_BOOTSTRAP_N = 1000
+_BOOTSTRAP_CI = 95
+
+
+def _bootstrap_ci(data: np.ndarray, n_boot: int = _BOOTSTRAP_N,
+                  ci: float = _BOOTSTRAP_CI) -> tuple[float, float, float]:
+    """Bootstrap 95% confidence interval for the mean of *data*.
+
+    Returns ``(mean, ci_lo, ci_hi)``.
+    """
+    data = np.asarray(data, dtype=float)
+    n = len(data)
+    if n < 10:
+        m = float(np.mean(data))
+        return m, m, m
+    rng = np.random.default_rng()
+    boot_means = np.empty(n_boot)
+    for i in range(n_boot):
+        boot_means[i] = float(np.mean(rng.choice(data, size=n, replace=True)))
+    alpha = (100 - ci) / 2
+    ci_lo, ci_hi = np.percentile(boot_means, [alpha, 100 - alpha])
+    return float(np.mean(data)), float(ci_lo), float(ci_hi)
+
 
 # ---------------------------------------------------------------------------
 # ITP parsing
@@ -304,11 +328,22 @@ def compute_internal_wasserstein(aa_internal: dict, cg_internal: dict,
 # Per-ligand analysis
 # ---------------------------------------------------------------------------
 
-def analyze_ligand(ligand_name: str) -> dict | None:
-    """Run SASA + RMSD for both AA and CG trajectories of a single ligand.
+def analyze_ligand(ligand_name: str, modes: set[str] | None = None) -> dict | None:
+    """Run SASA, RMSD and/or Wasserstein analysis for a single ligand.
+
+    Parameters
+    ----------
+    ligand_name : str
+    modes : set of {"sasa", "rmsd", "wass"} or None
+        Which analyses to run.  ``None`` means all three.
 
     Returns a dict of results, or None if data is missing.
     """
+    if modes is None:
+        modes = {"sasa", "rmsd", "wass"}
+    do_sasa = "sasa" in modes
+    do_rmsd = "rmsd" in modes
+    do_wass = "wass" in modes
     aa_dir = EXAMPLES_DIR / ligand_name / "aa_md"
     cg_dir = EXAMPLES_DIR / ligand_name / "cg_md" / CFG.cg_runname
     itp_path = EXAMPLES_DIR / ligand_name / f"{ligand_name}.itp"
@@ -327,73 +362,64 @@ def analyze_ligand(ligand_name: str) -> dict | None:
 
     # --- AA ---
     if aa_top.exists() and aa_trj.exists():
-        logger.info("[%s] AA: %s", ligand_name, aa_trj)
         traj = md.load(str(aa_trj), top=str(aa_top))
         results["aa_n_frames"] = traj.n_frames
         results["aa_n_atoms"] = traj.n_atoms
 
-        sasa_aa = compute_sasa(aa_top, aa_trj, is_cg=False)
-        results["aa_sasa_mean"] = float(np.mean(sasa_aa))
-        results["aa_sasa_std"] = float(np.std(sasa_aa))
+        if do_sasa:
+            logger.info("[%s] AA SASA: %s", ligand_name, aa_trj)
+            sasa_aa = compute_sasa(aa_top, aa_trj, is_cg=False)
+            mean, lo, hi = _bootstrap_ci(sasa_aa)
+            results["aa_sasa_mean"] = mean
+            results["aa_sasa_ci_lo"] = lo
+            results["aa_sasa_ci_hi"] = hi
 
-        rmsd_aa = compute_aa_cog_rmsd(aa_top, aa_trj, mapping)
-        results["aa_rmsd_mean"] = float(np.mean(rmsd_aa))
-        results["aa_rmsd_std"] = float(np.std(rmsd_aa))
+        if do_rmsd:
+            logger.info("[%s] AA RMSD: %s", ligand_name, aa_trj)
+            rmsd_aa = compute_aa_cog_rmsd(aa_top, aa_trj, mapping)
+            mean, lo, hi = _bootstrap_ci(rmsd_aa)
+            results["aa_rmsd_mean"] = mean
+            results["aa_rmsd_ci_lo"] = lo
+            results["aa_rmsd_ci_hi"] = hi
     else:
         logger.warning("[%s] AA data missing, skipping AA analysis.", ligand_name)
 
     # --- CG ---
     if cg_top.exists() and cg_trj.exists():
-        logger.info("[%s] CG: %s", ligand_name, cg_trj)
         traj = md.load(str(cg_trj), top=str(cg_top))
         results["cg_n_frames"] = traj.n_frames
         results["cg_n_beads"] = traj.n_atoms
 
-        sasa_cg = compute_sasa(cg_top, cg_trj, is_cg=True, bead_types=bead_types)
-        results["cg_sasa_mean"] = float(np.mean(sasa_cg))
-        results["cg_sasa_std"] = float(np.std(sasa_cg))
+        if do_sasa:
+            logger.info("[%s] CG SASA: %s", ligand_name, cg_trj)
+            sasa_cg = compute_sasa(cg_top, cg_trj, is_cg=True, bead_types=bead_types)
+            mean, lo, hi = _bootstrap_ci(sasa_cg)
+            results["cg_sasa_mean"] = mean
+            results["cg_sasa_ci_lo"] = lo
+            results["cg_sasa_ci_hi"] = hi
 
-        rmsd_cg = compute_cg_rmsd(cg_top, cg_trj)
-        results["cg_rmsd_mean"] = float(np.mean(rmsd_cg))
-        results["cg_rmsd_std"] = float(np.std(rmsd_cg))
+        if do_rmsd:
+            logger.info("[%s] CG RMSD: %s", ligand_name, cg_trj)
+            rmsd_cg = compute_cg_rmsd(cg_top, cg_trj)
+            mean, lo, hi = _bootstrap_ci(rmsd_cg)
+            results["cg_rmsd_mean"] = mean
+            results["cg_rmsd_ci_lo"] = lo
+            results["cg_rmsd_ci_hi"] = hi
     else:
         logger.warning("[%s] CG data missing, skipping CG analysis.", ligand_name)
 
     # --- AA/CG internal-coordinate Wasserstein distances ---
+    if do_wass:
+        _analyze_ligand_wasserstein(ligand_name, cg_top, cg_trj, itp_path, results)
+
+    return results
+
+
+def _analyze_ligand_wasserstein(ligand_name: str, cg_top: Path, cg_trj: Path,
+                                itp_path: Path, results: dict) -> None:
+    """Compute AA/CG Wasserstein distances for *ligand_name*; mutate *results*."""
     pkl_path = EXAMPLES_DIR / ligand_name / "internal_coords.pkl"
-    if pkl_path.exists() and cg_top.exists() and cg_trj.exists() and itp_path.exists():
-        logger.info("[%s] Computing AA/CG Wasserstein distances", ligand_name)
-        try:
-            with open(pkl_path, "rb") as f:
-                aa_internal = pickle.load(f)
-
-            topo = smartini.topology.read_itp(str(itp_path))
-
-            cg_traj = read_cg_trajectory(cg_top, cg_trj, start=0, stop=None, step=1)
-            cg_internal = calculate_internal_coordinates(cg_traj, topo)
-
-            dists = compute_internal_wasserstein(aa_internal, cg_internal, topo)
-            results["bond_wass_mean"] = dists["bond_mean"]
-            results["angle_wass_mean"] = dists["angle_mean"]
-            results["dihedral_wass_mean"] = dists["dihedral_mean"]
-
-            # Save per-term distance arrays as pkl
-            dist_pkl = OUTPUT_DIR / f"{ligand_name}_wasserstein.pkl"
-            dist_pkl.parent.mkdir(parents=True, exist_ok=True)
-            with open(dist_pkl, "wb") as f:
-                pickle.dump(dists, f, protocol=pickle.HIGHEST_PROTOCOL)
-            logger.info("[%s] Wasserstein pkl saved to %s", ligand_name, dist_pkl)
-
-            logger.info(
-                "[%s] Mean Wasserstein — bonds: %.4f  angles: %.4f  dihedrals: %.4f",
-                ligand_name,
-                dists["bond_mean"],
-                dists["angle_mean"],
-                dists["dihedral_mean"],
-            )
-        except Exception:
-            logger.warning("[%s] Wasserstein computation failed, skipping.", ligand_name, exc_info=True)
-    else:
+    if not (pkl_path.exists() and cg_top.exists() and cg_trj.exists() and itp_path.exists()):
         logger.warning(
             "[%s] Missing data for Wasserstein "
             "(pkl=%s, cg_top=%s, cg_trj=%s, itp=%s)",
@@ -403,8 +429,39 @@ def analyze_ligand(ligand_name: str) -> dict | None:
             cg_trj.exists(),
             itp_path.exists(),
         )
+        return
 
-    return results
+    logger.info("[%s] Computing AA/CG Wasserstein distances", ligand_name)
+    try:
+        with open(pkl_path, "rb") as f:
+            aa_internal = pickle.load(f)
+
+        topo = smartini.topology.read_itp(str(itp_path))
+
+        cg_traj = read_cg_trajectory(cg_top, cg_trj, start=0, stop=None, step=1)
+        cg_internal = calculate_internal_coordinates(cg_traj, topo)
+
+        dists = compute_internal_wasserstein(aa_internal, cg_internal, topo)
+        results["bond_wass_mean"] = dists["bond_mean"]
+        results["angle_wass_mean"] = dists["angle_mean"]
+        results["dihedral_wass_mean"] = dists["dihedral_mean"]
+
+        # Save per-term distance arrays as pkl
+        dist_pkl = OUTPUT_DIR / f"{ligand_name}_wasserstein.pkl"
+        dist_pkl.parent.mkdir(parents=True, exist_ok=True)
+        with open(dist_pkl, "wb") as f:
+            pickle.dump(dists, f, protocol=pickle.HIGHEST_PROTOCOL)
+        logger.info("[%s] Wasserstein pkl saved to %s", ligand_name, dist_pkl)
+
+        logger.info(
+            "[%s] Mean Wasserstein — bonds: %.4f  angles: %.4f  dihedrals: %.4f",
+            ligand_name,
+            dists["bond_mean"],
+            dists["angle_mean"],
+            dists["dihedral_mean"],
+        )
+    except Exception:
+        logger.warning("[%s] Wasserstein computation failed, skipping.", ligand_name, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -412,28 +469,49 @@ def analyze_ligand(ligand_name: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def save_results(all_results: list[dict], out_dir: Path):
-    """Save a summary CSV, then delegate plotting to :mod:`scripts.plots`."""
+    """Save a summary CSV (merging with existing), then delegate plotting."""
+    import csv as _csv
+
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "sasa_rmsd_summary.csv"
 
-    # --- CSV ---
     columns = [
         "ligand",
         "aa_n_frames", "aa_n_atoms",
-        "aa_sasa_mean", "aa_sasa_std",
-        "aa_rmsd_mean", "aa_rmsd_std",
+        "aa_sasa_mean", "aa_sasa_ci_lo", "aa_sasa_ci_hi",
+        "aa_rmsd_mean", "aa_rmsd_ci_lo", "aa_rmsd_ci_hi",
         "cg_n_frames", "cg_n_beads",
-        "cg_sasa_mean", "cg_sasa_std",
-        "cg_rmsd_mean", "cg_rmsd_std",
+        "cg_sasa_mean", "cg_sasa_ci_lo", "cg_sasa_ci_hi",
+        "cg_rmsd_mean", "cg_rmsd_ci_lo", "cg_rmsd_ci_hi",
         "bond_wass_mean", "angle_wass_mean", "dihedral_wass_mean",
     ]
-    with open(csv_path, "w") as f:
-        f.write(",".join(columns) + "\n")
-        for r in all_results:
-            f.write(",".join(str(r.get(c, "")) for c in columns) + "\n")
+
+    # Load existing rows and merge new data by ligand name
+    existing: dict[str, dict] = {}
+    if csv_path.exists():
+        with csv_path.open(newline="") as fh:
+            for row in _csv.DictReader(fh):
+                existing[row["ligand"]] = dict(row)
+
+    for r in all_results:
+        name = r["ligand"]
+        merged = existing.get(name, {})
+        # Only overwrite keys that the new result actually computed
+        for k, v in r.items():
+            if v is not None:
+                merged[k] = str(v)
+        existing[name] = merged
+
+    with open(csv_path, "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
+        w.writeheader()
+        for name in sorted(existing):
+            w.writerow(existing[name])
     logger.info("CSV summary saved to %s", csv_path)
 
     # --- Plots (delegated to scripts/plots.py) ---
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from scripts.plots import plot_sasa_rmsd, plot_wasserstein
 
     plot_sasa_rmsd(all_results, out_dir)
@@ -461,16 +539,37 @@ def _discover_ligands() -> list[str]:
 
 
 if __name__ == "__main__":
-    import sys
-    names = sys.argv[1:] if len(sys.argv) > 1 else _discover_ligands()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="SASA / RMSD / Wasserstein analysis")
+    parser.add_argument("ligands", nargs="*", help="Ligand names (default: all with AA+CG data)")
+    parser.add_argument("--sasa", action="store_true", help="Compute SASA")
+    parser.add_argument("--rmsd", action="store_true", help="Compute RMSD")
+    parser.add_argument("--wass", action="store_true", help="Compute Wasserstein distances")
+    args = parser.parse_args()
+
+    # If no flags are given, run all analyses
+    if not (args.sasa or args.rmsd or args.wass):
+        args.sasa = args.rmsd = args.wass = True
+
+    modes = set()
+    if args.sasa:
+        modes.add("sasa")
+    if args.rmsd:
+        modes.add("rmsd")
+    if args.wass:
+        modes.add("wass")
+
+    names = args.ligands if args.ligands else _discover_ligands()
     if not names:
         logger.error("No ligands with complete AA+CG data found in examples/")
         sys.exit(1)
 
+    logger.info("Modes: %s", ", ".join(sorted(modes)))
     logger.info("Analysing %d ligand(s): %s", len(names), ", ".join(names))
     all_results = []
     for name in names:
-        res = analyze_ligand(name)
+        res = analyze_ligand(name, modes=modes)
         if res:
             all_results.append(res)
 
