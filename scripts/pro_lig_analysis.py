@@ -778,26 +778,18 @@ if __name__ == "__main__":
             png_name=f"{args.sysname}_contact_freq_comparison.png",
         )
 
-    # --- Q(t) combined plot (with inset contact map) ---
+    # --- Q(t) combined plot (with inset contact maps) ---
     Q_data = {}
     for mode in modes:
         Q = results.get(f"{mode}_Q")
         if Q is not None:
             Q_data[mode.upper()] = Q
     if Q_data:
-        # Build unified contact freq for inset
-        inset = None
-        if freq_cg is not None and freq_aa is not None:
-            inset = (freq_cg + freq_aa) / 2.0
-        elif freq_cg is not None:
-            inset = freq_cg
-        elif freq_aa is not None:
-            inset = freq_aa
-
         plot_Q_time_series(
             Q_data,
             args.out_dir,
-            inset_freq=inset,
+            inset_freq_cg=freq_cg,
+            inset_freq_aa=freq_aa,
             png_name=f"{args.sysname}_Q_vs_time.png",
         )
 

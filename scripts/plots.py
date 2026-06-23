@@ -425,10 +425,11 @@ def plot_Q_time_series(
     palette: dict | None = None,
     xlabel: str = "Time / ns",
     ylabel: str = "$Q(t)$",
-    ylim: tuple[float, float] = (0.55, 1.05),
+    ylim: tuple[float, float] = (0.5, 0.9),
     png_name: str = "Q_vs_time.png",
-    inset_freq: np.ndarray | None = None,
-    inset_labels: dict | None = None,
+    inset_freq_cg: np.ndarray | None = None,
+    inset_freq_aa: np.ndarray | None = None,
+    inset_cmap: str = "YlOrRd",
     add_title: bool = False,
     **kwargs,
 ) -> Path | None:
@@ -502,19 +503,34 @@ def plot_Q_time_series(
         ax.set_xlim(left=0)
         ax.set_ylim(*ylim)
 
-        # --- inset: contact frequency thumbnail (bottom-right) ---
-        if inset_freq is not None:
+        # --- inset: mini contact maps (bottom-right, side-by-side CG | AA) ---
+        panels = []
+        if inset_freq_cg is not None:
+            panels.append(inset_freq_cg)
+        if inset_freq_aa is not None:
+            panels.append(inset_freq_aa)
+        if panels:
             from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-            iax = inset_axes(ax, width="28%", height="40%",
+            from matplotlib.colors import Normalize as Norm
+            n_panels = len(panels)
+            # make inset wider if two panels
+            inset_w = "30%" if n_panels == 1 else "40%"
+            iax = inset_axes(ax, width=inset_w, height="38%",
                              loc="lower right",
                              bbox_to_anchor=(0.0, 0.02, 1, 1),
                              bbox_transform=ax.transAxes)
-            from matplotlib.colors import Normalize as Norm
-            iax.imshow(inset_freq, aspect="auto", origin="upper",
-                       cmap="YlOrRd", norm=Norm(0, 1), interpolation="nearest")
+            # stack panels horizontally with a 2-pixel gap
+            combined = np.hstack(panels) if n_panels == 2 else panels[0]
+            iax.imshow(combined, aspect="auto", origin="upper",
+                       cmap=inset_cmap, norm=Norm(0, 1), interpolation="nearest")
+            # draw a thin white separator between CG and AA
+            if n_panels == 2:
+                mid = panels[0].shape[1] - 0.5
+                iax.axvline(mid, color="white", linewidth=1.5)
             iax.set_xticks([])
             iax.set_yticks([])
-            # thin border
+            iax.set_xlabel("Protein residues", fontsize=6, labelpad=1)
+            iax.set_ylabel("Ligand beads", fontsize=6, labelpad=1)
             for spine in iax.spines.values():
                 spine.set_linewidth(0.5)
 
@@ -611,7 +627,7 @@ if __name__ == "__main__":
                 lig_labels  = cr.get("lig_bead_names"),
                 prot_labels = cr.get("unified_prot_labels"),
                 png_name    = f"{sysname}_contact_freq_comparison.png",
-                # cmap     = "YlOrRd",
+                cmap     = "Greys",
                 # figsize  = (12.0, 5.5),
                 # add_suptitle = True,
             )
@@ -622,21 +638,14 @@ if __name__ == "__main__":
             if Q is not None:
                 Q_data[mode.upper()] = Q
         if Q_data:
-            # Build unified contact freq for inset (average CG + AA if both present)
-            inset = None
-            if freq_cg is not None and freq_aa is not None:
-                inset = (freq_cg + freq_aa) / 2.0
-            elif freq_cg is not None:
-                inset = freq_cg
-            elif freq_aa is not None:
-                inset = freq_aa
-
             plot_Q_time_series(
                 Q_data,
                 mda_dir,
-                png_name    = f"{sysname}_Q_vs_time.png",
-                inset_freq  = inset,
-                # ylim      = (0.55, 1.05),
+                png_name       = f"{sysname}_Q_vs_time.png",
+                inset_freq_cg  = freq_cg,
+                inset_freq_aa  = freq_aa,
+                inset_cmap     = "Greys",
+                ylim      = (0.50, 0.9),
                 # add_title = True,
             )
 
