@@ -1044,7 +1044,6 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
     AutoM3 : Returns water/octanol partitioning free energy defined empiricaly from customized database
     """
     logger.debug("Entering smi2alogps()")
-    forcepred = False
 
     ## AutoM3 ###
     if not logp_file:

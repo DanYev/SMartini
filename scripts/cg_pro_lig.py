@@ -79,17 +79,17 @@ def setup(sysdir, sysname, ligand_src=None):
     molname = "protein_0"
     ligand_src = ligand_src or LIGAND_SRC
     mdsys = GmxSystem(sysdir, sysname)
-    input_pdb = mdsys.root / f"{sysname}.pdb"
+    input_pdb = mdsys.sysdir / f"{sysname}.pdb"
     # mdsys.prepare_files(pour_martini=True) # be careful it can overwrite later files
-    mdsys.clean_pdb_mm(input_pdb, find_missing_residues=False, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
+    # mdsys.clean_pdb_mm(input_pdb, find_missing_residues=False, add_missing_atoms=True, add_hydrogens=True, pH=7.0) # Generates Amber ff names in PDB
+    shutil.copy(input_pdb, mdsys.inpdb)  # Copy source PDB to inpdb.pdb (bypasses clean_pdb_mm)
     shutil.copy(mdsys.inpdb, mdsys.prodir / f"{molname}.pdb")  # Copy cleaned PDB to prodir for martinizing. This is the file that will be used for martinizing and ligand mapping.
-    # shutil.copy(input_pdb, mdsys.inpdb)  # Copy source PDB to inpdb.pdb (bypasses clean_pdb_mm)
 
-    # Merge ligand all-atom PDB into inpdb for ligand martinization
-    _merge_ligand_aa_pdb(mdsys.inpdb, ligand_src / f"{LIGAND_NAME}_aa.pdb")
+    # # Merge ligand all-atom PDB into inpdb for ligand martinization
+    # _merge_ligand_aa_pdb(mdsys.inpdb, ligand_src / f"{LIGAND_NAME}_aa.pdb")
 
     # Martinizing
-    mdsys.martinize_proteins_en(append=False) # SWITCH APPEND TO TRUE IF ALREADY DONE
+    mdsys.martinize_proteins_en(append=False, ef=1000, el=0.3, eu=1.0, text="-ignore ANP,MG") # SWITCH APPEND TO TRUE IF ALREADY DONE
     # mdsys.martinize_proteins_go(go_eps=12.0, go_low=0.3, go_up=1.1, ff="martini3001",
     #     p="backbone", pf="500",  text="", append=True) 
     # shutil.copy(mdsys.topdir / f"{molname}.itp", mdsys.topdir / "tmp.itp") 
@@ -103,12 +103,13 @@ def setup(sysdir, sysname, ligand_src=None):
     shutil.copy(ligand_src / f"{LIGAND_NAME}.map", lig_dir / f"{LIGAND_NAME}.map")
     # !!!!!!
     # LIGANDS MUST BE IN ALPHABETICAL ORDER FOR NOW. I'LL FIX THIS LATER
-    mdsys.martinize_ligands(input_pdb=mdsys.inpdb, ligands=[LIGAND_NAME], merge_with=molname)
+    mdsys.martinize_ligands(input_pdb=mdsys.inpdb, ligands=[LIGAND_NAME, "MG"], merge_with=molname)
     # !!!!!!!
     mdsys.make_cg_structure() # CG structure. Returns mdsys.solupdb ("solute.pdb") file
     mdsys.make_cg_topology() # CG topology. Returns mdsys.systop ("mdsys.top") file
     # _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N08", "N18"]) # FOR 1TQN HEM
-    _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names=["N04", "N07", "D01", "MG"]) # ANP
+    _add_protein_ligand_bonds(mdsys, molname, 
+        ligand_bead_names=["D01", "N08", "N05", "N04", "P11", "MG"]) # ANP
     
     # PROTEIN+WATER SYSTEMS:
     mdsys.make_box(d="1.25", bt="dodecahedron", center="0 0 0")
@@ -152,7 +153,7 @@ def _add_protein_ligand_bonds(mdsys, molname, ligand_bead_names) -> None:
             # Use serial numbers from PDB (1-indexed)
             ligand_id = ligand_bead.index + 1
             protein_id = closest_protein.index + 1
-            restraints.append(((ligand_id, protein_id), (1, distance, 1000), "BONDED DISTANCE RESTRAINT"))
+            restraints.append(((ligand_id, protein_id), (1, distance * 0.85, 2000), "BONDED DISTANCE RESTRAINT"))
             logger.info(f"Bond: protein atom {protein_id} ({closest_protein.name}) <-> "
                         f"ligand atom {ligand_id} ({ligand_bead.name}), distance: {distance:.2f} nm")
     # Update topology with generated restraints
@@ -205,6 +206,6 @@ if __name__ == "__main__":
     sysdir = SYSDIR
     sysname = "KDA"
     runname = "mdrun_2"
-    setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
-    md_npt(sysdir, sysname, runname)
+    # setup(sysdir, sysname, ligand_src=LIGAND_SRC) 
+    # md_npt(sysdir, sysname, runname)
     trjconv(sysdir, sysname, runname)
