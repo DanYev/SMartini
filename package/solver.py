@@ -236,6 +236,7 @@ class CG_molecule:
 
             # Get bead types based on mapping and features of the atoms in each bead
             try:
+                logger.info("Attempt %d: calling get_bead_types with mapping: %s", attempt, mapping)
                 bead_types, bead_smiles, bead_atomnames, charges = get_bead_types(
                     mapping=mapping,
                     molecule=self.molecule,
@@ -733,6 +734,7 @@ def get_bead_types(mapping, molecule, hbonda, hbondd, logp_file=None, forcepred=
 
     for idx, bead in enumerate(mapping):
         smi_frag, wc_log_p, charge, converted_smi, real_smi = substruct2smi(bead, molecule)
+        logger.info("Bead %d/%d: atoms=%s, SMILES=%s, charge=%s", idx + 1, len(mapping), bead, smi_frag, charge)
         if "." in smi_frag:
             logger.info((f"Fragment SMILES contains a dot ('.'), your atoms in bead {bead}: {smi_frag} are disconnected. "
             "Skipping to the next one."))
@@ -1081,11 +1083,33 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
         soup = ""
         try:
             session = requests.session()
-            logger.debug("Calling http://vcclab.org/web/alogps/calc?SMILES=" + str(smi))
-            req = session.get(
-                "http://vcclab.org/web/alogps/calc?SMILES=" + str(smi.replace("#", "%23"))
-            )
+            url = "http://vcclab.org/web/alogps/calc?SMILES=" + str(smi.replace("#", "%23"))
+            logger.info("[bead %s] Sending to server: SMILES=%s", str(bead), str(smi))
+            logger.debug("Calling %s", url)
+            req = session.get(url, timeout=15)
+            logger.info("[bead %s] Server responded (status=%s, content_length=%s)", str(bead), req.status_code, len(req.content) if req.content else 0)
+        except requests.exceptions.Timeout:
+            logger.error("[bead %s] Server request TIMED OUT after 15s for SMILES=%s", str(bead), str(smi))
+            print("Error. Timeout connecting to vcclab.org for SMILES: %s" % smi)
+            if forcepred:
+                log_p = wc_log_p
+                logger.warning("[bead %s] Falling back to Wildman-Crippen prediction: %s", str(bead), str(log_p))
+                return (convert_log_k(log_p), "; Wildman-Crippen (server timeout)")
+            else:
+                log_p = 0.0
+                return (convert_log_k(log_p), "; ALOGPS undefined (server timeout)")
+        except requests.exceptions.ConnectionError:
+            logger.error("[bead %s] Connection error to vcclab.org for SMILES=%s", str(bead), str(smi))
+            print("Error. Can't reach vcclab.org to estimate free energy for SMILES: %s" % smi)
+            if forcepred:
+                log_p = wc_log_p
+                logger.warning("[bead %s] Falling back to Wildman-Crippen prediction: %s", str(bead), str(log_p))
+                return (convert_log_k(log_p), "; Wildman-Crippen (connection error)")
+            else:
+                log_p = 0.0
+                return (convert_log_k(log_p), "; ALOGPS undefined (connection error)")
         except:
+            logger.error("[bead %s] Unexpected error for SMILES=%s", str(bead), str(smi))
             print("Error. Can't reach vcclab.org to estimate free energy.")
             exit(1)
         try:
@@ -1105,6 +1129,7 @@ def smi2alogps(forcepred, smi, wc_log_p, bead, converted_smi, real_smi, logp_fil
                 log_p = float(line[line.index("mol_1") + 1])
                 found_mol_1 = True
                 break
+        logger.debug("[bead %s] Server response parsed, found_mol_1=%s, log_p=%s", str(bead), str(found_mol_1), str(log_p))
         if not found_mol_1:
             # If we're forcing a prediction, use Wildman-Crippen
             if forcepred:
