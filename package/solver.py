@@ -431,7 +431,7 @@ class CG_molecule:
 
         molecule = self.molecule
         rings = molecule.GetRingInfo().AtomRings()
-        rings_to_symmetrize = [rings[i] for i in CFG.symmetrize_rings]
+        rings_to_symmetrize = [rings[i] for i in CFG.symmetrize_rings] if CFG.symmetrize_rings else []
         # go thru each ring
         sym_mappings = [mapping]
         for ring in rings_to_symmetrize:

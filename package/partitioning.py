@@ -302,7 +302,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     ha_neis = [[n for n in nei if n in fragment] for nei in frag_neis] # only consider neighbors in the fragment, since we will map each fragment separately and then merge the mappings.
     fragment_mappings = []
     min_fragment_beads, max_fragment_beads = get_min_max_beads(fragment, atoms)
-    rings_to_symmetrize = [initial_rings[i] for i in CFG.symmetrize_rings]
+    rings_to_symmetrize = [initial_rings[i] for i in CFG.symmetrize_rings] if CFG.symmetrize_rings else []
     for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
         logger.info(f"Finding combinations for fragment {fragment} with {nbeads} beads...")
         combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
