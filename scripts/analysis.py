@@ -107,11 +107,12 @@ def _parse_itp(itp_path: Path) -> tuple[list[list[int]], list[str]]:
 
 def _bead_radius(bead_type: str) -> float:
     """Martini bead radius (nm): T* → 0.17, S* → 0.205, else → 0.235."""
+    factor = 2 ** (1/6)
     if bead_type.startswith("T"):
-        return 0.17
+        return 0.17 * factor
     if bead_type.startswith("S"):
-        return 0.205
-    return 0.235
+        return 0.205 * factor
+    return 0.235 * factor
 
 
 # ---------------------------------------------------------------------------

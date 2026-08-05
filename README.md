@@ -11,8 +11,8 @@ SMartini runs an AA→CG fitting pipeline: initial mapping, atomistic sampling, 
 
 ## Installation
 ```bash
-git clone https://github.com/DanYev/LigPar
-cd LigPar
+git clone https://github.com/DanYev/SMartini
+cd SMartini
 conda env create --file environment.yml
 source activate smartini
 ```
