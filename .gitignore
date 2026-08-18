@@ -12,7 +12,6 @@ tmp/
 *.npz
 *.pdf
 *.pkl
-*.gro
 aa*.png
 
 # ---- Python ----
