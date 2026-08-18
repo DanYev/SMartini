@@ -18,8 +18,7 @@ def setup_logging(level=logging.INFO, force=False):
         else:
                 root_logger.setLevel(level)
 
-from ..package.smartini import solver, topology
-from ._version import __version__
-
+# from ..package.smartini import solver, topology
+# from ._version import __version__
 
 __all__ = ["solver", "topology", "partitioning", "__version__", "setup_logging"]
