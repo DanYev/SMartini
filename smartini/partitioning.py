@@ -211,12 +211,12 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
             max_beads = n_atoms // 2
             return min_beads, max_beads
         if is_in_ring:
-            min_beads = n_atoms // 4
+            min_beads = n_atoms // 3
             if n_atoms % 3 != 0:
                 min_beads += 1
             max_beads = n_atoms // 2 
             return min_beads, max_beads
-        min_beads = n_atoms // 4
+        min_beads = n_atoms // 3
         if min_beads == 0:
             min_beads = 1
         # if n_atoms % 4 != 0:
