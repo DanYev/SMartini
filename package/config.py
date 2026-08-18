@@ -31,7 +31,7 @@ class SMConfig:
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
     max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
-    max_bead_size: int = 4
+    max_bead_size: int = 5
     max_ring_bead_size: int = 3
 
     # ============================================================================

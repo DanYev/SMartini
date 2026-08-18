@@ -377,6 +377,7 @@ def fit_gmm_1d_best(
     min_weight=0.1,
     min_spacing_std=2.0,
     min_prob=1e-3,
+    n_init=5,
 ):
     """Fit a 1D Gaussian mixture and choose model order by AIC.
 
@@ -426,7 +427,7 @@ def fit_gmm_1d_best(
                 max_iter=int(max_iter),
                 tol=float(tol),
                 reg_covar=float(var_floor),
-                n_init=5,
+                n_init=int(n_init),
                 random_state=0,
             )
             gmm.fit(X)
@@ -874,6 +875,7 @@ def fit_type9_dihedral(
     nbins=360,
     min_prob=1e-6,
     fc_scale: float = 1.0,
+    gmm_n_init: int = 1,
 ):
     r"""Fit GROMACS type-9 dihedral terms from sampled dihedral angles.
 
@@ -919,7 +921,7 @@ def fit_type9_dihedral(
     phi_rad = np.deg2rad(phi_centers)
 
     # Fit GMM with BIC selection (using module-level function)
-    best_gmm = fit_gmm_1d_best(values, max_components=3, min_prob=min_prob)
+    best_gmm = fit_gmm_1d_best(values, max_components=3, min_prob=min_prob, n_init=gmm_n_init)
     best_means = best_gmm[1] if best_gmm is not None else None
     
     # Fit free energy from histogram density

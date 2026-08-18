@@ -211,7 +211,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
             max_beads = n_atoms // 2
             return min_beads, max_beads
         if is_in_ring:
-            min_beads = n_atoms // 3
+            min_beads = n_atoms // 4
             if n_atoms % 3 != 0:
                 min_beads += 1
             max_beads = n_atoms // 2 
@@ -256,6 +256,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     def distribute_neis(mapping):
         n = len(mapping)
         mapping = [set(ns) for ns in mapping]
+        print(mapping)
         mappings = [mapping]
         for i in range(n):
             for j in range(i + 1, n):
@@ -278,6 +279,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                     else:
                         new_mappings.append(mapping)
                 mappings = new_mappings
+        print(mappings)
         return mappings
 
     def filter_out_non_symmetrizable_mappings(mappings, ring):
@@ -452,7 +454,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
     # # DEBUG
-    # print(fragments)
+    fragments = [fragments[1], set(fragments[2] + fragments[0])]
+    print(fragments)
     # print(frag_is_symmetric)
     # alist = [0, 1, 2, 3, 4, 5, 6]
     # alist = [0, 1, 2, 3, 4, 6]
