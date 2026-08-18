@@ -200,6 +200,6 @@ def _get_reporters(append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    # process_ligand()
-    # md_npt()
+    process_ligand()
+    md_npt()
     trjconv()

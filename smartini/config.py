@@ -83,7 +83,7 @@ class SMConfig:
     scale_by_sin3_for_type11: bool = False  # Whether to scale type 11 dihedrals by sin^3(theta)
     nbins: int = 120
     min_prob: float = 1e-12
-    fc_scale: float = 0.3  # Scaling factor for initial force constants to roughly account for coupling of the potentials
+    fc_scale: float = 0.4  # Scaling factor for initial force constants to roughly account for coupling of the potentials
     # Refinement guardrails
     alpha_max: float = 0.20
     alpha_min: float = 0.02

@@ -25,7 +25,7 @@ sysdir = CFG.wdir
 outdir = CFG.mol_dir
 sysname = CFG.cg_sysname
 runname = CFG.cg_runname
-data_dir = Path(__file__).resolve().parent / "package" / "cgmd_params"
+data_dir = Path(__file__).resolve().parent / "smartini" / "cgmd_params"
 
 # Compute NSTEPS from config
 NSTEPS = int(CFG.cg_total_time_ns * 1e3 / CFG.cg_dt)
