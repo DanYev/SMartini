@@ -17,15 +17,16 @@ build-backend = "poetry.core.masonry.api"
 name = "smartini"
 version = "0.2"
 packages = [
-  { include = "package" }
+  { include = "smartini" }
 ]
 exclude = [
   "*/tests/",
   "*/cgmd_params/"
 ]
 include = [
-  {path = "package/optimization_cy.pyx", format = "wheel"},
-  {path = "package/*.so", format = "wheel"},
+  {path = "smartini/optimization_cy.pyx", format = "wheel"},
+  {path = "smartini/ligpar_cy.pyx", format = "wheel"},
+  {path = "smartini/*.so", format = "wheel"},
 ]
 description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
@@ -100,7 +101,7 @@ line-length = 99
 # Coverage settings
 [tool.coverage.run]
 branch = true
-source = ["package"]
+source = ["smartini"]
 
 [tool.coverage.report]
 exclude_lines = [
