@@ -12,14 +12,14 @@ def build(setup_kwargs: dict) -> None:
     # "-fopenmp" or adjust for your compiler toolchain.
     ext = [
         Extension(
-            name="smartini.optimization_cy",
+            name="optimization_cy",
             sources=["optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
-            name="smartini.ligpar_cy",
+            name="ligpar_cy",
             sources=["ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
@@ -39,14 +39,14 @@ def _make_extensions():
     """Extension list shared by Poetry hook and manual setuptools builds."""
     return [
         Extension(
-            name="smartini.optimization_cy",
+            name="optimization_cy",
             sources=["optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
-            name="smartini.ligpar_cy",
+            name="ligpar_cy",
             sources=["ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],

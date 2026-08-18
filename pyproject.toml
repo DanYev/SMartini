@@ -100,7 +100,7 @@ line-length = 99
 # Coverage settings
 [tool.coverage.run]
 branch = true
-source = ["smartini"]
+source = ["."]
 
 [tool.coverage.report]
 exclude_lines = [
