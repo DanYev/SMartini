@@ -299,9 +299,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     def find_mappings_from_degree(anchors_combs, fragment):
         """Find mappings based on the degree of the atoms in the fragment."""
         for anchors in anchors_combs:
-            print(anchors)
             mapping = [[int(i)] + ha_neis[int(i)] for i in anchors]
-            print(mapping)
             no_mapping = []
             mapping_flat = flat_set(mapping)
             all_atoms_are_covered = set(fragment).issubset(mapping_flat)
@@ -316,8 +314,12 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                     if a in anchors and a != anchor:
                         continue
                     new_bead.append(a)
-                no_mapping.append(new_bead) 
-            mappings.append(no_mapping)
+                if len(new_bead) >= 2:
+                    no_mapping.append(new_bead) 
+                    continue
+                break
+            if no_mapping:
+                mappings.append(no_mapping)
         return mappings
 
     def filter_out_non_symmetrizable_mappings(mappings, ring):
@@ -354,8 +356,6 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         logger.warning(f"No mappings found for fragment {fragment}. Trying to find anchors based on degree...")
         anchors = find_anchors_from_degree(fragment, atoms)
         fragment_mappings = find_mappings_from_degree(anchors, fragment)
-    print(fragment_mappings)
-    exit()
     return fragment_mappings
 
 
@@ -498,7 +498,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
     # # DEBUG
-    fragments = [fragments[2]]
+    # fragments = [fragments[2]]
     print(fragments)
     # print(frag_is_symmetric)
     # alist = [0, 1, 2, 3, 4, 5, 6]
