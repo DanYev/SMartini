@@ -44,7 +44,6 @@ echo "  SM_CONFIG_YML: ${SM_CONFIG_YML:-}" >&2
 nsteps=200000
 
 python 1_gen_cg_topo.py
-exit 1
 python 2_aa_md.py
 python 3_boltz_inv.py plot
 python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples
