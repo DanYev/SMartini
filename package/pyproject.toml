@@ -15,22 +15,22 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "smartini"
-version = "0.0.0"
+version = "0.2"
 packages = [
-  { include = "smartini", from = "package" }
+  { include = "." }
 ]
 exclude = [
-  "*/tests/"
+  "*/tests/",
+  "*/cgmd_params/"
 ]
 include = [
-  {path = "package/smartini/optimization_cy.pyx", format = "wheel"},
-  {path = "package/smartini/*.so", format = "wheel"},
+  {path = "package/optimization_cy.pyx", format = "wheel"},
+  {path = "package/*.so", format = "wheel"},
 ]
-description = "Automated ligand parametrization for Martini 3 Force Field"
+description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: Linux",
-  "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Cython",
 ]
