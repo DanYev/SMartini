@@ -104,19 +104,22 @@ def split_into_fragments(molecule):
         rings = molecule.GetRingInfo().AtomRings()
         rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
         n_rings = len(rings)
-        fused_rings = []
+        fused_rings = [ring for ring in rings]
         overlaps = []
-        for r1 in rings:
-            for r2 in rings:
+        n_rings = len(rings)
+        for i in range(n_rings):
+            for j in range(i + 1, n_rings):
+                r1 = rings[i]
+                r2 = rings[j]
                 if r1 == r2:
                     continue
                 overlap = r1.intersection(r2)
                 if overlap:
-                    rings.append(r1.union(r2))
-                    rings.remove(r1)
-                    rings.remove(r2)
+                    fused_rings.remove(r1)
+                    fused_rings.remove(r2)
+                    fused_rings.append(r1.union(r2))
                     overlaps.append(overlap)
-        rings = sort_nested(rings)
+        rings = sort_nested(fused_rings)
         overlaps = sort_nested(overlaps)
         return rings, overlaps
 
@@ -222,6 +225,8 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         # if n_atoms % 4 != 0:
         #     min_beads += 1
         max_beads = n_atoms // 2 + 1
+        print(min_beads)
+        print(max_beads)
         return min_beads, max_beads
 
     @timeit(level=logging.DEBUG)
@@ -235,7 +240,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         logger.debug(f"Found {acc_combs.shape[0]} acceptable combinations")
         return acc_combs
 
-    def find_no_overlap_mappings(combs, fragment):
+    def find_no_overlap_mappings(combs, fragment, n_atoms_in_bead_min=2):
         """Map a fragment to a set of beads based on the trial combinations."""
         mappings = []
         for comb in combs:
@@ -245,7 +250,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
             all_atoms_are_covered = set(fragment).issubset(mapping_flat)
             if not all_atoms_are_covered:
                 continue
-            no_mappings = distribute_neis(mapping)
+            no_mappings = distribute_neis(mapping, n_atoms_in_bead_min=n_atoms_in_bead_min)
             for mapping in no_mappings:
                 mapping = sort_nested(mapping)
                 if mapping in mappings:
@@ -253,7 +258,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                 mappings.append(mapping) 
         return mappings
 
-    def distribute_neis(mapping):
+    def distribute_neis(mapping, n_atoms_in_bead_min=2):
         n = len(mapping)
         mapping = [set(ns) for ns in mapping]
         mappings = [mapping]
@@ -266,18 +271,55 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                     overlap = s1.intersection(s2)
                     if overlap:
                         new_bead_1 = s1 - overlap
-                        if len(new_bead_1) > 1:
+                        if len(new_bead_1) >= n_atoms_in_bead_min:
                             new_mapping_1 = mapping.copy()
                             new_mapping_1[i] = new_bead_1
                             new_mappings.append(new_mapping_1)
                         new_bead_2 = s2 - overlap
-                        if len(new_bead_2) > 1:
+                        if len(new_bead_2) >= n_atoms_in_bead_min:
                             new_mapping_2 = mapping.copy()
                             new_mapping_2[j] = new_bead_2
                             new_mappings.append(new_mapping_2)
                     else:
                         new_mappings.append(mapping)
                 mappings = new_mappings
+        return mappings
+
+    def find_anchors_from_degree(fragment, atoms):
+        """Find anchors based on the degree of the atoms in the fragment."""
+        degrees = [atoms[a].GetDegree() for a in fragment]
+        anchors = [a for a, deg in zip(fragment, degrees) if deg > 1]
+        combos = [
+            combo
+            for r in range(2, len(anchors) + 1)
+            for combo in itertools.combinations(anchors, r)
+        ]
+        return combos
+
+    def find_mappings_from_degree(anchors_combs, fragment):
+        """Find mappings based on the degree of the atoms in the fragment."""
+        for anchors in anchors_combs:
+            mapping = [[int(i)] + ha_neis[int(i)] for i in anchors]
+            no_mapping = []
+            mapping_flat = flat_set(mapping)
+            all_atoms_are_covered = set(fragment).issubset(mapping_flat)
+            if not all_atoms_are_covered:
+                continue
+            n = len(mapping)
+            for i in range(n):
+                bead = mapping[i]
+                anchor = anchors[i]
+                new_bead = []
+                for a in bead:
+                    if a in anchors and a != anchor:
+                        continue
+                    new_bead.append(a)
+                if len(new_bead) >= 2:
+                    no_mapping.append(new_bead) 
+                    continue
+                break
+            if no_mapping:
+                mappings.append(no_mapping)
         return mappings
 
     def filter_out_non_symmetrizable_mappings(mappings, ring):
@@ -302,14 +344,18 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     ha_neis = [[n for n in nei if n in fragment] for nei in frag_neis] # only consider neighbors in the fragment, since we will map each fragment separately and then merge the mappings.
     fragment_mappings = []
     min_fragment_beads, max_fragment_beads = get_min_max_beads(fragment, atoms)
-    rings_to_symmetrize = [initial_rings[i] for i in CFG.symmetrize_rings]
+    rings_to_symmetrize = [initial_rings[i] for i in CFG.symmetrize_rings] if CFG.symmetrize_rings else []
     for nbeads in range(min_fragment_beads, max_fragment_beads + 1):
         logger.info(f"Finding combinations for fragment {fragment} with {nbeads} beads...")
-        combs = find_anchors(fragment, bonds, nbeads, dtype=dtype)
-        mappings = find_no_overlap_mappings(combs, fragment)
+        anchors = find_anchors(fragment, bonds, nbeads, dtype=dtype)
+        mappings = find_no_overlap_mappings(anchors, fragment)
         for ring in rings_to_symmetrize:
             mappings = filter_out_non_symmetrizable_mappings(mappings, ring)
         fragment_mappings.extend(mappings)
+    if not fragment_mappings:
+        logger.warning(f"No mappings found for fragment {fragment}. Trying to find anchors based on degree...")
+        anchors = find_anchors_from_degree(fragment, atoms)
+        fragment_mappings = find_mappings_from_degree(anchors, fragment)
     return fragment_mappings
 
 
@@ -452,7 +498,8 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
     # # DEBUG
-    # print(fragments)
+    # fragments = [fragments[2]]
+    print(fragments)
     # print(frag_is_symmetric)
     # alist = [0, 1, 2, 3, 4, 5, 6]
     # alist = [0, 1, 2, 3, 4, 6]

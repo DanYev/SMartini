@@ -15,22 +15,23 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "smartini"
-version = "0.0.0"
+version = "0.2"
 packages = [
-  { include = "smartini", from = "package" }
+  { include = "smartini" }
 ]
 exclude = [
-  "*/tests/"
+  "*/tests/",
+  "*/cgmd_params/"
 ]
 include = [
-  {path = "package/smartini/optimization_cy.pyx", format = "wheel"},
-  {path = "package/smartini/*.so", format = "wheel"},
+  {path = "smartini/optimization_cy.pyx", format = "wheel"},
+  {path = "smartini/ligpar_cy.pyx", format = "wheel"},
+  {path = "smartini/*.so", format = "wheel"},
 ]
-description = "Automated ligand parametrization for Martini 3 Force Field"
+description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: Linux",
-  "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Cython",
 ]
@@ -111,7 +112,8 @@ exclude_lines = [
     "pytest.mark.skip"
 ]
 omit = [
-  "smartini/tests/*"
+  "tests/*",
+  "cgmd_params/*"
 ]
 show_missing = true
 fail_under = 0 # coverage not working
@@ -123,4 +125,4 @@ profile = "black"
 # Pytest options
 [tool.pytest.ini_options]
 xfail_strict = true
-testpaths = "smartini/tests"
+testpaths = "tests"

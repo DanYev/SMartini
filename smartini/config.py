@@ -21,23 +21,23 @@ class SMConfig:
     # ============================================================================
     # Identity, coarse graining and partitioning settings
     # ============================================================================
-    molname: str = "HEM"
+    molname: str = "UNK"
     smiles: Optional[str] = None
     specify_beads: Optional[list[list[int]]] = None
     n_beads: Optional[int] = None 
     use_vsites: bool = False
-    symmetrize_rings: list[int] = None # list of which rings to symmetrize (from info.txt)
+    symmetrize_rings: Optional[list[int]] = None # list of which rings to symmetrize (from info.txt)
     keep_rings_together: bool = True
     max_combs_merged: int = 1000
     max_ring_len: int = 12  # Large rings are usually not aromatic and can be broken up
     max_mappings_to_keep: int = 500  # Keep top mappings to avoid combinatorial explosion
-    max_bead_size: int = 4
+    max_bead_size: int = 5
     max_ring_bead_size: int = 3
 
     # ============================================================================
     # Working folders
     # ============================================================================
-    systems_dir: Path = Path("examples")
+    systems_dir: Path = Path("systems")
     wdir: Path = systems_dir / molname
     mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
@@ -138,7 +138,15 @@ def _refresh_paths(cfg: SMConfig) -> SMConfig:
 
 def load_config() -> SMConfig:
     cfg = SMConfig()
+    # Override molname from environment variable if set (before resolving
+    # config path so the correct molecule directory is used).
+    if env_molname := os.environ.get("SM_MOLNAME"):
+        cfg.molname = env_molname
     cfg = _apply_overrides(cfg, _load_overrides(_resolve_config_path(cfg)))
+    # A second override in case the YAML did not set molname (or the file
+    # was missing) and SM_MOLNAME was provided.
+    if env_molname := os.environ.get("SM_MOLNAME"):
+        cfg.molname = env_molname
     cfg = _refresh_paths(cfg)
     return cfg
 

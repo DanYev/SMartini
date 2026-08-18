@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import pickle
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
@@ -46,8 +47,8 @@ smartini.setup_logging(level=logging.INFO)
 # ---------------------------------------------------------------------------
 SYSTEMS_DIR = Path("protein_systems").resolve()
 OUTPUT_DIR = Path("analysis").resolve()
-DEFAULT_SYSNAME = "1TQN"
-DEFAULT_LIGAND_RESNAME = "HEM"
+DEFAULT_SYSNAME = "KDA"
+DEFAULT_LIGAND_RESNAME = "ANP"
 
 # Contact cutoff (nm) – same for CG and AA since both are at bead/residue-COG level
 CONTACT_CUTOFF = 0.8
@@ -408,7 +409,16 @@ def analyze_system(
     ]:
         if itp_path.exists():
             mapping, bead_types = _parse_itp(itp_path)
-            lig_bead_names = [f"{bt[0]}{i + 1:02d}" for i, bt in enumerate(bead_types)]
+            # Use full bead type names from ITP; deduplicate with suffix
+            counts = Counter(bead_types)
+            seen: dict[str, int] = {}
+            lig_bead_names = []
+            for bt in bead_types:
+                if counts[bt] > 1:
+                    seen[bt] = seen.get(bt, 0) + 1
+                    lig_bead_names.append(f"{bt}#{seen[bt]}")
+                else:
+                    lig_bead_names.append(bt)
             logger.info("Parsed ITP: %d beads from %s", len(mapping), itp_path)
             break
     if lig_bead_names is None:
@@ -791,6 +801,7 @@ if __name__ == "__main__":
             inset_freq_cg=freq_cg,
             inset_freq_aa=freq_aa,
             png_name=f"{args.sysname}_Q_vs_time.png",
+            ylim=(0, 1.05)
         )
 
     logger.info("Done.")
