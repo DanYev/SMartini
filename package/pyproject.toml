@@ -24,8 +24,8 @@ exclude = [
   "*/cgmd_params/"
 ]
 include = [
-  {path = "package/optimization_cy.pyx", format = "wheel"},
-  {path = "package/*.so", format = "wheel"},
+  {path = "optimization_cy.pyx", format = "wheel"},
+  {path = "*.so", format = "wheel"},
 ]
 description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
@@ -34,7 +34,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Cython",
 ]
-readme = "README.md"
+readme = "../README.md"
 homepage = "https://github.com/DanYev/SMartini"
 build = "setup.py"
 
@@ -111,7 +111,7 @@ exclude_lines = [
     "pytest.mark.skip"
 ]
 omit = [
-  "smartini/tests/*"
+  "tests/*"
 ]
 show_missing = true
 fail_under = 0 # coverage not working
@@ -123,4 +123,4 @@ profile = "black"
 # Pytest options
 [tool.pytest.ini_options]
 xfail_strict = true
-testpaths = "smartini/tests"
+testpaths = "tests"

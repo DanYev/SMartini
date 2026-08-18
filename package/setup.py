@@ -13,14 +13,14 @@ def build(setup_kwargs: dict) -> None:
     ext = [
         Extension(
             name="smartini.optimization_cy",
-            sources=["package/optimization_cy.pyx"],
+            sources=["optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
             name="smartini.ligpar_cy",
-            sources=["package/ligpar_cy.pyx"],
+            sources=["ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
@@ -40,14 +40,14 @@ def _make_extensions():
     return [
         Extension(
             name="smartini.optimization_cy",
-            sources=["package/optimization_cy.pyx"],
+            sources=["optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
             name="smartini.ligpar_cy",
-            sources=["package/ligpar_cy.pyx"],
+            sources=["ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
@@ -66,8 +66,8 @@ if __name__ == "__main__":
     setup(
         name="smartini",
         version="0.2",
-        packages=find_packages(where="package"),
-        package_dir={"": "package"},
+        packages=find_packages(where="."),
+        package_dir={"": "."},
         ext_modules=cythonize(
             _make_extensions(),
             compiler_directives={"language_level": "3"},
