@@ -47,7 +47,7 @@ def process_ligand():
     logger.info("Reading ligand file: %s", input_file)
     ligand = Molecule.from_file(str(input_file))
     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
-    forcefield = app.ForceField("amber19-all.xml", "amber19/opc.xml")
+    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
     # Ligand FF
     forcefield.registerTemplateGenerator(smirnoff.generator)
     ff = ForceField("openff-2.1.0.offxml")
@@ -57,9 +57,9 @@ def process_ligand():
     model = app.Modeller(ligand_topology, ligand_positions)
     logger.info("Adding solvent and ions")
     model.addSolvent(forcefield, 
-        model='opc', 
+        model='tip3p', 
         boxShape='dodecahedron', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.2 * unit.nanometer,
+        padding=1.5 * unit.nanometer,
         ionicStrength=0.0 * unit.molar,
         positiveIon='Na+',
         negativeIon='Cl-')    
@@ -200,6 +200,6 @@ def _get_reporters(append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    process_ligand()
-    md_npt()
+    # process_ligand()
+    # md_npt()
     trjconv()
