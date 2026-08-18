@@ -104,20 +104,26 @@ def split_into_fragments(molecule):
         rings = molecule.GetRingInfo().AtomRings()
         rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
         n_rings = len(rings)
-        fused_rings = []
+        fused_rings = [ring for ring in rings]
         overlaps = []
-        for r1 in rings:
-            for r2 in rings:
+        n_rings = len(rings)
+        for i in range(n_rings):
+            for j in range(i + 1, n_rings):
+                r1 = rings[i]
+                r2 = rings[j]
                 if r1 == r2:
                     continue
                 overlap = r1.intersection(r2)
                 if overlap:
-                    rings.append(r1.union(r2))
-                    rings.remove(r1)
-                    rings.remove(r2)
+                    fused_rings.remove(r1)
+                    fused_rings.remove(r2)
+                    fused_rings.append(r1.union(r2))
                     overlaps.append(overlap)
-        rings = sort_nested(rings)
+        print(fused_rings)
+        print(overlaps)
+        rings = sort_nested(fused_rings)
         overlaps = sort_nested(overlaps)
+        exit()
         return rings, overlaps
 
     molecule = Chem.RemoveHs(molecule)
@@ -216,7 +222,7 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                 min_beads += 1
             max_beads = n_atoms // 2 
             return min_beads, max_beads
-        min_beads = n_atoms // 3
+        min_beads = n_atoms // 4
         if min_beads == 0:
             min_beads = 1
         # if n_atoms % 4 != 0:
