@@ -119,11 +119,8 @@ def split_into_fragments(molecule):
                     fused_rings.remove(r2)
                     fused_rings.append(r1.union(r2))
                     overlaps.append(overlap)
-        print(fused_rings)
-        print(overlaps)
         rings = sort_nested(fused_rings)
         overlaps = sort_nested(overlaps)
-        exit()
         return rings, overlaps
 
     molecule = Chem.RemoveHs(molecule)
