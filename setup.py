@@ -12,15 +12,15 @@ def build(setup_kwargs: dict) -> None:
     # "-fopenmp" or adjust for your compiler toolchain.
     ext = [
         Extension(
-            name="optimization_cy",
-            sources=["optimization_cy.pyx"],
+            name="smartini.optimization_cy",
+            sources=["smartini/optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
-            name="ligpar_cy",
-            sources=["ligpar_cy.pyx"],
+            name="smartini.ligpar_cy",
+            sources=["smartini/ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
@@ -39,15 +39,15 @@ def _make_extensions():
     """Extension list shared by Poetry hook and manual setuptools builds."""
     return [
         Extension(
-            name="optimization_cy",
-            sources=["optimization_cy.pyx"],
+            name="smartini.optimization_cy",
+            sources=["smartini/optimization_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
         ),
         Extension(
-            name="ligpar_cy",
-            sources=["ligpar_cy.pyx"],
+            name="smartini.ligpar_cy",
+            sources=["smartini/ligpar_cy.pyx"],
             include_dirs=[numpy.get_include()],
             extra_compile_args=["-O3", "-ffast-math", "-ftree-vectorize", "-fopenmp"],
             extra_link_args=["-fopenmp"],
@@ -66,8 +66,8 @@ if __name__ == "__main__":
     setup(
         name="smartini",
         version="0.2",
-        packages=find_packages(where="."),
-        package_dir={"": "."},
+        packages=find_packages(where="smartini"),
+        package_dir={"": "smartini"},
         ext_modules=cythonize(
             _make_extensions(),
             compiler_directives={"language_level": "3"},

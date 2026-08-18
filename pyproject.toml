@@ -17,15 +17,15 @@ build-backend = "poetry.core.masonry.api"
 name = "smartini"
 version = "0.2"
 packages = [
-  { include = "." }
+  { include = "package" }
 ]
 exclude = [
   "*/tests/",
   "*/cgmd_params/"
 ]
 include = [
-  {path = "optimization_cy.pyx", format = "wheel"},
-  {path = "*.so", format = "wheel"},
+  {path = "package/optimization_cy.pyx", format = "wheel"},
+  {path = "package/*.so", format = "wheel"},
 ]
 description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
@@ -34,7 +34,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Cython",
 ]
-readme = "../README.md"
+readme = "README.md"
 homepage = "https://github.com/DanYev/SMartini"
 build = "setup.py"
 
@@ -100,7 +100,7 @@ line-length = 99
 # Coverage settings
 [tool.coverage.run]
 branch = true
-source = ["."]
+source = ["package"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -111,7 +111,8 @@ exclude_lines = [
     "pytest.mark.skip"
 ]
 omit = [
-  "tests/*"
+  "tests/*",
+  "cgmd_params/*"
 ]
 show_missing = true
 fail_under = 0 # coverage not working
