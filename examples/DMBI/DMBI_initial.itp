@@ -11,15 +11,15 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   TN4   1   DMBI   N01    1    0.0  36.0   ; N1 C1          ; CN             ;          
-2   TN4   1   DMBI   N02    2    0.0  36.0   ; N2 C2          ; CN             ;          
-3   SN1   1   DMBI   N03    3    0.0  54.0   ; N3 C3 C4       ; CNC            ;          
-4   SC5   1   DMBI   C04    4    0.0  54.0   ; C5 C6 C7       ; CC=C           ;          
-5   TC5   1   DMBI   C05    5    0.0  36.0   ; C8 C9          ; C=C            ;          
-6   TC5   1   DMBI   C06    6    0.0  36.0   ; C10 C11        ; C=C            ;          
-7   TC5   1   DMBI   C07    7    0.0  36.0   ; C12 C13        ; C=C            ;          
-8   TC5   1   DMBI   C08    8    0.0  36.0   ; C14 C15        ; C=C            ;          
-9   TC5   1   DMBI   C09    9    0.0  36.0   ; C16 C17        ; C=C            ;          
+1   TN4   1   DMBI   N01    1    0.0  36.0   ; N1, C5         ; CN             ;          
+2   TN4   1   DMBI   N02    2    0.0  36.0   ; N2, C6         ; CN             ;          
+3   SN1   1   DMBI   N03    3    0.0  54.0   ; N3, C16, C17   ; CNC            ;          
+4   SC5   1   DMBI   C04    4    0.0  54.0   ; C1, C4, C10    ; CC=C           ;          
+5   TC5   1   DMBI   C05    5    0.0  36.0   ; C2, C7         ; C=C            ;          
+6   TC5   1   DMBI   C06    6    0.0  36.0   ; C3, C8         ; C=C            ;          
+7   TC5   1   DMBI   C07    7    0.0  36.0   ; C9, C14        ; C=C            ;          
+8   TC5   1   DMBI   C08    8    0.0  36.0   ; C11, C12       ; C=C            ;          
+9   TC5   1   DMBI   C09    9    0.0  36.0   ; C13, C15       ; C=C            ;          
 
 
 [bonds]

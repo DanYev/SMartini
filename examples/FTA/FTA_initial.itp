@@ -11,17 +11,17 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   TN5d  1   FTA    N01    1    0.0  36.0   ; N1 C1          ; CN             ;          
-2   TC5   1   FTA    C02    2    0.0  36.0   ; C2 C3          ; C=C            ;          
-3   TC5   1   FTA    C03    3    0.0  36.0   ; C4 C5          ; C=C            ;          
-4   TC5   1   FTA    C04    4    0.0  36.0   ; C6 C7          ; C=C            ;          
-5   TC5   1   FTA    C05    5    0.0  36.0   ; C8 C9          ; C=C            ;          
-6   TC5   1   FTA    C06    6    0.0  36.0   ; C10 C11        ; C=C            ;          
-7   TN5d  1   FTA    N07    7    0.0  36.0   ; C12 N2         ; CN             ;          
-8   SC2   1   FTA    C08    8    0.0  54.0   ; C13 C14 C15    ; CC=C           ;          
-9   TN2   1   FTA    N09    9    0.0  36.0   ; C16 N3         ; C#N            ;          
-10  TP2d  1   FTA    P10    10   0.0  36.0   ; N4 N5          ; NN             ;          
-11  TP2d  1   FTA    P11    11   0.0  36.0   ; N6 N7          ; NN             ;          
+1   TN5d  1   FTA    N01    1    0.0  36.0   ; N1, C7         ; CN             ;          
+2   TC5   1   FTA    C02    2    0.0  36.0   ; C1, C6         ; C=C            ;          
+3   TC5   1   FTA    C03    3    0.0  36.0   ; C2, C3         ; C=C            ;          
+4   TC5   1   FTA    C04    4    0.0  36.0   ; C4, C5         ; C=C            ;          
+5   TC5   1   FTA    C05    5    0.0  36.0   ; C8, C9         ; C=C            ;          
+6   TC5   1   FTA    C06    6    0.0  36.0   ; C10, C11       ; C=C            ;          
+7   TN5d  1   FTA    N07    7    0.0  36.0   ; C12, N2        ; CN             ;          
+8   SC2   1   FTA    C08    8    0.0  54.0   ; C13, C14, C16  ; CC=C           ;          
+9   TN2   1   FTA    N09    9    0.0  36.0   ; C15, N3        ; C#N            ;          
+10  TP2d  1   FTA    P10    10   0.0  36.0   ; N4, N5         ; NN             ;          
+11  TP2d  1   FTA    P11    11   0.0  36.0   ; N6, N7         ; NN             ;          
 
 
 [bonds]

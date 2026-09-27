@@ -136,7 +136,7 @@ class Topology:
             if dist > 0.54:
                 self.constraints.remove(bond)
             if dist < 0.134:
-                raise NameError("Bond too short")
+                raise NameError(f"Bond {bond} too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 

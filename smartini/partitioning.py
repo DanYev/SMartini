@@ -99,26 +99,59 @@ def split_into_fragments(molecule):
         ``fragments`` are heavy-atom index lists used by the mapper.
     """
 
+    # def fuse_rings(molecule):
+    #     # Get ring atoms (systems of joined rings)
+    #     rings = molecule.GetRingInfo().AtomRings()
+    #     rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
+    #     n_rings = len(rings)
+    #     fused_rings = [ring for ring in rings]
+    #     overlaps = []
+    #     n_rings = len(rings)
+    #     for i in range(n_rings):
+    #         for j in range(i + 1, n_rings):
+    #             r1 = rings[i]
+    #             r2 = rings[j]
+    #             if r1 == r2:
+    #                 continue
+    #             overlap = r1.intersection(r2)
+    #             if overlap:
+    #                 fused_rings.remove(r1)
+    #                 fused_rings.remove(r2)
+    #                 fused_rings.append(r1.union(r2))
+    #                 overlaps.append(overlap)
+    #     rings = sort_nested(fused_rings)
+    #     overlaps = sort_nested(overlaps)
+    #     return rings, overlaps
+
     def fuse_rings(molecule):
-        # Get ring atoms (systems of joined rings)
-        rings = molecule.GetRingInfo().AtomRings()
-        rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
-        n_rings = len(rings)
-        fused_rings = [ring for ring in rings]
+        rings = [
+            set(ring) for ring in molecule.GetRingInfo().AtomRings() 
+            if len(ring) < CFG.max_ring_len
+        ]
         overlaps = []
-        n_rings = len(rings)
-        for i in range(n_rings):
-            for j in range(i + 1, n_rings):
-                r1 = rings[i]
-                r2 = rings[j]
-                if r1 == r2:
-                    continue
-                overlap = r1.intersection(r2)
+        for i in range(len(rings)):
+            for j in range(i + 1, len(rings)):
+                overlap = rings[i].intersection(rings[j])
                 if overlap:
-                    fused_rings.remove(r1)
-                    fused_rings.remove(r2)
-                    fused_rings.append(r1.union(r2))
                     overlaps.append(overlap)
+        # Transitive set merging
+        fused_rings = []
+        visited = [False] * len(rings)
+        for i in range(len(rings)):
+            if visited[i]:
+                continue
+            current_fused = set(rings[i])
+            visited[i] = True
+            # Grow the component transitively
+            queue = [rings[i]]
+            while queue:
+                curr_ring = queue.pop(0)
+                for j in range(len(rings)):
+                    if not visited[j] and curr_ring.intersection(rings[j]):
+                        visited[j] = True
+                        current_fused.update(rings[j])
+                        queue.append(rings[j])
+            fused_rings.append(current_fused)
         rings = sort_nested(fused_rings)
         overlaps = sort_nested(overlaps)
         return rings, overlaps
@@ -156,7 +189,8 @@ def split_into_fragments(molecule):
         for frag in linear_fragments:
             atom_neis = ha_neis[atom]
             if any(nei in frag for nei in atom_neis):
-                frag.append(atom)
+                if atom not in frag:
+                    frag.append(atom)
                 break
     # Add leftover atoms to existing fragments
     fragments = ring_fragments + linear_fragments
@@ -225,8 +259,8 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         # if n_atoms % 4 != 0:
         #     min_beads += 1
         max_beads = n_atoms // 2 + 1
-        print(min_beads)
-        print(max_beads)
+        # print(min_beads)
+        # print(max_beads)
         return min_beads, max_beads
 
     @timeit(level=logging.DEBUG)
@@ -299,8 +333,10 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
     def find_mappings_from_degree(anchors_combs, fragment):
         """Find mappings based on the degree of the atoms in the fragment."""
         for anchors in anchors_combs:
+            if len(anchors) > len(fragment) // 2:
+                continue
             mapping = [[int(i)] + ha_neis[int(i)] for i in anchors]
-            no_mapping = []
+            no_mapping = [] # NO OVERLAP
             mapping_flat = flat_set(mapping)
             all_atoms_are_covered = set(fragment).issubset(mapping_flat)
             if not all_atoms_are_covered:
@@ -312,6 +348,8 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
                 new_bead = []
                 for a in bead:
                     if a in anchors and a != anchor:
+                        continue
+                    if a in flat_set(no_mapping):
                         continue
                     new_bead.append(a)
                 if len(new_bead) >= 2:
@@ -356,6 +394,9 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         logger.warning(f"No mappings found for fragment {fragment}. Trying to find anchors based on degree...")
         anchors = find_anchors_from_degree(fragment, atoms)
         fragment_mappings = find_mappings_from_degree(anchors, fragment)
+    for f in fragment_mappings:
+        print(f)
+    # exit()
     return fragment_mappings
 
 
@@ -490,6 +531,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     atoms, bonds = _get_ha_graph(molecule)
     logger.info("Splitting molecule into fragments...")
     fragments, top_ranks_list, fused_rings, shared_atoms, initial_rings = split_into_fragments(molecule)
+    print(fragments)
     frag_is_symmetric = [len(set(ranks)) < len(ranks) for ranks in top_ranks_list]
     logger.info(f"Total Number of Fragments: {len(fragments)}, Number of Rings: {len(fused_rings)}")
     bonds = _remove_shared_atoms_from_bonds(bonds, shared_atoms)
@@ -499,7 +541,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     # # DEBUG
     # fragments = [fragments[2]]
-    print(fragments)
+    # print(fragments)
     # print(frag_is_symmetric)
     # alist = [0, 1, 2, 3, 4, 5, 6]
     # alist = [0, 1, 2, 3, 4, 6]
