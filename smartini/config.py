@@ -37,7 +37,7 @@ class SMConfig:
     # ============================================================================
     # Working folders
     # ============================================================================
-    systems_dir: Path = Path("systems")
+    systems_dir: Path = Path("examples")
     wdir: Path = systems_dir / molname
     mol_dir: Path = wdir
     aa_sysname: str = "aa_md"
