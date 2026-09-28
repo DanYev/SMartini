@@ -1,11 +1,17 @@
 """Runtime configuration for the ligand fitting pipeline.
 
+Configuration is layered, lowest priority first:
+1. Hard-coded dataclass defaults (:class:`SMConfig`).
+2. Package defaults from ``<parent_folder>/config.yaml`` (next to the
+   ``smartini`` folder) - override the location with ``SM_BASE_CONFIG``.
+3. Optional per-molecule overrides from
+   ``<systems_dir>/<MOLNAME>/config.yml`` (or ``config.yaml``) - override the
+   location with ``SM_CONFIG_YML``.
+
 Expected inputs by default:
 - Required SDF: <systems_dir>/<MOLNAME>/<MOLNAME>.sdf
-- Optional config overrides: <systems_dir>/<MOLNAME>/config.yml (or config.yaml)
 
-Set SM_MOLNAME to choose the molecule name and optionally set SM_CONFIG_YML
-to point to a specific YAML file.
+Set ``SM_MOLNAME`` to choose the molecule name.
 """
 
 from __future__ import annotations
@@ -89,6 +95,18 @@ class SMConfig:
     alpha_min: float = 0.02
 
 
+def _base_config_path() -> Path:
+    """Return the package-level default config in the project's parent folder.
+
+    This is ``<parent_folder>/config.yaml`` (the parent of the ``smartini``
+    package). Override with the ``SM_BASE_CONFIG`` environment variable.
+    """
+    env_path = os.environ.get("SM_BASE_CONFIG")
+    if env_path:
+        return Path(env_path)
+    return Path(__file__).resolve().parent.parent / "config.yaml"
+
+
 def _default_config_path(base_cfg: SMConfig) -> Path:
     molname = os.environ.get("SM_MOLNAME", base_cfg.molname)
     return base_cfg.systems_dir / molname / "config.yml"
@@ -138,15 +156,25 @@ def _refresh_paths(cfg: SMConfig) -> SMConfig:
 
 def load_config() -> SMConfig:
     cfg = SMConfig()
-    # Override molname from environment variable if set (before resolving
-    # config path so the correct molecule directory is used).
-    if env_molname := os.environ.get("SM_MOLNAME"):
+
+    # 1. Package defaults from config.yaml in the parent folder (on top of the
+    #    dataclass defaults).
+    cfg = _apply_overrides(cfg, _load_overrides(_base_config_path()))
+
+    # 2. Override molname from the environment variable if set (before resolving
+    #    the molecule config path so the correct molecule directory is used).
+    env_molname = os.environ.get("SM_MOLNAME")
+    if env_molname:
         cfg.molname = env_molname
+
+    # 3. Optional per-molecule overrides on top of the package defaults.
     cfg = _apply_overrides(cfg, _load_overrides(_resolve_config_path(cfg)))
-    # A second override in case the YAML did not set molname (or the file
-    # was missing) and SM_MOLNAME was provided.
-    if env_molname := os.environ.get("SM_MOLNAME"):
+
+    # 4. Re-apply SM_MOLNAME in case a config file changed molname (or the
+    #    molecule YAML was missing) and SM_MOLNAME was provided.
+    if env_molname:
         cfg.molname = env_molname
+
     cfg = _refresh_paths(cfg)
     return cfg
 
