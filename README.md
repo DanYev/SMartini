@@ -3,11 +3,12 @@ SMartini
 
 ## What is SMartini?
 
-A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic simulation data.
+A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic structure or SMILES string.
+
+SMartini runs an AA→CG fitting pipeline: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms from AA simulations, CG simulation, and parameter updates based on CG-vs-AA distribution mismatch.
 
 The determination of non-bonded terms (bead types) is based on AutoMartini M3. However, CG topology generation is now much faster: initial topologies are generated in seconds, even for larger molecules such as chlorophyll (~64 heavy atoms). Bonded terms are determined from atomistic reference MD simulations.
 
-SMartini runs an AA→CG fitting pipeline: initial mapping, atomistic sampling, Boltzmann inversion of bonded terms from AA simulations, CG simulation, and parameter updates based on CG-vs-AA distribution mismatch.
 
 ## Installation
 ```bash
@@ -23,7 +24,7 @@ A directory `<CFG.sysdir>/<MOLNAME>` is expected, containing either:
 - an `.sdf` file (if starting from a structure), or
 - a `config.yml` file with `smiles: <SMILES>`.
 
-The default configuration file is `config.py`, and parameters can optionally be overridden in `config.yml`. Examples are available in `examples`.
+The default configuration file is `config.yaml`, and parameters can optionally be overridden with additional .yaml files. Examples are available in `examples`.
 
 Run:
 
