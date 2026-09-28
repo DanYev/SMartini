@@ -2,17 +2,33 @@ name: smartini
 channels:
  - conda-forge
 dependencies:
+ # --- Python & build ---
  - python=3.12
+ - cython            # builds the .pyx extensions (optimization_cy, ligpar_cy)
+
+ # --- Core MD / chemistry ---
  - openmm
  - openmmforcefields
  - openff-toolkit
  - openff-interchange
- - numpy
  - rdkit
  - mdanalysis
+ - pdbfixer          # scripts/aa_pro_lig.py
+
+ # --- Numerics / analysis / plotting ---
+ - numpy
+ - matplotlib        # smartini/plots.py (imported by 3_boltz_inv.py, 5_cgmd_upd.py)
+ - scikit-learn      # smartini/lpmath.py (sklearn.mixture.GaussianMixture)
+#  - mdtraj            # scripts/analysis.py, scripts/pro_lig_analysis.py
+
+ # --- IO / web ---
  - requests
  - pyyaml
  - lxml
  - beautifulsoup4
-#  - matplotlib
-#  - scikit-learn
+
+ # --- Dev / test ---
+ - pytest            # smartini/tests/
+
+# NOTE: scripts/cg_pro_lig.py imports `reforge`, which is not published on
+# conda-forge. Install it separately or remove/ignore that script.
