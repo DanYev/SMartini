@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import requests
 from collections import defaultdict
+from copy import deepcopy
 from itertools import chain
 from bs4 import BeautifulSoup
 from rdkit import Chem, RDConfig
@@ -214,9 +215,10 @@ class CG_molecule:
                     logger.info("Skipping mapping because it does not contain all specified atoms in the same bead")
                     continue
 
-            # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
+            # IF ATOM OF A BEAD IS IN A RING, ADD ALL ATOMS OF THIS BEAD TO THE RING ATOMS
             # for connectivity purposes
-            for ring in self.ring_atoms:
+            extended_ring_atoms = deepcopy(self.ring_atoms)
+            for ring in extended_ring_atoms:
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():
                         if atom_idx in atom_indices:
@@ -225,7 +227,7 @@ class CG_molecule:
                                 if at not in ring:
                                     ring.append(at)
             ringbeads = []
-            for ring in self.ring_atoms:
+            for ring in extended_ring_atoms:
                 new_ring = []
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():

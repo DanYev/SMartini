@@ -210,7 +210,7 @@ def split_into_fragments(molecule):
     frag_ranks_list = [[ranks[a] for a in frag] for frag in fragments]
 
     initial_rings = molecule.GetRingInfo().AtomRings()
-    print(f"Initial rings (before fusion): {initial_rings}")
+    assert_rings_fused_correctly(rings, initial_rings)
 
     return fragments, frag_ranks_list, rings, shared_atoms, initial_rings
 
@@ -259,8 +259,6 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         # if n_atoms % 4 != 0:
         #     min_beads += 1
         max_beads = n_atoms // 2 + 1
-        # print(min_beads)
-        # print(max_beads)
         return min_beads, max_beads
 
     @timeit(level=logging.DEBUG)
@@ -394,9 +392,6 @@ def map_fragment(fragment, atoms, bonds, initial_rings, dtype=np.int32):
         logger.warning(f"No mappings found for fragment {fragment}. Trying to find anchors based on degree...")
         anchors = find_anchors_from_degree(fragment, atoms)
         fragment_mappings = find_mappings_from_degree(anchors, fragment)
-    for f in fragment_mappings:
-        print(f)
-    # exit()
     return fragment_mappings
 
 
@@ -531,7 +526,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     atoms, bonds = _get_ha_graph(molecule)
     logger.info("Splitting molecule into fragments...")
     fragments, top_ranks_list, fused_rings, shared_atoms, initial_rings = split_into_fragments(molecule)
-    print(fragments)
     frag_is_symmetric = [len(set(ranks)) < len(ranks) for ranks in top_ranks_list]
     logger.info(f"Total Number of Fragments: {len(fragments)}, Number of Rings: {len(fused_rings)}")
     bonds = _remove_shared_atoms_from_bonds(bonds, shared_atoms)
@@ -541,7 +535,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
 
     # # DEBUG
     # fragments = [fragments[2]]
-    # print(fragments)
     # print(frag_is_symmetric)
     # alist = [0, 1, 2, 3, 4, 5, 6]
     # alist = [0, 1, 2, 3, 4, 6]
@@ -562,7 +555,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     merged_frag = fragments.pop(0)
     for x in range(len(fragments)):
         other_frag, other_index, overlaps = find_overlaps(merged_frag, fragments)
-        print(f"Overlap of {overlaps} between fragments {merged_frag} and {other_frag}")
+        logger.info(f"Overlap of {overlaps} between fragments {merged_frag} and {other_frag}")
         mappings_to_add = all_mappings.pop(other_index)
         merged_frag += other_frag
         new_mappings = []
@@ -738,7 +731,7 @@ def filter_mappings(
         return mappings
 
     if keep_rings_together:
-        print(f"Keeping rings together in the mapping...")
+        (f"Keeping rings together in the mapping...")
         # Prefer keeping rings together (no mixing ring/non-ring)
         tmp_list = []
         for mapping in mappings:
@@ -981,3 +974,12 @@ def invert_mapping_dictionary(mapping_dict):
                 raise ValueError(f"Atom {atom_idx} appears in multiple beads")
             atom_partitioning[atom_idx] = bead_idx
     return dict(sorted(atom_partitioning.items()))
+
+#############################################################################
+### ASSERTS ###
+#############################################################################
+
+def assert_rings_fused_correctly(rings, initial_rings):
+    logger.info(f"Initial rings (before fusion): {initial_rings}")
+    logger.info(f"Fused rings: {rings}")
+    return None

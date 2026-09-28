@@ -46,7 +46,6 @@ nruns=1
 
 python 0_preprocess_ligand.py
 python 1_gen_cg_topo.py
-exit 1
 # python 2_aa_md.py
 python 3_boltz_inv.py plot
 for i in $(seq 1 $nruns); do
