@@ -23,6 +23,7 @@ import warnings
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
+from typing import Any, Callable
 
 def get_logger(name="smartini"):
     """Get the configured logger instance.
@@ -48,7 +49,7 @@ def get_logger(name="smartini"):
 logger = get_logger()
 
 
-def timeit(*args, **kwargs):
+def timeit(*args, **kwargs) -> Callable[..., Any]:
     """Backwards-compatible timeit decorator"""
     # If called with no args, it's being used as @timeit
     if len(args) == 0:
@@ -104,7 +105,7 @@ def _timeit(level=logging.DEBUG, unit='s'):
     return decorator
 
 
-def memprofit(*args, **kwargs):
+def memprofit(*args, **kwargs) -> Callable[..., Any]:
     """Backwards-compatible memory profiling decorator"""
     # If called with no args, it's being used as @memprofit
     if len(args) == 0:

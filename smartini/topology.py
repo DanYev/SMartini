@@ -1,5 +1,6 @@
 import logging
 import math
+import re
 import numpy as np
 from rdkit import Chem
 from dataclasses import dataclass, field
@@ -29,6 +30,8 @@ class Topology:
     logp_origins: list = field(default_factory=list)
     mapping: list = field(default_factory=list)
     aa_mapping: list = field(default_factory=list)
+    # Atom-index strings per bead, consumed by the (optional) Bartender output.
+    atoms_in_smi_dict: dict = field(default_factory=dict)
     
     # Bonds data: list of [i, j, funct, dist, k]
     bonds: list = field(default_factory=list)
@@ -47,6 +50,9 @@ class Topology:
 
     # Exclusions data: list of [i, j] pairs
     exclusions: list = field(default_factory=list)
+    
+    # Parsing bookkeeping: de-duplicate exclusions while reading an ITP
+    _exclusions_seen: set = field(default_factory=set, repr=False)
     
     # Rigid dihedrals (for virtual sites)
     rigid_dihedrals: list = field(default_factory=list)
@@ -136,7 +142,7 @@ class Topology:
             if dist > 0.54:
                 self.constraints.remove(bond)
             if dist < 0.134:
-                raise NameError("Bond too short")
+                raise NameError(f"Bond {bond} too short")
 
         # If we have 4 bonds corrected in a ring, we can add a constraint between 
         # the two non-bonded beads in the ring with the shortest distance. 
@@ -157,7 +163,7 @@ class Topology:
                         if dist < min_dist:
                             min_dist = dist
                             min_pair = pair
-                if n_bonds == 4: 
+                if n_bonds == 4 and min_pair is not None: 
                     self.constraints.append([min_pair[0], min_pair[1], 1, min_dist, "ring_diagonal"])
         return 
         
@@ -477,7 +483,7 @@ class Topology:
                     anchors.append(furthest_bead)                
             return sorted(anchors)
 
-        def _make_vs3_fad_entry(site: int, i: int, j: int, k: int) -> dict:
+        def _make_vs3_fad_entry(site: int, i: int, j: int, k: int) -> list:
             """Create a `virtual_sites3` funct=3 (3fad) entry.
 
             Parameters are derived from the current `coords` so that the
@@ -542,6 +548,7 @@ class Topology:
                 logger.info(f"Added bond between {anchor} and {bead} in ring {ring}")
         
         # For now check if we have rings with 5+ beads 
+        anchors = []
         for ring in self.ringbeads:
             if len(ring) < 5 or len(ring) > 6:
                 continue
@@ -1245,7 +1252,7 @@ def read_itp(itp_file):
                 site = int(parts[0]) - 1
                 funct = int(parts[1])
                 atoms = [int(p) - 1 for p in parts[2:]]
-                entry = [site, funct, *atoms]
+                entry: list = [site, funct, *atoms]
                 if comment:
                     entry.append(comment)
                 topo.virtual_sites['virtual_sitesn'].append(entry)
@@ -1290,6 +1297,48 @@ def read_itp(itp_file):
 ###################################################################################
 ### OLD STUFF
 ###################################################################################
+
+def write_position_restraints(
+    atom_indices,
+    force_constant: str = "POSRES_FC",
+    funct: int = 1,
+    ifdef: str = "POSRES",
+    include_end_if: bool = True,
+):
+    """Return a position restraints section for the provided atom indices.
+
+    Parameters
+    ----------
+    atom_indices : iterable of int
+        Atom indices (1-based) to restrain.
+    force_constant : str
+        Force constant label written for x/y/z (default: POSRES_FC).
+    funct : int
+        Gromacs function type (default: 1).
+    ifdef : str
+        Preprocessor symbol used for conditional inclusion.
+    include_end_if : bool
+        Whether to append a matching #endif line.
+    """
+    if not atom_indices:
+        return ""
+
+    lines = [
+        "#ifndef POSRES_FC",
+        "#define POSRES_FC 1000.0",
+        "#endif",
+        "[ position_restraints ]",
+        f"#ifdef {ifdef}",
+    ]
+    for atom_index in atom_indices:
+        atom_id = int(atom_index)
+        lines.append(
+            f"{atom_id:5d} {funct:d} {force_constant} {force_constant} {force_constant}"
+        )
+    if include_end_if:
+        lines.append("#endif")
+    return "\n".join(lines) + "\n"
+
 
 def topout_noVS(header_write, atoms_write, bonds_write, angles_write, dihedrals_write, bead_coords, ring_atoms, cg_beads, 
     write_exclusions=True): ### AutoM3 ###
@@ -1531,7 +1580,7 @@ def topout_vs(header_write, atoms_write, bonds_write, angles_write, dihedrals_wr
                     if str(vs+1) in bond_line[:2]:
                         # memorizing atom bonded with VS = vs_bond
                         if str(vs+1) == bond_line[0] : vs_bond = bond_line[1] 
-                        if str(vs+1) == bond_line[1] : vs_bond = bond_line[0]
+                        else: vs_bond = bond_line[0]
 
                         #memorize VS bond count
                         if str(vs+1) not in bond_with_vs:

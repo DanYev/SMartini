@@ -11,33 +11,33 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   TC5   1   CLA    C01    1    0.0  36.0   ; C1 C2          ; C=C            ;          
-2   TC5   1   CLA    C02    2    0.0  36.0   ; C3 C4          ; C=C            ;          
-3   TC5   1   CLA    C03    3    0.0  36.0   ; C5 C6          ; C=C            ;          
-4   TC5   1   CLA    C04    4    0.0  36.0   ; C7 C8          ; C=C            ;          
-5   TN6a  1   CLA    N05    5    0.0  36.0   ; N1 C9          ; CN             ;          
-6   SC3   1   CLA    C06    6    0.0  54.0   ; C10 C11 C12    ; CCC            ;          
-7   TC3   1   CLA    C07    7    0.0  36.0   ; C13 C14        ; CC             ;          
-8   TN5a  1   CLA    N08    8    0.0  36.0   ; C15 O1         ; C=O            ;          
-9   SP2a  1   CLA    P09    9    0.0  54.0   ; O2 C16 C17     ; CCO            ;          
-10  TN6d  1   CLA    N10    10   0.0  36.0   ; N2 C18         ; CN             ;          
-11  SC5   1   CLA    C11    11   0.0  54.0   ; C19 C20 C21    ; CC=C           ;          
-12  TC4   1   CLA    C12    12   0.0  36.0   ; C22 C23        ; C=C            ;          
-13  TN6a  1   CLA    N13    13   0.0  36.0   ; N3 C24         ; CN             ;          
-14  SC4   1   CLA    C14    14   0.0  54.0   ; C25 C26 C27    ; CC=C           ;          
-15  TC3   1   CLA    C15    15   0.0  36.0   ; C28 C29        ; CC             ;          
-16  TN6d  1   CLA    N16    16   0.0  36.0   ; N4 C30         ; CN             ;          
-17  SC5   1   CLA    C17    17   0.0  54.0   ; C31 C32 C33    ; CC=C           ;          
-18  SN5a  1   CLA    N18    18   0.0  54.0   ; C34 O3 C35     ; CC=O           ;          
-19  TN5a  1   CLA    N19    19   0.0  36.0   ; C36 O4         ; C=O            ;          
-20  TP2a  1   CLA    P20    20   0.0  36.0   ; O5 C37         ; CO             ;          
-21  TC3   1   CLA    C21    21   0.0  36.0   ; C38 C39        ; CC             ;          
-22  SC3   1   CLA    C22    22   0.0  54.0   ; C40 C41 C42    ; CCC            ;          
-23  TC3   1   CLA    C23    23   0.0  36.0   ; C43 C44        ; CC             ;          
-24  SC3   1   CLA    C24    24   0.0  54.0   ; C45 C46 C47    ; CCC            ;          
-25  TC3   1   CLA    C25    25   0.0  36.0   ; C48 C49        ; CC             ;          
-26  SC3   1   CLA    C26    26   0.0  54.0   ; C50 C51 C52    ; CCC            ;          
-27  SC3   1   CLA    C27    27   0.0  54.0   ; C53 C54 C55    ; CCC            ;          
+1   TC5   1   CLA    C01    1    0.0  36.0   ; C1, C5         ; C=C            ;          
+2   TC5   1   CLA    C02    2    0.0  36.0   ; C2, C13        ; C=C            ;          
+3   TC5   1   CLA    C03    3    0.0  36.0   ; C3, C20        ; C=C            ;          
+4   TC5   1   CLA    C04    4    0.0  36.0   ; C4, C27        ; C=C            ;          
+5   TN6a  1   CLA    N05    5    0.0  36.0   ; N1, C8         ; CN             ;          
+6   SC3   1   CLA    C06    6    0.0  54.0   ; C6, C10, C11   ; CCC            ;          
+7   TC3   1   CLA    C07    7    0.0  36.0   ; C7, C9         ; CC             ;          
+8   TN5a  1   CLA    N08    8    0.0  36.0   ; C12, O1        ; C=O            ;          
+9   SP2a  1   CLA    P09    9    0.0  54.0   ; O2, C36, C37   ; CCO            ;          
+10  TN6d  1   CLA    N10    10   0.0  36.0   ; N2, C16        ; CN             ;          
+11  SC5   1   CLA    C11    11   0.0  54.0   ; C14, C15, C17  ; CC=C           ;          
+12  TC4   1   CLA    C12    12   0.0  36.0   ; C18, C19       ; C=C            ;          
+13  TN6a  1   CLA    N13    13   0.0  36.0   ; N3, C23        ; CN             ;          
+14  SC4   1   CLA    C14    14   0.0  54.0   ; C21, C22, C24  ; CC=C           ;          
+15  TC3   1   CLA    C15    15   0.0  36.0   ; C25, C26       ; CC             ;          
+16  TN6d  1   CLA    N16    16   0.0  36.0   ; N4, C30        ; CN             ;          
+17  SC5   1   CLA    C17    17   0.0  54.0   ; C28, C29, C31  ; CC=C           ;          
+18  SN5a  1   CLA    N18    18   0.0  54.0   ; C32, O3, C33   ; CC=O           ;          
+19  TN5a  1   CLA    N19    19   0.0  36.0   ; C34, O4        ; C=O            ;          
+20  TP2a  1   CLA    P20    20   0.0  36.0   ; O5, C35        ; CO             ;          
+21  TC3   1   CLA    C21    21   0.0  36.0   ; C38, C39       ; CC             ;          
+22  SC3   1   CLA    C22    22   0.0  54.0   ; C40, C41, C42  ; CCC            ;          
+23  TC3   1   CLA    C23    23   0.0  36.0   ; C43, C44       ; CC             ;          
+24  SC3   1   CLA    C24    24   0.0  54.0   ; C45, C46, C47  ; CCC            ;          
+25  TC3   1   CLA    C25    25   0.0  36.0   ; C48, C49       ; CC             ;          
+26  SC3   1   CLA    C26    26   0.0  54.0   ; C50, C51, C52  ; CCC            ;          
+27  SC3   1   CLA    C27    27   0.0  54.0   ; C53, C54, C55  ; CCC            ;          
 
 
 [bonds]

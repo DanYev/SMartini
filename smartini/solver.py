@@ -1,11 +1,14 @@
 import logging
 import math
 import os
+import random
 import sys
 import numpy as np
 import requests
 from collections import defaultdict
+from copy import deepcopy
 from itertools import chain
+from typing import Optional
 from bs4 import BeautifulSoup
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, ChemicalFeatures, rdMolDescriptors, rdchem
@@ -41,7 +44,7 @@ class CG_molecule:
 
     # Initialize feature factory for feature extraction
     _fdefName = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
-    _factory = ChemicalFeatures.BuildFeatureFactory(_fdefName)
+    _factory = ChemicalFeatures.BuildFeatureFactory(_fdefName)  # type: ignore[attr-defined]
 
     # NOTE: These helpers are static because they don't depend on instance state.
     # Keeping them on the class groups mapping logic in one place.
@@ -97,8 +100,6 @@ class CG_molecule:
         self.symmetrize_rings = symmetrize_rings
         self.forcepred = forcepred
         self.logp_file = os.path.join(os.path.dirname(__file__), logp_file_name)
-        self.bartender = bartender
-        self.bartenderfname = bartenderfname
         
         # Initialize state attributes
         self.ha_list = None
@@ -115,7 +116,6 @@ class CG_molecule:
         self.mapping = None
         self.bead_names = []
         self.bead_coords = []
-        self.bartender_out = None
         self.ga_graph = None
         self.aa_graph = None
         # Initialize topology early so it can be updated throughout
@@ -126,8 +126,8 @@ class CG_molecule:
         # INITIALIZE THE AA MOLECULE
         logger.info("Embedding the AA molecule + MMFF optimization")
         self.molecule = Chem.Mol(self.molecule)
-        AllChem.EmbedMolecule(self.molecule, randomSeed=1)
-        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')
+        AllChem.EmbedMolecule(self.molecule, randomSeed=1)  # type: ignore[attr-defined]
+        AllChem.MMFFOptimizeMolecule(self.molecule, maxIters=1000, mmffVariant='MMFF94s')  # type: ignore[attr-defined]
         if not self.raw_molecule:
             self.raw_molecule = self.molecule  
         self.conformer = self.raw_molecule.GetConformer()
@@ -189,15 +189,16 @@ class CG_molecule:
         for mapping in mappings:
 
             attempt += 1
-            if attempt % 100 == 0:  # Log every 1000 attempts
+            if attempt % 100 == 0:  # Log every 100 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
             print(mapping)
 
             # NOT NEEDED ANYMORE BUT USEFUL FOR DEBUGGING 
+            mapping_dict = {}
             try:
                 mapping_dict = {idx: bead for idx, bead in enumerate(mapping)}
                 self.partitioning = partitioning.invert_mapping_dictionary(mapping_dict)
-            except:
+            except Exception:
                 logger.warning("Failed to create partitioning dictionary for attempt %d: %s", attempt, mapping)
                 # continue
             logger.debug("Attempt %d/%d: trying %d CG beads", attempt + 1, self.max_attempts, len(mapping))
@@ -214,9 +215,10 @@ class CG_molecule:
                     logger.info("Skipping mapping because it does not contain all specified atoms in the same bead")
                     continue
 
-            # IF AN ATOM IS IN A RING, ADD ALL ATOMS OF THIS BEADS TO THE RING ATOMS
+            # IF ATOM OF A BEAD IS IN A RING, ADD ALL ATOMS OF THIS BEAD TO THE RING ATOMS
             # for connectivity purposes
-            for ring in self.ring_atoms:
+            extended_ring_atoms = deepcopy(self.ring_atoms) or []
+            for ring in extended_ring_atoms:
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():
                         if atom_idx in atom_indices:
@@ -225,7 +227,7 @@ class CG_molecule:
                                 if at not in ring:
                                     ring.append(at)
             ringbeads = []
-            for ring in self.ring_atoms:
+            for ring in extended_ring_atoms:
                 new_ring = []
                 for atom_idx in ring:
                     for bead_idx, atom_indices in mapping_dict.items():
@@ -301,10 +303,9 @@ class CG_molecule:
         num_atoms = conformer.GetNumAtoms()
         list_aa = []
         list_aa_names = []
-        atoms = range(num_atoms)
-        for i in np.nditer(atoms):
-            atom_name = self.molecule.GetAtomWithIdx(int(atoms[i])).GetSymbol()
-            list_aa.append(atoms[i])
+        for i in range(num_atoms):
+            atom_name = self.molecule.GetAtomWithIdx(i).GetSymbol()
+            list_aa.append(i)
             list_aa_names.append(f"{atom_name}{i+1}")
         
         # Get coordinates - heavy atoms and all atoms
@@ -494,7 +495,7 @@ class CG_molecule:
         """
         # Extract atom coordinates
         aa_coords = []
-        mol = self.raw_molecule
+        mol = self.raw_molecule if self.raw_molecule is not None else self.molecule
         conformer = self.conformer
         for i in range(mol.GetNumAtoms()):
             coord = np.array([conformer.GetAtomPosition(i)[j] for j in range(3)])
@@ -576,8 +577,7 @@ class CG_molecule:
         """Finalise topology after a successful mapping attempt.
 
         Stores convenience references on the topology, runs a lightweight
-        sanity check on the bond/angle count, and optionally generates
-        Bartender input.
+        sanity check on the bond/angle count.
         """
         # Store convenience references
         self.topology.aa_mapping = self.aa_mapping
@@ -610,15 +610,6 @@ class CG_molecule:
         dihedrals_write = self.topology.format_dihedrals()
         virtual_sites_write = self.topology.format_virtual_sites()
 
-        # Build topology output and bartender input
-        # run_bartender generates complete topology including exclusions and position_restraints
-        if self.bartender and self.bartenderfname:
-            self.bartender_out = run_bartender(
-            header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
-            self.bead_coords, self.ring_atoms, beads,
-            self.molecule, self.molname, self.topology.atoms_in_smi_dict,
-            )
-        
 
     def to_itp(self, itp_output=None):
         """Serialise the CG topology to GROMACS ITP format.
@@ -629,11 +620,6 @@ class CG_molecule:
             Output file path.  Returns the ITP string when not provided.
         """
         topout = self.topology.to_itp()
-        
-        if self.bartender and self.bartenderfname:
-            with open(self.bartenderfname, "w") as btf:
-                btf.write(self.bartender_out)
-            logger.info("Wrote bartender input: %s", self.bartenderfname)
         
         if itp_output:
             with open(itp_output, "w") as fp:
@@ -646,7 +632,7 @@ class CG_molecule:
     def to_aa_gro(self, aa_output=None):
         """Write the all-atom structure to a GROMACS GRO file (or return the string)."""
         # Optional all-atom output to GRO file
-        aa_out = output.output_gro(self.ha_coords, self.list_ha_names, self.molname)
+        aa_out = output.output_gro(self.aa_coords, self.list_aa_names, self.molname)
         if aa_output:
             with open(aa_output, "w") as fp:
                 fp.write(aa_out)
@@ -697,7 +683,7 @@ class CG_molecule:
 
 
     def output_map(self,
-        map_file: str = None,
+        map_file: Optional[str] = None,
         to_ff: str = "martini3001"
         ):
         """Write the atom-to-bead mapping file for use with external tools.
@@ -902,9 +888,9 @@ def gen_molecule_smi(smi):
     # Continue
     logger.debug("Adding hydrogens + embedding + UFF optimization")
     molecule = Chem.AddHs(molecule)
-    AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
+    AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # type: ignore[attr-defined]  # Set Seed for random coordinate generation = 1.
     try:
-        AllChem.UFFOptimizeMolecule(molecule)
+        AllChem.UFFOptimizeMolecule(molecule)  # type: ignore[attr-defined]
     except ValueError as e:
         logger.warning("%s" % e)
         exit(1)
@@ -923,9 +909,9 @@ def gen_molecule_sdf(sdf):
     Chem.SanitizeMol(molecule)
     logger.debug("Adding hydrogens + embedding + UFF optimization")
     molecule = Chem.AddHs(molecule)
-    AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # Set Seed for random coordinate generation = 1.
+    AllChem.EmbedMolecule(molecule, randomSeed=1, useRandomCoords=True)  # type: ignore[attr-defined]  # Set Seed for random coordinate generation = 1.
     try:
-        AllChem.UFFOptimizeMolecule(molecule)
+        AllChem.UFFOptimizeMolecule(molecule)  # type: ignore[attr-defined]
     except ValueError as e:
         exit(1)
     logger.info("Successfully generated molecule from SDF")
@@ -955,10 +941,10 @@ def find_closest_logPvalue(value, keyslist, in_ring): ### AutoM3 ###
 def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ### AutoM3 ###
     """Determine CG bead type from delta_f value, charge,
     and hbond acceptor, and donor"""
+    bead_type: Optional[str] = None
     if charge < -2 or charge > +2:
         logger.error("Charge is too large: %s" % charge)
         exit(1)
-    # bead_type = None
     #smi_frag = ''.join(char for char in smi_frag if char.isalpha() and char!='H')
     if charge != 0:
         if charge == -2 or charge == -2:
@@ -970,8 +956,9 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
                 bead_type = " D"
         else:
             # The compound has a +/- charge -> Q type
+            othertypes_Q = []
             if count_letters(str(smi_frag)) == 2:
-                other_types_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
+                othertypes_Q = ["TQ1", "TQ2", "TQ3", "TQ4", "TQ5",]
             if count_letters(str(smi_frag)) == 3:
                 othertypes_Q = ["SQ1", "SQ2", "SQ3", "SQ4", "SQ5",]
             if count_letters(str(smi_frag)) > 3:
@@ -981,6 +968,8 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
     else:
         # Neutral group
         if hbonda > 0 or hbondd > 0:
+            other_types_NPa = []
+            other_types_NPd = []
             if count_letters(str(smi_frag)) == 2:
                 other_types_NPa = ["TN1a", "TN2a", "TN3a", "TN4a", "TN5a", "TN6a", "TP1a", "TP2a", "TP3a", "TP4a", "TP5a", "TP6a"]
                 other_types_NPd = ["TN1d", "TN2d", "TN3d", "TN4d", "TN5d", "TN6d", "TP1d", "TP2d", "TP3d", "TP4d", "TP5d", "TP6d"]
@@ -999,7 +988,8 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
         else:
             # all other cases. Simply find the atom type that's closest in
             # free energy.
-            
+
+            other_types = []
             if count_letters(str(smi_frag)) == 2:
                 other_types = ["TP6", "TP5", "TP4", "TP3", "TP2", "TP1", "TC6", "TC5", "TC4", "TC3", "TC2", "TC1", "TN6", "TN5", "TN4", "TN3", "TN2", "TN1"]
                 if not in_ring: other_types.remove("TC5")
@@ -1015,6 +1005,7 @@ def determine_bead_type(delta_f, charge, hbonda, hbondd, in_ring, smi_frag): ###
     
     for hal in ["Cl", "Br", "F", "I"]:
         if hal in str(smi_frag):
+            other_types = []
             if count_letters(str(smi_frag)) == 2: other_types = ["TX4", "TX3", "TX2", "TX1"]
             if count_letters(str(smi_frag)) == 3: other_types = ["SX4", "SX3", "SX2", "SX1"]
             if count_letters(str(smi_frag)) > 3: other_types = ["X4", "X3", "X2", "X1"]

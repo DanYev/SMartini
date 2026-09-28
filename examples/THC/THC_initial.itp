@@ -11,15 +11,15 @@
 
 [atoms]
 ;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
-1   SP1a  1   THC    P01    1    0.0  54.0   ; O1 C1 C2       ; C=CO           ;          
-2   TP2d  1   THC    P02    2    0.0  36.0   ; O2 C3          ; CO             ;          
-3   SC3   1   THC    C03    3    0.0  54.0   ; C4 C5 C6       ; CCC            ;          
-4   TC3   1   THC    C04    4    0.0  36.0   ; C7 C8          ; CC             ;          
-5   SC3   1   THC    C05    5    0.0  54.0   ; C9 C10 C11     ; CCC            ;          
-6   TC3   1   THC    C06    6    0.0  36.0   ; C12 C13        ; CC             ;          
-7   SC5   1   THC    C07    7    0.0  54.0   ; C14 C15 C16    ; CC=C           ;          
-8   TC3   1   THC    C08    8    0.0  36.0   ; C17 C18        ; CC             ;          
-9   SC3   1   THC    C09    9    0.0  54.0   ; C19 C20 C21    ; CCC            ;          
+1   SP1a  1   THC    P01    1    0.0  54.0   ; O1, C5, C9     ; C=CO           ;          
+2   TP2d  1   THC    P02    2    0.0  36.0   ; O2, C12        ; CO             ;          
+3   SC3   1   THC    C03    3    0.0  54.0   ; C1, C4, C6     ; CCC            ;          
+4   TC3   1   THC    C04    4    0.0  36.0   ; C2, C7         ; CC             ;          
+5   SC3   1   THC    C05    5    0.0  54.0   ; C3, C10, C11   ; CCC            ;          
+6   TC3   1   THC    C06    6    0.0  36.0   ; C8, C14        ; CC             ;          
+7   SC5   1   THC    C07    7    0.0  54.0   ; C13, C15, C16  ; CC=C           ;          
+8   TC3   1   THC    C08    8    0.0  36.0   ; C17, C18       ; CC             ;          
+9   SC3   1   THC    C09    9    0.0  54.0   ; C19, C20, C21  ; CCC            ;          
 
 
 [bonds]

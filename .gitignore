@@ -13,6 +13,7 @@ tmp/
 *.pdf
 *.pkl
 aa*.png
+*.png
 
 # ---- Python ----
 __pycache__/

@@ -1,8 +1,8 @@
 REMARK   Generated from smartini
 REMARK   Molecule: ANP
-ATOM      1 D01  ANP A   1      62.906  33.083  58.712  1.00  0.00            
-ATOM      2 Q02  ANP A   1      66.004  32.701  57.467  1.00  0.00            
-ATOM      3 Q03  ANP A   1      64.924  32.245  59.916  1.00  0.00            
+ATOM      1 D01  ANP A   1      63.428  33.167  59.004  1.00  0.00            
+ATOM      2 Q02  ANP A   1      65.855  32.780  56.997  1.00  0.00            
+ATOM      3 Q03  ANP A   1      65.532  31.756  59.818  1.00  0.00            
 ATOM      4 N04  ANP A   1      74.189  32.131  49.394  1.00  0.00            
 ATOM      5 N05  ANP A   1      74.404  35.262  49.189  1.00  0.00            
 ATOM      6 N06  ANP A   1      72.447  34.840  50.861  1.00  0.00            
