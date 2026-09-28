@@ -1,9 +1,11 @@
 import itertools
 import logging
 import multiprocessing as mp
+from collections import namedtuple
 import numpy as np
 from rdkit import Chem
-from . import optimization_cy as opcy
+from rdkit.Chem import rdMolTransforms
+from . import optimization_cy as opcy  # type: ignore[attr-defined]
 from .utils import timeit, memprofit
 from .config import CFG
 
@@ -831,7 +833,7 @@ def collect_energies_and_combs(
         dists = np.zeros((n, n), dtype=np.float32)
         for i in range(n):
             for j in range(i + 1, n):
-                dist = Chem.rdMolTransforms.GetBondLength(conformer, i, j)
+                dist = rdMolTransforms.GetBondLength(conformer, i, j)
                 dists[i, j] = dist
                 dists[j, i] = dist
         return dists
