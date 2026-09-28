@@ -498,12 +498,22 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
         """Map overlapping beads when connecting the fragments"""
 
         def bead_is_connected(bead):
-            return True
-            for i in range(len(bead)):
-                for j in range(i + 1, len(bead)):
-                    if not [bead[i], bead[j]] in bonds and not [bead[j], bead[i]] in bonds:
-                        return False
-            return True
+            """Not fully correct but OK for now"""
+            n_bonds = 0
+            n_atoms = len(bead)
+            for i in range(n_atoms):
+                for j in range(i + 1, n_atoms):
+                    bond_ij = [bead[i], bead[j]]
+                    if bond_ij in bonds:
+                        n_bonds += 1
+                        continue
+                    bond_ji = [bead[j], bead[i]]
+                    if bond_ji in bonds:
+                        n_bonds += 1
+                        continue
+            if n_bonds >= n_atoms - 1:
+                return True
+            return False
         
         logger.debug(f"Mapping overlap of {overlap} with beads {beads}")
         beads_set = flat_set(beads)

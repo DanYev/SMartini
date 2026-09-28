@@ -42,7 +42,7 @@ echo "  SM_MOLNAME: ${SM_MOLNAME}" >&2
 echo "  SM_CONFIG_YML: ${SM_CONFIG_YML:-}" >&2
 
 nsteps=200000
-nruns=4
+nruns=1
 
 python 0_preprocess_ligand.py
 python 1_gen_cg_topo.py

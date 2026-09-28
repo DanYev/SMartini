@@ -100,8 +100,6 @@ class CG_molecule:
         self.symmetrize_rings = symmetrize_rings
         self.forcepred = forcepred
         self.logp_file = os.path.join(os.path.dirname(__file__), logp_file_name)
-        self.bartender = bartender
-        self.bartenderfname = bartenderfname
         
         # Initialize state attributes
         self.ha_list = None
@@ -118,7 +116,6 @@ class CG_molecule:
         self.mapping = None
         self.bead_names = []
         self.bead_coords = []
-        self.bartender_out = None
         self.ga_graph = None
         self.aa_graph = None
         # Initialize topology early so it can be updated throughout
@@ -580,8 +577,7 @@ class CG_molecule:
         """Finalise topology after a successful mapping attempt.
 
         Stores convenience references on the topology, runs a lightweight
-        sanity check on the bond/angle count, and optionally generates
-        Bartender input.
+        sanity check on the bond/angle count.
         """
         # Store convenience references
         self.topology.aa_mapping = self.aa_mapping
@@ -614,16 +610,6 @@ class CG_molecule:
         dihedrals_write = self.topology.format_dihedrals()
         virtual_sites_write = self.topology.format_virtual_sites()
 
-        # Build topology output and bartender input
-        # run_bartender generates complete topology including exclusions and position_restraints
-        if self.bartender and self.bartenderfname:
-            # `run_bartender` returns (topology_text, bartender_input_text).
-            self.bartender_out = run_bartender(
-            header_write, atoms_write, bonds_write, angles_write, dihedrals_write,
-            self.bead_coords, self.ring_atoms, beads,
-            self.molecule, self.molname, self.topology.atoms_in_smi_dict,
-            )[1]
-        
 
     def to_itp(self, itp_output=None):
         """Serialise the CG topology to GROMACS ITP format.
@@ -634,11 +620,6 @@ class CG_molecule:
             Output file path.  Returns the ITP string when not provided.
         """
         topout = self.topology.to_itp()
-        
-        if self.bartender and self.bartenderfname and self.bartender_out:
-            with open(self.bartenderfname, "w") as btf:
-                btf.write(self.bartender_out)
-            logger.info("Wrote bartender input: %s", self.bartenderfname)
         
         if itp_output:
             with open(itp_output, "w") as fp:
