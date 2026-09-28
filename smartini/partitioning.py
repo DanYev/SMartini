@@ -154,6 +154,7 @@ def split_into_fragments(molecule):
             fused_rings.append(current_fused)
         rings = sort_nested(fused_rings)
         overlaps = sort_nested(overlaps)
+        # TODO add assert
         return rings, overlaps
 
     molecule = Chem.RemoveHs(molecule)
@@ -210,6 +211,7 @@ def split_into_fragments(molecule):
     frag_ranks_list = [[ranks[a] for a in frag] for frag in fragments]
 
     initial_rings = molecule.GetRingInfo().AtomRings()
+    # TODO add assert
     assert_rings_fused_correctly(rings, initial_rings)
 
     return fragments, frag_ranks_list, rings, shared_atoms, initial_rings

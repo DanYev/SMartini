@@ -29,6 +29,8 @@ class Topology:
     logp_origins: list = field(default_factory=list)
     mapping: list = field(default_factory=list)
     aa_mapping: list = field(default_factory=list)
+    # Atom-index strings per bead, consumed by the (optional) Bartender output.
+    atoms_in_smi_dict: dict = field(default_factory=dict)
     
     # Bonds data: list of [i, j, funct, dist, k]
     bonds: list = field(default_factory=list)

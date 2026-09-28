@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 import logging
 from sys import exit
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,7 @@ def output_pdb(sites, site_names, molname, bonds=None, constraints=None):
     return pdb_out
 
 
-def output_map(topology, map_file: str, to_ff: str = "martini3001"):
+def output_map(topology, map_file: Optional[str] = None, to_ff: str = "martini3001"):
     """Create a `.map` file from a Topology instance.
 
     Parameters
@@ -182,5 +183,9 @@ def output_map(topology, map_file: str, to_ff: str = "martini3001"):
     # This part is omitted as it was parsed from ITP comments.
 
     out += "\n"
-    with open(Path(map_file), "w") as f:
-        f.write(out)
+    if map_file:
+        with open(Path(map_file), "w") as f:
+            f.write(out)
+    else:
+        print(out)
+    return out
