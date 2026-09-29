@@ -101,30 +101,6 @@ def split_into_fragments(molecule):
         ``fragments`` are heavy-atom index lists used by the mapper.
     """
 
-    # def fuse_rings(molecule):
-    #     # Get ring atoms (systems of joined rings)
-    #     rings = molecule.GetRingInfo().AtomRings()
-    #     rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
-    #     n_rings = len(rings)
-    #     fused_rings = [ring for ring in rings]
-    #     overlaps = []
-    #     n_rings = len(rings)
-    #     for i in range(n_rings):
-    #         for j in range(i + 1, n_rings):
-    #             r1 = rings[i]
-    #             r2 = rings[j]
-    #             if r1 == r2:
-    #                 continue
-    #             overlap = r1.intersection(r2)
-    #             if overlap:
-    #                 fused_rings.remove(r1)
-    #                 fused_rings.remove(r2)
-    #                 fused_rings.append(r1.union(r2))
-    #                 overlaps.append(overlap)
-    #     rings = sort_nested(fused_rings)
-    #     overlaps = sort_nested(overlaps)
-    #     return rings, overlaps
-
     def fuse_rings(molecule):
         rings = [
             set(ring) for ring in molecule.GetRingInfo().AtomRings() 

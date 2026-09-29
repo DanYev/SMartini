@@ -19,11 +19,11 @@
 # -----------------------------------------------------------------------------
 molname: UNK                       # Overridden by SM_MOLNAME / per-molecule config
 smiles: null
-specify_beads: null                # e.g. [[4, 5, 8]]
+specify_beads: null                # e.g. [[4, 5, 8]] # if need to explicitly specify some beads
 n_beads: null
-use_vsites: false
-symmetrize_rings: null             # e.g. [0] - list of ring indices to symmetrize
-keep_rings_together: true
+use_vsites: false                  # Currently only for double aromatic rings
+symmetrize_rings: null             # e.g. [0] - list of ring indices to symmetrize (from info.txt)
+keep_rings_together: true          # False to allow a bead contain atoms from diffent rings (see LIB example)
 max_combs_merged: 1000
 max_ring_len: 12                   # Large rings are usually not aromatic and can be broken up
 max_mappings_to_keep: 500          # Keep top mappings to avoid combinatorial explosion
@@ -33,6 +33,7 @@ max_ring_bead_size: 3
 # -----------------------------------------------------------------------------
 # Working folders
 # -----------------------------------------------------------------------------
+# The code assumes setup similar to the one in examples
 systems_dir: examples              # wdir/mol_dir/aa_dir/cg_dir are derived from this
 aa_sysname: aa_md
 cg_sysname: cg_md
@@ -62,19 +63,22 @@ cg_selection: all
 # Refinement settings (Fitting, filtering, and optimization)
 # -----------------------------------------------------------------------------
 temperature: 300.0
-bond_k_lower: 2000.0
+fc_scale: 0.4                       # Scaling factor for initial force constants to roughly account for coupling of the potentials
+# Lower and upper ranges for bond constants
+bond_k_lower: 2000.0                
 bond_k_upper: 50000.0
 angle_k_lower: 3.0
 angle_k_upper: 2000.0
 dihedral_k_lower: 0.0
 dihedral_k_upper: 1000.0
-ill_defined_angle_cutoff: 160.0
-type9_max_n: 6
-use_type11_for_linear: true        # Whether to use type 11 dihedrals for linear angles
-scale_by_sin3_for_type11: false    # Whether to scale type 11 dihedrals by sin^3(theta)
+# Dihedrals
+ill_defined_angle_cutoff: 160.0     # Will use type 11 dihedrals if one of the base angles is ill defined
+type9_max_n: 6                      # Max number of harmonics for type 9 dihedrals
+use_type11_for_linear: true         # Whether to use type 11 dihedrals for linear angles
+scale_by_sin3_for_type11: false     # Whether to scale type 11 dihedrals by sin^3(theta)
+# Histograms
 nbins: 120
 min_prob: 1.0e-12
-fc_scale: 0.4                      # Scaling factor for initial force constants to roughly account for coupling of the potentials
 # Refinement guardrails
-alpha_max: 0.20
-alpha_min: 0.02
+alpha_max: 0.20                     # Max allowed relative change for bonded update iteration - Increase if convergence is too slow
+alpha_min: 0.02                     # Min allowed relative change for bonded update iteration - Increase if convergence is too slow
