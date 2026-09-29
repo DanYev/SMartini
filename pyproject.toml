@@ -2,12 +2,11 @@
 
 [build-system]
 requires = [
-    "poetry-core>=1.0.8", 
-    "setuptools", 
-    "wheel", 
+    "poetry-core>=1.8.0",
+    "setuptools",
+    "wheel",
     "Cython>=0.29.21",
-    "numpy", 
-    "poetry-dynamic-versioning",
+    "numpy",
 ]
 build-backend = "poetry.core.masonry.api"
 
@@ -15,84 +14,53 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "smartini"
-version = "0.2"
-packages = [
-  { include = "smartini" }
-]
+version = "0.2.0"
+description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
+readme = "README.md"
+packages = [{ include = "smartini" }]
 exclude = [
-  "*/tests/",
-  "*/cgmd_params/"
+    "*/tests/",
+    "*/cgmd_params/",
 ]
 include = [
-  {path = "smartini/optimization_cy.pyx", format = "wheel"},
-  {path = "smartini/ligpar_cy.pyx", format = "wheel"},
-  {path = "smartini/*.so", format = "wheel"},
+    { path = "smartini/optimization_cy.pyx", format = "wheel" },
+    { path = "smartini/ligpar_cy.pyx", format = "wheel" },
+    { path = "smartini/*.so", format = "wheel" },
 ]
-description = "Small Molecule parametrization pipeline for Martini 3 Force Field"
 classifiers = [
-  "Intended Audience :: Developers",
-  "Operating System :: Linux",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Cython",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Cython",
 ]
-readme = "README.md"
 homepage = "https://github.com/DanYev/SMartini"
-build = "setup.py"
 
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-metadata = true
-dirty = true
-
-
-# Dependencies ----------
-
-# The conda channels and platforms from which to resolve dependencies
-[tool.conda-lock]
-channels = [
-  'conda-forge',
-]
-platforms = [
-    'linux-64'
-]
-
-# Runtime dependencies that are only conda installable
-[tool.conda-lock.dependencies]
-rdkit = ">=v2022.03.4"
-
-# Runtime dependencies that are both pip and conda installable
 [tool.poetry.dependencies]
-python = ">=3.8.0,<4"
-importlib_metadata = {version = ">=1.6.0,<2.0.0", python = "~3.7"}
+python = ">=3.12,<3.13"
 beautifulsoup4 = ">=4.11.1"
-lxml = ">=4.9.1"
-requests = ">=2.28.1"
-numpy = ">=1.23.1"
 cython = ">=0.29.21"
+mdanalysis = ">=2.0.0"
+matplotlib = ">=3.6.0"
+numpy = ">=1.23.1"
+openff-interchange = ">=0.5.0"
+openff-toolkit = ">=0.19.0"
+openmm = ">=8.0.0"
+openmmforcefields = ">=0.16.0"
+pyyaml = ">=6.0.0"
+rdkit = ">=2022.03.4"
+requests = ">=2.28.1"
+scikit-learn = ">=1.1.0"
 six = ">=1.16.0"
-# openff-forcefields = ">=2025.10.1"
-# openff-interchange = ">=0.4.11"
-# openff-toolkit = ">=0.18.0"
+lxml = ">=4.9.1"
 
-
-# Development dependencies that are at least pip installable.
-# If dependencies are only pip installable, set
-# them as {version = "<version number>", source = "pypi"}
-[tool.poetry.dev-dependencies]
-black = "22.3.0"
-flake8 = "3.9.2"
-flake8-bugbear = "22.1.11"
-flake8-comprehensions = "3.8.0"
-flake8-logging-format = "0.6.0"
-flake8-mutable = "1.2.0"
-isort = "5.10.1"
-pip = "*"
-poetry = "1.1.13"
-pytest = "6.2.5"
-pytest-cov = "3.0.0"
-poetry-dynamic-versioning = "0.17.1"
-# Dev tool configuration ---
+[tool.poetry.group.dev.dependencies]
+black = ">=24.0.0"
+flake8 = ">=7.0.0"
+flake8-bugbear = ">=24.0.0"
+flake8-comprehensions = ">=3.8.0"
+flake8-logging-format = ">=0.6.0"
+flake8-mutable = ">=1.2.0"
+isort = ">=5.10.1"
+pytest = ">=7.0.0"
+pytest-cov = ">=5.0.0"
 
 # Black formatting parameters
 [tool.black]
@@ -105,18 +73,18 @@ source = ["smartini"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",  
+    "pragma: no cover",
     "raise AssertionError",
     "raise NotImplementedError",
     "pass",
-    "pytest.mark.skip"
+    "pytest.mark.skip",
 ]
 omit = [
-  "tests/*",
-  "cgmd_params/*"
+    "tests/*",
+    "cgmd_params/*",
 ]
 show_missing = true
-fail_under = 0 # coverage not working
+fail_under = 0
 
 # Isort settings
 [tool.isort]
@@ -125,4 +93,4 @@ profile = "black"
 # Pytest options
 [tool.pytest.ini_options]
 xfail_strict = true
-testpaths = "tests"
+testpaths = ["tests"]

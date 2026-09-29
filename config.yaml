@@ -47,7 +47,7 @@ aa_gamma: 1.0                      # Friction coefficient (1/picosecond)
 aa_pressure_bar: 1.0               # Pressure in bar
 aa_timestep_fs: 2.0                # Timestep in femtoseconds
 aa_total_steps: 10000000           # Total MD steps (1e7 = 20 ns with a 2 fs timestep)
-aa_trj_nout: 10000                 # Trajectory output frequency (frames every N steps)
+aa_trj_nout: 10000                 # Trajectory output frequency (frames every N steps) (20 ps with 10000 and dt=2)
 aa_log_nout: 10000                 # Log output frequency (every N steps)
 aa_chk_nout: 100000                # Checkpoint output frequency (every N steps)
 
