@@ -115,6 +115,7 @@ def process_to_ff():
     """
     # INPUTS
     ligand_name = CFG.molname
+    logger.info("Setting up AA version")
     logger.info("Working directory: %s", wdir)
     logger.info("Processing ligand: %s", ligand_name)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange

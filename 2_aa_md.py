@@ -30,58 +30,6 @@ system_pdb = aa_dir / "system.pdb"
 system_xml = aa_dir / "system.xml"
 
 
-# def process_ligand():
-#     """Build and solvate the ligand AA system, then write topology artifacts.
-
-#     Writes:
-#     - ``system.pdb`` and ``system.xml`` for simulation,
-#     - ``md.pdb`` with ``CFG.aa_selection`` for trajectory output reference.
-#     """
-#     # INPUTS
-#     ligand_name = CFG.molname
-#     logger.info("Working directory: %s", wdir)
-#     logger.info("Processing ligand: %s", ligand_name)
-#     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
-#     aa_dir.mkdir(parents=True, exist_ok=True)
-#     input_file = wdir / f"{ligand_name}.sdf"
-#     logger.info("Reading ligand file: %s", input_file)
-#     ligand = Molecule.from_file(str(input_file))
-#     ligand.assign_partial_charges("gasteiger")
-#     openff_version = "openff-2.1.0"
-#     smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand], forcefield=openff_version)
-#     forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
-#     # Ligand FF
-#     forcefield.registerTemplateGenerator(smirnoff.generator)
-#     ff = ForceField(f"{openff_version}.offxml")
-#     interchange = Interchange.from_smirnoff(ff, ligand.to_topology(), charge_from_molecules=[ligand])
-#     ligand_topology = interchange.to_openmm_topology()
-#     ligand_positions = interchange.positions.to_openmm()
-#     model = app.Modeller(ligand_topology, ligand_positions)
-#     logger.info("Adding solvent and ions")
-#     model.addSolvent(forcefield, 
-#         model='tip3p', 
-#         boxShape='dodecahedron', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-#         padding=1.5 * unit.nanometer,
-#         ionicStrength=0.0 * unit.molar,
-#         positiveIon='Na+',
-#         negativeIon='Cl-')    
-#     with open(system_pdb, "w", encoding="utf-8") as file:
-#         app.PDBFile.writeFile(model.topology, model.positions, file, keepIds=True)    
-#     logger.info("Generating topology...")
-#     system = forcefield.createSystem(
-#         model.topology,
-#         nonbondedMethod=app.PME,
-#         nonbondedCutoff=1.0 * unit.nanometer,
-#         constraints=app.HBonds,
-#         removeCMMotion=True,     
-#         ewaldErrorTolerance=1e-5,
-#         rigidWater=True,
-#     )
-#     _save_system_to_xml(system, system_xml)
-#     logger.info(f'Saving reference PDB with selection: {CFG.aa_selection}')
-#     mda.Universe(system_pdb).select_atoms(CFG.aa_selection).write(str(aa_dir / "md.pdb"))
-
-
 def md_npt(): 
     """Run AA MD in OpenMM: minimize, heat, equilibrate, then produce trajectory."""
     # Prep
@@ -153,13 +101,6 @@ def trjconv(start=0, stop=None, step=1, fit=True):
     logger.info("Done!")
 
 
-# def _save_system_to_xml(system, filename):
-#     """Serialize an OpenMM ``System`` to XML."""
-#     with open(str(filename), "w", encoding="utf-8") as file:
-#         file.write(mm.XmlSerializer.serialize(system))
-#     logger.info(f"Saved system to {filename}")
-
-
 def _load_system_from_xml(filename):
     """Load an OpenMM ``System`` from XML."""
     with open(str(filename), 'r') as file:
@@ -202,6 +143,5 @@ def _get_reporters(append=False, prefix="md"):
 
 
 if __name__ == "__main__":
-    # process_ligand()
     md_npt()
     trjconv()
