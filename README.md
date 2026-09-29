@@ -20,7 +20,8 @@ pip install -e package
 ```
 
 ## How it works
-A directory `<CFG.sysdir>/<MOLNAME>` is expected, containing either:
+
+A directory `<systems_dir>/<MOLNAME>` (see `config.yaml`) is expected, containing either:
 - an `.sdf` file (if starting from a structure), or
 - a `config.yml` file with `smiles: <SMILES>`.
 
