@@ -18,6 +18,7 @@ conda env create --file environment.yml
 source activate smartini
 pip install -e .
 ```
+GROMACS is needed for CGMD refinement loop.
 
 ## How it works
 
