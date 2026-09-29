@@ -34,7 +34,7 @@ max_ring_bead_size: 3
 # Working folders
 # -----------------------------------------------------------------------------
 # The code assumes setup similar to the one in examples
-systems_dir: examples              # wdir/mol_dir/aa_dir/cg_dir are derived from this
+systems_dir: systems              # wdir/mol_dir/aa_dir/cg_dir are derived from this
 aa_sysname: aa_md
 cg_sysname: cg_md
 cg_runname: mdrun
@@ -46,8 +46,8 @@ aa_selection: "resname UNK"
 aa_gamma: 1.0                      # Friction coefficient (1/picosecond)
 aa_pressure_bar: 1.0               # Pressure in bar
 aa_timestep_fs: 2.0                # Timestep in femtoseconds
-aa_total_steps: 1000000           # Total MD steps (1e7 = 20 ns with a 2 fs timestep)
-aa_trj_nout: 10000                 # Trajectory output frequency (frames every N steps)
+aa_total_steps: 10000000           # Total MD steps (1e7 = 20 ns with a 2 fs timestep)
+aa_trj_nout: 10000                 # Trajectory output frequency (frames every N steps) (20 ps with 10000 and dt=2)
 aa_log_nout: 10000                 # Log output frequency (every N steps)
 aa_chk_nout: 100000                # Checkpoint output frequency (every N steps)
 
