@@ -191,7 +191,7 @@ class CG_molecule:
             attempt += 1
             if attempt % 100 == 0:  # Log every 100 attempts
                 logger.info("Attempt %d/%d", attempt, self.max_attempts)
-            print(mapping)
+                logger.info(mapping)
 
             # NOT NEEDED ANYMORE BUT USEFUL FOR DEBUGGING 
             mapping_dict = {}
