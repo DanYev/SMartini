@@ -101,30 +101,6 @@ def split_into_fragments(molecule):
         ``fragments`` are heavy-atom index lists used by the mapper.
     """
 
-    # def fuse_rings(molecule):
-    #     # Get ring atoms (systems of joined rings)
-    #     rings = molecule.GetRingInfo().AtomRings()
-    #     rings = [set(ring) for ring in rings if len(ring) < CFG.max_ring_len] # Large rings are usually not aromatic and can be broken up into smaller fragments
-    #     n_rings = len(rings)
-    #     fused_rings = [ring for ring in rings]
-    #     overlaps = []
-    #     n_rings = len(rings)
-    #     for i in range(n_rings):
-    #         for j in range(i + 1, n_rings):
-    #             r1 = rings[i]
-    #             r2 = rings[j]
-    #             if r1 == r2:
-    #                 continue
-    #             overlap = r1.intersection(r2)
-    #             if overlap:
-    #                 fused_rings.remove(r1)
-    #                 fused_rings.remove(r2)
-    #                 fused_rings.append(r1.union(r2))
-    #                 overlaps.append(overlap)
-    #     rings = sort_nested(fused_rings)
-    #     overlaps = sort_nested(overlaps)
-    #     return rings, overlaps
-
     def fuse_rings(molecule):
         rings = [
             set(ring) for ring in molecule.GetRingInfo().AtomRings() 
@@ -547,14 +523,6 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     ha_neis = [[n.GetIdx() for n in a.GetNeighbors() if n.GetAtomicNum() > 1] for a in atoms]
     ha_atoms_and_neis = [[a] + ha_neis[a] for a in atids]
 
-    # # DEBUG
-    # fragments = [fragments[2]]
-    # print(frag_is_symmetric)
-    # alist = [0, 1, 2, 3, 4, 5, 6]
-    # alist = [0, 1, 2, 3, 4, 6]
-    # new_fragments = [fragments[i] for i in alist]
-    # fragments = new_fragments
-
     # Stage 1: local enumeration on each fragment.
     # We intentionally solve small local mapping problems first.
     all_mappings = []
@@ -587,20 +555,7 @@ def generate_mappings(molecule, min_beads=None, max_beads=None, dtype=np.int32):
     logger.info("Filtering and sorting the mappings...")
     mappings = filter_mappings(mappings, molecule, fused_rings, CFG.max_bead_size, CFG.max_ring_bead_size)
     mappings = sort_mappings(mappings, molecule, fused_rings)
-    print(len(mappings))
-    for mapping in mappings[:10]:
-        print(mapping)
 
-    # tmp_mappings = []
-    # count = 0
-    # for mapping in mappings:
-    #     if [17, 18, 20] in mapping and [25, 26, 28] in mapping and [37, 38, 39] in mapping and not [6, 7, 9] in mapping:
-    #         count += 1
-    #         print(len(mapping), mapping)
-    #         tmp_mappings.append(mapping)
-    #         if count >= 10:
-    #             break
-    # mappings = tmp_mappings
     return mappings
 
 

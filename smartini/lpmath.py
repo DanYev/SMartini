@@ -11,10 +11,10 @@ Coordinate arrays are expected to be in nm in fitting routines.
 
 import logging
 import numpy as np
-from . import ligpar_cy
+from . import ligpar_cy  # type: ignore[attr-defined]
 from MDAnalysis import Universe
 from sklearn.mixture import GaussianMixture
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -316,6 +316,7 @@ def fit_gmm_1d_best_old(data, max_components=1, max_iter=100, tol=1e-4, var_floo
         weights = np.full(n_components, 1.0 / n_components)
 
         prev_ll = None
+        ll = None
         for _ in range(max_iter):
             pdf = gmm_pdf_1d(data, weights, means, variances)
             pdf = np.clip(pdf, min_prob, None)
@@ -333,6 +334,9 @@ def fit_gmm_1d_best_old(data, max_components=1, max_iter=100, tol=1e-4, var_floo
             if prev_ll is not None and abs(ll - prev_ll) < tol:
                 break
             prev_ll = ll
+
+        if ll is None:
+            continue
 
         # Hard cutoff: reject if any component has weight < min_weight
         if np.any(weights < min_weight):
@@ -435,8 +439,8 @@ def fit_gmm_1d_best(
             continue
 
         weights = np.asarray(gmm.weights_, dtype=float)
-        means = np.asarray(gmm.means_.reshape(-1), dtype=float)
-        variances = np.asarray(gmm.covariances_.reshape(-1), dtype=float)
+        means = np.asarray(gmm.means_, dtype=float).reshape(-1)
+        variances = np.asarray(gmm.covariances_, dtype=float).reshape(-1)
         variances = np.clip(variances, var_floor, None)
 
         order = np.argsort(means)
@@ -746,7 +750,10 @@ def _eval_type11_potential(term, phi_deg: np.ndarray) -> np.ndarray:
     cos_phi = np.cos(np.deg2rad(phi_deg))
     kphi = float(term[5])
     a    = [float(term[6 + n]) for n in range(5)]
-    U = kphi * sum(a[n] * cos_phi ** n for n in range(5))
+    poly = np.zeros_like(cos_phi, dtype=float)
+    for n in range(5):
+        poly = poly + a[n] * cos_phi ** n
+    U = kphi * poly
     return U
 
 # ---------------------------------------------------------------------------
@@ -757,8 +764,8 @@ def _fit_type9_to_target(
     pmf: np.ndarray,
     shift: float,
     harmonics: list,
-    weights: np.ndarray = None,
-    phi_grid: np.ndarray = None,
+    weights: Optional[np.ndarray] = None,
+    phi_grid: Optional[np.ndarray] = None,
     nbins: int = 360,
 ) -> list:
     """Fit GROMACS type-9 Fourier terms to a target potential on a phi grid.
@@ -827,8 +834,8 @@ def _fit_type9_to_target(
 
 def _fit_type11_to_target(
     pmf: np.ndarray,
-    weights: np.ndarray = None,
-    phi_grid: np.ndarray = None,
+    weights: Optional[np.ndarray] = None,
+    phi_grid: Optional[np.ndarray] = None,
     nbins: int = 360,
 ):
     """Fit a type-11 (CBT) polynomial potential on a dihedral grid.
