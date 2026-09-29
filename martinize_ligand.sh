@@ -46,7 +46,7 @@ nruns=3
 
 python 0_preprocess_ligand.py
 python 1_gen_cg_topo.py
-# python 2_aa_md.py
+python 2_aa_md.py
 python 3_boltz_inv.py plot
 for i in $(seq 1 $nruns); do
 	echo "Running CG MD simulation run $i of $nruns" >&2

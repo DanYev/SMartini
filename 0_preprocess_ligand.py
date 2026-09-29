@@ -4,6 +4,7 @@ import smartini
 import MDAnalysis as mda
 
 from pathlib import Path
+from openmm import XmlSerializer
 from openmm import app, unit
 from openff.toolkit import ForceField, Molecule, Topology 
 from openff.interchange import Interchange
@@ -54,7 +55,7 @@ def print_ligand_info(sdf_path: Path, ligand_name: str) -> None:
     tpsa          = rdMolDescriptors.CalcTPSA(mol)
     charge        = Chem.GetFormalCharge(mol)
 
-    # --- Ring information (THE key output) -------------------------------------
+    # --- Ring information -------------------------------------
     ring_info = mol.GetRingInfo()
     rings     = ring_info.AtomRings()   # tuple of tuples of atom indices
 
@@ -125,20 +126,22 @@ def process_to_ff():
     print_ligand_info(input_file, ligand_name)
 
     ligand = Molecule.from_file(str(input_file))
-    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand])
-    forcefield = app.ForceField("amber19-all.xml", "amber19/opc.xml")
+    ligand.assign_partial_charges("gasteiger")
+    openff_version = "openff-2.2.1"
+    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand], forcefield=openff_version)
+    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
     # Ligand FF
     forcefield.registerTemplateGenerator(smirnoff.generator)
-    ff = ForceField("openff-2.1.0.offxml")
-    interchange = Interchange.from_smirnoff(ff, ligand.to_topology())
+    ff = ForceField(f"{openff_version}.offxml")
+    interchange = Interchange.from_smirnoff(ff, ligand.to_topology(), charge_from_molecules=[ligand])
     ligand_topology = interchange.to_openmm_topology()
     ligand_positions = interchange.positions.to_openmm()
     model = app.Modeller(ligand_topology, ligand_positions)
     logger.info("Adding solvent and ions")
     model.addSolvent(forcefield, 
-        model='opc', 
+        model='tip3p', 
         boxShape='dodecahedron', #  ‘cube’, ‘dodecahedron’, and ‘octahedron’
-        padding=1.2 * unit.nanometer,
+        padding=1.5 * unit.nanometer,
         ionicStrength=0.0 * unit.molar,
         positiveIon='Na+',
         negativeIon='Cl-')    
@@ -159,5 +162,13 @@ def process_to_ff():
     mda.Universe(system_pdb).select_atoms(CFG.aa_selection).write(str(aa_dir / "md.pdb"))
 
 
+def _save_system_to_xml(system, filename):
+    """Serialize an OpenMM ``System`` to XML."""
+    with open(str(filename), "w", encoding="utf-8") as file:
+        file.write(XmlSerializer.serialize(system))
+    logger.info(f"Saved system to {filename}")
+
+
 if __name__ == "__main__":
     print_ligand_info(wdir / f"{ligand_name}.sdf", ligand_name)
+    process_to_ff()

@@ -203,9 +203,15 @@ def prepare_protein_ligand_system(
                 "ligand_smiles or ligand_sdf parameter."
             )
 
+    ligand_mol.assign_partial_charges("gasteiger")
+
     # Register the ligand FF template on the AMBER force field so that
     # forcefield.createSystem() can parameterize the ligand atoms.
-    smirnoff = SMIRNOFFTemplateGenerator(molecules=[ligand_mol])
+    template_forcefield = openff_version.removesuffix(".offxml")
+    smirnoff = SMIRNOFFTemplateGenerator(
+        molecules=[ligand_mol],
+        forcefield=template_forcefield,
+    )
     forcefield.registerTemplateGenerator(smirnoff.generator)
 
     # Generate ligand topology *from the SDF molecule* via OpenFF Interchange.
@@ -218,7 +224,7 @@ def prepare_protein_ligand_system(
         interchange, ligand_topology, ligand_positions = cached
     else:
         ff = ForceField(openff_version)
-        interchange = Interchange.from_smirnoff(ff, ligand_mol.to_topology())
+        interchange = Interchange.from_smirnoff(ff, ligand_mol.to_topology(), charge_from_molecules=[ligand_mol])
         ligand_topology = interchange.to_openmm_topology()
         ligand_positions = interchange.positions.to_openmm()
         _save_interchange_cache(ligand_sdf or ligand_smiles or str(temp_dir / "ligand"),

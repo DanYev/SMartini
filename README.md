@@ -16,7 +16,7 @@ git clone https://github.com/DanYev/SMartini
 cd SMartini
 conda env create --file environment.yml
 source activate smartini
-pip install -e smartini
+pip install -e .
 ```
 
 ## How it works
