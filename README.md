@@ -16,7 +16,7 @@ git clone https://github.com/DanYev/SMartini
 cd SMartini
 conda env create --file environment.yml
 source activate smartini
-pip install -e package
+pip install -e smartini
 ```
 
 ## How it works
@@ -39,12 +39,10 @@ This runs the following scripts:
 - `2_aa_md.py` — Atomistic reference simulation
 - `3_boltz_inv.py` — Initial bonded-parameter fit from AA data
 
-Then, the bonded parameters are updated in iterative cycles (2 by default):
+Then, the bonded parameters are updated in iterative cycles (3 by default):
 
 - `4_cg_md.py` — CG simulation with the current topology
 - `5_cgmd_upd.py` — Bonded parameter update based on CG MD
-
-This cycle is repeated until CG distributions reasonably match AA references.
 
 ## License and upstream attribution
 
@@ -54,4 +52,4 @@ This project uses and adapts parts of AutoMartini M3:
 The project is distributed under **GNU GPL v2.0 (or later)** terms, consistent with upstream usage of GPL-licensed code.
 
 ## Developers
-* Danis Yangaliev
+* DY
