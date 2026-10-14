@@ -1,6 +1,11 @@
 SMartini
 ========
 
+## Preprint
+
+ - https://www.biorxiv.org/content/10.64898/2026.09.29.755481v1
+
+
 ## What is SMartini?
 
 A pipeline for generating and iteratively refining Martini 3 small-molecule topologies from atomistic structure or SMILES string.
@@ -15,7 +20,7 @@ The determination of non-bonded terms (bead types) is based on AutoMartini M3. H
 git clone https://github.com/DanYev/SMartini
 cd SMartini
 conda env create --file environment.yml
-source activate smartini
+conda activate smartini
 pip install -e .
 ```
 GROMACS is needed for CGMD refinement loop.
@@ -44,6 +49,12 @@ Then, the bonded parameters are updated in iterative cycles (3 by default):
 
 - `4_cg_md.py` — CG simulation with the current topology
 - `5_cgmd_upd.py` — Bonded parameter update based on CG MD
+
+## Other Martini 3 related work
+
+RNA/DNA Force Fields:
+ - https://github.com/DanYev/Martini-3-DNA-RNA
+
 
 ## License and upstream attribution
 
