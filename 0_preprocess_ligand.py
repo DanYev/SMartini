@@ -1,5 +1,11 @@
-import logging
+import os
 import sys
+
+# Allow `python 0_preprocess_ligand.py <MOLNAME>` in addition to SM_MOLNAME.
+if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+    os.environ.setdefault("SM_MOLNAME", sys.argv[1])
+
+import logging
 import smartini
 import MDAnalysis as mda
 
@@ -11,6 +17,7 @@ from openff.interchange import Interchange
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 from rdkit import Chem
 from smartini.config import CFG
+from smartini.io import ensure_ligand_sdf
 
 logger = logging.getLogger(__name__)
 smartini.setup_logging(level=logging.INFO)
@@ -120,7 +127,7 @@ def process_to_ff():
     logger.info("Processing ligand: %s", ligand_name)
     # Generate ligand topology and structure using OpenFF Toolkit and Interchange
     aa_dir.mkdir(parents=True, exist_ok=True)
-    input_file = wdir / f"{ligand_name}.sdf"
+    input_file = ensure_ligand_sdf(wdir, ligand_name, smiles=CFG.smiles)
     logger.info("Reading ligand file: %s", input_file)
 
     # Print chemical information (rings, formula, etc.) to screen + info.txt
@@ -171,5 +178,4 @@ def _save_system_to_xml(system, filename):
 
 
 if __name__ == "__main__":
-    print_ligand_info(wdir / f"{ligand_name}.sdf", ligand_name)
     process_to_ff()

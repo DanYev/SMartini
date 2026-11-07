@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
+#SBATCH --mem=24G
 #SBATCH --gres=gpu:1
 #SBATCH -o slurm_jobs/output.%A.out
 #SBATCH -e slurm_jobs/error.%A.err
@@ -44,10 +44,10 @@ echo "  SM_CONFIG_YML: ${SM_CONFIG_YML:-}" >&2
 nsteps=200000
 nruns=3
 
-python 0_preprocess_ligand.py
-python 1_gen_cg_topo.py
-python 2_aa_md.py
-python 3_boltz_inv.py plot
+# python 0_preprocess_ligand.py
+# python 1_gen_cg_topo.py
+# python 2_aa_md.py
+# python 3_boltz_inv.py plot
 for i in $(seq 1 $nruns); do
 	echo "Running CG MD simulation run $i of $nruns" >&2
 	python 4_cg_md.py nsteps $nsteps # 10000 steps for 100 ps 100 samples

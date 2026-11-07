@@ -183,6 +183,31 @@ def split_into_fragments(molecule):
                     break
             break
     fragments = sort_nested(ring_fragments) + sort_nested(linear_fragments)
+
+    # Every pair of fragments joined by a bond must share at least one atom,
+    # because merge_fragments() stitches fragments only along shared atoms.
+    # Ring fragments are "ring + immediate neighbours", so a short linker
+    # between two ring systems (e.g. the C=C bridge in PIT) can otherwise
+    # leave two fragments connected by a bond with no overlap.
+    for i in range(len(fragments)):
+        for j in range(i + 1, len(fragments)):
+            frag_i = set(fragments[i])
+            frag_j = set(fragments[j])
+            if frag_i & frag_j:
+                continue
+            connector = next(
+                (
+                    bond for bond in bonds
+                    if (bond[0] in frag_i and bond[1] in frag_j)
+                    or (bond[1] in frag_i and bond[0] in frag_j)
+                ),
+                None,
+            )
+            if connector is None:
+                continue
+            shared_atom = connector[1] if connector[1] in frag_j else connector[0]
+            fragments[i] = sorted(frag_i | {shared_atom})
+
     if not len(flat_set(fragments)) == len(atoms):
         missing_atoms = set(atids) - flat_set(fragments)
         raise ValueError(f"Error in fragment generation: {missing_atoms} atoms are missing from the fragments. Check your fragments. Fragments: {fragments}")

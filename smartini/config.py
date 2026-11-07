@@ -49,6 +49,7 @@ class SMConfig:
     aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
+    gmx_callable: str = "gmx"
     aa_dir: Path = wdir / aa_sysname
     cg_dir: Path = wdir / cg_sysname
 
@@ -90,6 +91,9 @@ class SMConfig:
     nbins: int = 120
     min_prob: float = 1e-12
     fc_scale: float = 0.4  # Scaling factor for initial force constants to roughly account for coupling of the potentials
+    # Optional logP lookup table (absolute path) used for bead-type assignment.
+    # When None, the bundled smartini/logP_smi_extended.dat is used.
+    logp_file: Optional[str] = None
     # Refinement guardrails
     alpha_max: float = 0.20
     alpha_min: float = 0.02

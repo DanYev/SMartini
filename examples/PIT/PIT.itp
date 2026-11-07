@@ -1,0 +1,100 @@
+; GENERATED WITH smartini for PIT
+; Developed by: DY
+; SMILES code : [H]Oc1c([H])c(O[H])c([H])c(C([H])=C([H])c2c([H])c([H])c(O[H])c(O[H])c2[H])c1[H]
+; Mapping: [[0, 1, 18], [2, 3, 4, 19, 20], [5, 6, 17, 21, 29], [7, 8, 22, 23], [9, 16, 28], [10, 11, 24, 25], [12, 13, 26], [14, 15, 27]]
+; Ringbeads: [[0, 1, 2], [4, 5, 6, 7]]
+
+[moleculetype]
+; molname       nrexcl
+  PIT           2
+
+
+[atoms]
+;id type resn res    atom  cgnr chrg  mass ; atomnames      ; smiles         ; logp_origin
+1   TP2d  1   PIT    P01    1    0.0  36.0   ; O1, C1         ; CO             ;          
+2   SP1d  1   PIT    P02    2    0.0  54.0   ; C2, C3, O2     ; C=CO           ;          
+3   SC5   1   PIT    C03    3    0.0  54.0   ; C4, C5, C14    ; CC=C           ;          
+4   TC4   1   PIT    C04    4    0.0  36.0   ; C6, C7         ; C=C            ;          
+5   TC5   1   PIT    C05    5    0.0  36.0   ; C8, C13        ; C=C            ;          
+6   TC5   1   PIT    C06    6    0.0  36.0   ; C9, C10        ; C=C            ;          
+7   TP2d  1   PIT    P07    7    0.0  36.0   ; C11, O3        ; CO             ;          
+8   TP2d  1   PIT    P08    8    0.0  36.0   ; C12, O4        ; CO             ;          
+
+
+[bonds]
+;  i  j     funct   length   force.c.
+   1  2        1      0.348       7263.4
+   1  3        1      0.312       33591.4
+   2  3        1      0.282       39688.1
+   4  5        1      0.272       50000.0
+   5  8        1      0.258       3931.7
+   6  7        1      0.297       9619.5
+   7  8        1      0.246       2000.0
+   5  7        1      0.377       18568.2 ; ring_diagonal
+
+
+[constraints]
+;  i   j     funct   length
+   3  4        1      0.231
+   5  6        1      0.303
+
+
+[angles]
+;  i  j  k    funct  angle  force.c.
+   1  3  4       10    125.5  175.2
+   2  3  4        1    163.0  555.2
+   3  4  5       10    156.0  910.3
+   4  5  6       10    75.6   2000.0
+   4  5  8        1    165.9   66.0
+   6  5  8       10    90.3   112.1
+   6  7  8       10    94.4   509.9
+
+
+[dihedrals]
+;  i  j  k  l  funct  parameters...
+   1  2  3  4    11    111.1   0.401   0.6909   0.09254  -0.5074  -0.3095
+   1  3  4  5    9    168.9  1.852      1
+   2  1  3  4    9    -1.8   48.178      1
+   2  3  4  5    11    83.38   0.09348  -0.1091  -0.1972   0.6672   0.7038
+   3  4  5  6    9    -2.1   18.199      1
+   3  4  5  8    11    177.3   0.1902   0.5151   0.3627  -0.515  -0.5493
+   4  5  6  7    9    1.1    66.000      1
+   4  5  8  7    11    151.8   0.4315  -0.4875   0.1313   0.5825  -0.4686
+   6  5  7  8    9    -1.1   57.101      1
+   6  7  5  8    9    -1.9   57.101      1
+
+
+
+[exclusions]
+  1 2
+  1 3
+  1 4
+  2 3
+  2 4
+  3 4
+  3 5
+  4 5
+  4 6
+  4 7
+  4 8
+  5 6
+  5 7
+  5 8
+  6 7
+  6 8
+  7 8
+
+#ifndef POSRES_FC
+#define POSRES_FC 1000.0
+#endif
+[ position_restraints ]
+#ifdef POSRES
+    1 1 POSRES_FC POSRES_FC POSRES_FC
+    2 1 POSRES_FC POSRES_FC POSRES_FC
+    3 1 POSRES_FC POSRES_FC POSRES_FC
+    4 1 POSRES_FC POSRES_FC POSRES_FC
+    5 1 POSRES_FC POSRES_FC POSRES_FC
+    6 1 POSRES_FC POSRES_FC POSRES_FC
+    7 1 POSRES_FC POSRES_FC POSRES_FC
+    8 1 POSRES_FC POSRES_FC POSRES_FC
+#endif

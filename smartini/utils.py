@@ -183,10 +183,15 @@ def _kwargs_to_str(hyphen="-", **kwargs):
     return " ".join([f"{hyphen}{key} {value}" for key, value in kwargs.items()])
 
 
-def gmx(command, gmx_callable="gmx_mpi", **kwargs):
+def gmx(command, gmx_callable=None, **kwargs):
     """Execute a GROMACS command."""
     clinput = kwargs.pop("clinput", None)
     cltext = kwargs.pop("cltext", True)
+
+    if gmx_callable is None:
+        from .config import CFG
+
+        gmx_callable = CFG.gmx_callable
 
     if shutil.which(gmx_callable) is None and gmx_callable == "gmx_mpi":
         if shutil.which("gmx") is not None:

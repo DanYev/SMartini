@@ -1,3 +1,10 @@
+import os
+import sys
+
+# Allow `python 1_gen_cg_topo.py <MOLNAME>` in addition to SM_MOLNAME.
+if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+    os.environ.setdefault("SM_MOLNAME", sys.argv[1])
+
 import logging
 import MDAnalysis as mda
 import rdkit
@@ -7,6 +14,7 @@ from pathlib import Path
 from openff.toolkit import Molecule
 from rdkit import Chem
 from smartini.config import CFG
+from smartini.io import ensure_ligand_sdf
 
 logger = logging.getLogger("smartini")
 smartini.setup_logging(level=logging.INFO)
@@ -38,9 +46,8 @@ if __name__ == "__main__":
     mol_dir = CFG.mol_dir
     mol_dir.mkdir(parents=True, exist_ok=True)
 
-    ligand_sdf = wdir / f"{molname}.sdf"
+    ligand_sdf = ensure_ligand_sdf(wdir, molname, smiles=CFG.smiles)
     mol, raw_mol = gen_aa_molecule(molname, from_file=ligand_sdf)
-    # mol, raw_mol = gen_aa_molecule(molname, from_smiles=smiles)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     Chem.MolToPDBFile(raw_mol, mol_dir / f"{molname}_aa.pdb")
     
@@ -51,6 +58,7 @@ if __name__ == "__main__":
         symmetrize_rings=CFG.symmetrize_rings,
         min_beads=n_beads, 
         max_beads=n_beads, 
+        logp_file_name=CFG.logp_file or "logP_smi_extended.dat",
         raw_molecule=raw_mol)
     cg_mol.process()
     
