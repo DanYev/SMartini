@@ -1,3 +1,7 @@
 # piceatannol
 molname: PIT
 smiles: Oc1cc(O)cc(/C=C/c2ccc(O)c(O)c2)c1
+fc_scale: 0.6                       # Scaling factor for initial force constants to roughly account for coupling of the potentials
+# Refinement guardrails
+alpha_max: 0.25                     # Max allowed relative change for bonded update iteration - Increase if convergence is too slow
+alpha_min: 0.02                     # Min allowed relative change for bonded update iteration - Increase if convergence is too slow

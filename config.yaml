@@ -29,6 +29,7 @@ max_ring_len: 12                   # Large rings are usually not aromatic and ca
 max_mappings_to_keep: 500          # Keep top mappings to avoid combinatorial explosion
 max_bead_size: 5
 max_ring_bead_size: 3
+logp_file: null                     # Optional absolute path to a logP lookup table; null uses smartini/logP_smi_extended.dat
 
 # -----------------------------------------------------------------------------
 # Working folders
@@ -65,7 +66,6 @@ cg_selection: all
 # -----------------------------------------------------------------------------
 temperature: 300.0
 fc_scale: 0.4                       # Scaling factor for initial force constants to roughly account for coupling of the potentials
-logp_file: null                     # Optional absolute path to a logP lookup table; null uses smartini/logP_smi_extended.dat
 # Lower and upper ranges for bond constants
 bond_k_lower: 2000.0                
 bond_k_upper: 50000.0
