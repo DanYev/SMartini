@@ -1,0 +1,35 @@
+[ molecule ]
+PIT
+
+[ from ]
+amber charmm
+
+[ to ]
+martini3001
+
+[ martini ]
+  P01 P02 C03 C04 C05 C06 P07 P08
+
+[ mapping ]
+amber charmm
+
+[ atoms ]
+     1      O1     P01
+     2      C1     P01
+     3      C2     P02
+     4      C3     P02
+     5      O2     P02
+     6      C4     C03
+     7      C5     C03
+     8     C14     C03
+     9      C6     C04
+    10      C7     C04
+    11      C8     C05
+    12     C13     C05
+    13      C9     C06
+    14     C10     C06
+    15     C11     P07
+    16      O3     P07
+    17     C12     P08
+    18      O4     P08
+
