@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
 REFS_DIR = TESTS_DIR / "refs"
@@ -14,19 +16,32 @@ PIPELINE_SCRIPT = REPO_ROOT / "1_gen_cg_topo.py"
 _SECTION_HEADER_RE = re.compile(r"^\s*\[\s*(?P<name>[^\]]+?)\s*\]\s*$")
 
 
+def _config_has_smiles(config_path: Path) -> bool:
+    """Return True when the config provides a usable ``smiles`` entry."""
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return False
+    return isinstance(data, dict) and bool(data.get("smiles"))
+
+
 def discover_molecules(refs_dir: Path = REFS_DIR) -> list[str]:
-    """Return molecule names that have a complete reference input set."""
+    """Return molecules with a reference ITP and config.
+
+    An SDF is optional when ``config.yml`` supplies a SMILES string; the test
+    pipeline then exercises the SMILES-to-SDF fallback.
+    """
     molecules = []
     for mol_dir in sorted(refs_dir.iterdir()):
         if not mol_dir.is_dir():
             continue
         molname = mol_dir.name
-        expected = (
-            mol_dir / f"{molname}_initial.itp",
-            mol_dir / f"{molname}.sdf",
-            mol_dir / "config.yml",
-        )
-        if all(path.is_file() for path in expected):
+        reference_itp = mol_dir / f"{molname}_initial.itp"
+        config_path = mol_dir / "config.yml"
+        sdf_path = mol_dir / f"{molname}.sdf"
+        if not reference_itp.is_file() or not config_path.is_file():
+            continue
+        if sdf_path.is_file() or _config_has_smiles(config_path):
             molecules.append(molname)
     return molecules
 

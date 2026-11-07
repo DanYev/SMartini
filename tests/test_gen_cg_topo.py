@@ -90,6 +90,7 @@ def test_pipeline_writes_expected_files(run_pipeline, molname):
     out_dir = run_pipeline(molname)
 
     expected_files = [
+        out_dir / f"{molname}.sdf",
         out_dir / f"{molname}_initial.itp",
         out_dir / f"{molname}.pdb",
         out_dir / f"{molname}.map",

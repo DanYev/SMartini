@@ -59,9 +59,11 @@ def run_pipeline(base_config: Path):
             shutil.rmtree(out_dir)
         out_dir.mkdir(parents=True)
 
-        # 1_gen_cg_topo.py expects <systems_dir>/<molname>/<molname>.sdf.
+        # 1_gen_cg_topo.py expects <systems_dir>/<molname>/<molname>.sdf, but
+        # it can generate that file from a `smiles` entry in config.yml.
         sdf = ref_dir / f"{molname}.sdf"
-        shutil.copy2(sdf, out_dir / sdf.name)
+        if sdf.is_file():
+            shutil.copy2(sdf, out_dir / sdf.name)
 
         env = os.environ.copy()
         env.update(
