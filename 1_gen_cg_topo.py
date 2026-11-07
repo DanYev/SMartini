@@ -51,6 +51,7 @@ if __name__ == "__main__":
         symmetrize_rings=CFG.symmetrize_rings,
         min_beads=n_beads, 
         max_beads=n_beads, 
+        logp_file_name=CFG.logp_file or "logP_smi_extended.dat",
         raw_molecule=raw_mol)
     cg_mol.process()
     

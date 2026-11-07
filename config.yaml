@@ -64,6 +64,7 @@ cg_selection: all
 # -----------------------------------------------------------------------------
 temperature: 300.0
 fc_scale: 0.4                       # Scaling factor for initial force constants to roughly account for coupling of the potentials
+logp_file: null                     # Optional absolute path to a logP lookup table; null uses smartini/logP_smi_extended.dat
 # Lower and upper ranges for bond constants
 bond_k_lower: 2000.0                
 bond_k_upper: 50000.0

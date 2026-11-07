@@ -90,6 +90,9 @@ class SMConfig:
     nbins: int = 120
     min_prob: float = 1e-12
     fc_scale: float = 0.4  # Scaling factor for initial force constants to roughly account for coupling of the potentials
+    # Optional logP lookup table (absolute path) used for bead-type assignment.
+    # When None, the bundled smartini/logP_smi_extended.dat is used.
+    logp_file: Optional[str] = None
     # Refinement guardrails
     alpha_max: float = 0.20
     alpha_min: float = 0.02

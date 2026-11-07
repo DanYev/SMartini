@@ -244,6 +244,7 @@ class CG_molecule:
                     molecule=self.molecule,
                     hbonda=self.hbond_a,
                     hbondd=self.hbond_d,
+                    logp_file=self.logp_file,
                 )
             except Exception as e:
                 continue  # If get_bead_types fails for any reason, skip to the next mapping
