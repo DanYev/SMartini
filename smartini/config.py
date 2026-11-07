@@ -49,6 +49,7 @@ class SMConfig:
     aa_sysname: str = "aa_md"
     cg_sysname: str = "cg_md"
     cg_runname: str = "mdrun"
+    gmx_callable: str = "gmx"
     aa_dir: Path = wdir / aa_sysname
     cg_dir: Path = wdir / cg_sysname
 

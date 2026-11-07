@@ -54,6 +54,7 @@ aa_chk_nout: 100000                # Checkpoint output frequency (every N steps)
 # -----------------------------------------------------------------------------
 # CG MD settings (Coarse-Grained Molecular Dynamics)
 # -----------------------------------------------------------------------------
+gmx_callable: gmx                  # GROMACS executable to invoke
 cg_dt: 0.010                       # Timestep in picoseconds
 cg_total_time_ns: 1000.0           # Total simulation time in nanoseconds
 cg_traj_stop: 2000                 # Trajectory sampling cutoff
